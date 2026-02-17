@@ -110,8 +110,10 @@ export function ScheduleView({
         <CalendarExport date={date} barbers={barbers} />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
-        <table className="w-full min-w-[800px] border-collapse">
+      <div className="-mx-4 sm:mx-0">
+        <p className="sm:hidden text-xs text-headz-gray mb-2 px-4">Scroll horizontally to see all times →</p>
+        <div className="overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
+          <table className="w-full min-w-[700px] border-collapse">
           <thead>
             <tr className="bg-headz-black/[0.04] border-b border-black/10">
               <th className="w-44 p-4 text-left text-xs font-semibold uppercase tracking-wider text-headz-gray">
@@ -137,6 +139,7 @@ export function ScheduleView({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {showWalkIn && (

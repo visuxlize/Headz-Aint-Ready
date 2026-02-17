@@ -30,10 +30,10 @@ export default async function BookPage({
     backendUnavailable = true
   }
   return (
-    <div className="min-h-screen bg-[var(--background)] py-12 px-4 sm:px-6">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Book your cut</h1>
-        <p className="text-headz-gray mb-8">
+    <div className="min-h-screen bg-[var(--background)] py-8 sm:py-12 px-4 sm:px-6">
+      <div className="max-w-2xl mx-auto w-full">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center sm:text-left">Book your cut</h1>
+        <p className="text-headz-gray mb-6 sm:mb-8 text-center sm:text-left">
           Pick a service, your barber, and a time. We&apos;ll hold your slot.
         </p>
         {backendUnavailable && (

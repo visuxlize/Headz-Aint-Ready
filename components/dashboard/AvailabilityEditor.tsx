@@ -137,12 +137,14 @@ export function AvailabilityEditor({
   return (
     <div className="space-y-6">
       {/* Weekly grid: staff × days */}
-      <div className="rounded-xl border border-black/10 bg-white shadow-sm overflow-hidden">
-        <div className="bg-headz-black/[0.04] px-4 py-3 border-b border-black/10">
-          <h2 className="font-semibold text-headz-black text-sm">Weekly availability</h2>
-          <p className="text-xs text-headz-gray mt-0.5">Recurring hours by barber. Closed = no availability set for that day.</p>
-        </div>
-        <div className="overflow-x-auto">
+      <div className="-mx-4 sm:mx-0">
+        <p className="sm:hidden text-xs text-headz-gray mb-2 px-4">Scroll horizontally to see all days →</p>
+        <div className="rounded-xl border border-black/10 bg-white shadow-sm overflow-hidden">
+          <div className="bg-headz-black/[0.04] px-4 py-3 border-b border-black/10">
+            <h2 className="font-semibold text-headz-black text-sm">Weekly availability</h2>
+            <p className="text-xs text-headz-gray mt-0.5">Recurring hours by barber. Closed = no availability set for that day.</p>
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full min-w-[600px] border-collapse">
             <thead>
               <tr className="border-b border-black/10">
@@ -212,6 +214,7 @@ export function AvailabilityEditor({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

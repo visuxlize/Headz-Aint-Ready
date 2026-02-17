@@ -173,9 +173,9 @@ export function BookingFlow({
   }
 
   const summaryCard = showSummary && (
-    <div className="rounded-xl border border-black/10 bg-white p-5 shrink-0 w-full md:w-72">
-      <h3 className="text-sm font-semibold text-headz-gray mb-3">Appointment summary</h3>
-      <div className="flex items-center gap-3 mb-3">
+    <div className="rounded-xl border border-black/10 bg-white p-5 shrink-0 w-full md:w-72 mx-auto md:mx-0 max-w-sm md:max-w-none">
+      <h3 className="text-sm font-semibold text-headz-gray mb-3 text-center md:text-left">Appointment summary</h3>
+      <div className="flex items-center gap-3 mb-3 justify-center md:justify-start">
         <div className="w-12 h-12 rounded-full overflow-hidden bg-headz-black/10 shrink-0">
           {barber?.avatarUrl ? (
             <Image src={barber.avatarUrl} alt="" width={48} height={48} className="w-full h-full object-cover" />
@@ -185,23 +185,23 @@ export function BookingFlow({
             </div>
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 text-center md:text-left">
           <p className="font-medium truncate">{service?.name}</p>
           <p className="text-headz-gray text-sm">{formatPrice(service?.priceCents ?? 0)} · {service?.durationMinutes} min</p>
         </div>
       </div>
-      <p className="text-sm text-headz-gray border-t border-black/10 pt-3">
+      <p className="text-sm text-headz-gray border-t border-black/10 pt-3 text-center md:text-left">
         {service?.name} with {barber?.name}
       </p>
-      <p className="font-medium mt-1">{formatPrice(service?.priceCents ?? 0)}</p>
+      <p className="font-medium mt-1 text-center md:text-left">{formatPrice(service?.priceCents ?? 0)}</p>
     </div>
   )
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 md:gap-10">
-      <div className="flex-1 min-w-0 space-y-6">
+    <div className="flex flex-col md:flex-row gap-8 md:gap-10 w-full max-w-full">
+      <div className="flex-1 min-w-0 space-y-6 w-full">
         {/* Progress */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap justify-center md:justify-start">
           {(['service', 'barber', 'date', 'time', 'details'] as const).map((s) => (
             <span
               key={s}
@@ -222,7 +222,7 @@ export function BookingFlow({
 
         {/* Step: Service */}
         {step === 'service' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6">
+          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
             <h3 className="font-semibold mb-2">Choose a service</h3>
             <p className="text-headz-gray text-sm mb-4">Pick one, then choose your barber and time.</p>
             <div className="space-y-2">
@@ -243,7 +243,7 @@ export function BookingFlow({
 
         {/* Step: Barber */}
         {step === 'barber' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6">
+          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
             <h3 className="font-semibold mb-4">Choose your barber</h3>
             <div className="grid grid-cols-2 gap-3">
               {barbers.map((b) => (
@@ -262,9 +262,9 @@ export function BookingFlow({
 
         {/* Step: Date – calendar style */}
         {step === 'date' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6">
+          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
             <h3 className="font-semibold mb-4">Pick a date</h3>
-            <div className="inline-block">
+            <div className="inline-block mx-auto md:mx-0">
               <div className="flex items-center justify-between mb-3">
                 <button
                   type="button"
@@ -338,7 +338,7 @@ export function BookingFlow({
 
         {/* Step: Time – Morning / Afternoon / Evening, EST note */}
         {step === 'time' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6">
+          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
             <h3 className="font-semibold mb-1">Pick a time</h3>
             {date && (
               <p className="text-headz-gray text-sm mb-2">
@@ -351,11 +351,11 @@ export function BookingFlow({
             ) : slots.length === 0 ? (
               <p className="text-headz-gray">No available slots this day. Try another date.</p>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-6 flex flex-col items-center md:items-stretch">
                 {groupedSlots.morning.length > 0 && (
-                  <div>
+                  <div className="w-full">
                     <p className="text-xs font-medium text-headz-gray uppercase tracking-wide mb-2">Morning</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                       {groupedSlots.morning.map((slot) => (
                         <button
                           key={slot}
@@ -374,9 +374,9 @@ export function BookingFlow({
                   </div>
                 )}
                 {groupedSlots.afternoon.length > 0 && (
-                  <div>
+                  <div className="w-full">
                     <p className="text-xs font-medium text-headz-gray uppercase tracking-wide mb-2">Afternoon</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                       {groupedSlots.afternoon.map((slot) => (
                         <button
                           key={slot}
@@ -395,9 +395,9 @@ export function BookingFlow({
                   </div>
                 )}
                 {groupedSlots.evening.length > 0 && (
-                  <div>
+                  <div className="w-full">
                     <p className="text-xs font-medium text-headz-gray uppercase tracking-wide mb-2">Evening</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                       {groupedSlots.evening.map((slot) => (
                         <button
                           key={slot}
@@ -429,7 +429,7 @@ export function BookingFlow({
 
         {/* Step: Details */}
         {step === 'details' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6">
+          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
             <h3 className="font-semibold mb-4">Your details</h3>
             <div className="space-y-4">
               <div>
@@ -490,7 +490,7 @@ export function BookingFlow({
         </div>
       )}
       {showSummary && (
-        <div className="md:hidden mt-4">
+        <div className="md:hidden mt-6 flex justify-center">
           {summaryCard}
         </div>
       )}
