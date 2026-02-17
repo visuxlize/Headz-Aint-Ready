@@ -123,6 +123,7 @@ After the first deploy, do these so booking and staff login work in production.
 
 - Use Supabase **Session** (connection pooler) if possible, not **Direct**.
 - In Supabase: **Project → Settings → Database → Connection string** → choose **URI** and **Session mode** (port **5432**). Copy that URI and set it as `DATABASE_URL` in Netlify.
+- **ENOTFOUND on pooler host?** Use **`aws-0-[region]`** (hyphen after aws: **aws-0** not **aws0**). Fix `DATABASE_URL` in Netlify and redeploy.
 - If you only have Direct and see connection errors (e.g. timeouts or ENETUNREACH) on Netlify, the app will still load but the book page will show “Booking is temporarily unavailable” until the DB is reachable.
 
 ### 3. Supabase auth redirect for your Netlify URL
