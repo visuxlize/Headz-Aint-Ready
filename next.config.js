@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Vercel: use module.exports (CommonJS) so no "type": "module" needed
 const nextConfig = {
   outputFileTracingRoot: process.cwd(),
   images: {
