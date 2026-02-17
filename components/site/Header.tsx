@@ -29,12 +29,17 @@ function isOverDarkSection(): boolean {
   return false
 }
 
+const AT_TOP_THRESHOLD = 8
+
 export function Header() {
   const pathname = usePathname()
-  const [darkBg, setDarkBg] = useState(false)
+  const [atTop, setAtTop] = useState(true)
+  const [darkSection, setDarkSection] = useState(false)
 
   const update = useCallback(() => {
-    setDarkBg(isOverDarkSection())
+    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0
+    setAtTop(scrollY < AT_TOP_THRESHOLD)
+    setDarkSection(isOverDarkSection())
   }, [])
 
   useEffect(() => {
@@ -54,7 +59,7 @@ export function Header() {
     return () => clearTimeout(t)
   }, [pathname, update])
 
-  const isDark = darkBg
+  const isDark = !atTop && darkSection
   const headerBg = isDark
     ? 'bg-headz-black/95 backdrop-blur-sm border-b border-white/20'
     : 'bg-white/95 backdrop-blur-sm border-b border-black/10'

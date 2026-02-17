@@ -2,11 +2,13 @@
 
 A modern redesign and full-stack rebuild of **[Headz Ain't Ready](https://headzaintready.com/)** (Jackson Heights, Queens, NYC) — public marketing site, online booking, and staff-only dashboard.
 
+**Live demo:** [https://headz-aint-ready.netlify.app/](https://headz-aint-ready.netlify.app/)
+
 ---
 
 ## Reference: Current Live Site
 
-**Existing site:** [https://headzaintready.com/](https://headzaintready.com/#)
+**Existing site:** [https://headzaintready.com/](https://headzaintready.com/)
 
 The current site is the reference for brand, copy, and services. This repo is a **new design and implementation** that keeps the Headz identity while fixing limitations and adding a real backend.
 
@@ -69,8 +71,8 @@ The current site is the reference for brand, copy, and services. This repo is a 
 ### Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/headz-aint-ready.git
-cd headz-aint-ready
+git clone https://github.com/visuxlize/Headz-Aint-Ready.git
+cd Headz-Aint-Ready
 npm install
 cp .env.example .env.local
 ```
@@ -114,6 +116,8 @@ npm run dev
 
 This app uses **Next.js server features** (API routes, server components, auth, database). It **cannot run as a static site on GitHub Pages**.
 
+**Live demo:** [headz-aint-ready.netlify.app](https://headz-aint-ready.netlify.app/)
+
 **Recommended: Netlify.** The backend (booking, DB, API routes) is set up to run on Netlify’s Next.js runtime. Use the same GitHub repo and env vars; see **`DEPLOY_NETLIFY.md`** for step-by-step instructions.
 
 | Platform | Use it? | Notes |
@@ -146,16 +150,16 @@ Full walkthrough: **`DEPLOY_NETLIFY.md`**.
 ## Pushing to GitHub
 
 ```bash
-cd headz-aint-ready
+cd Headz-Aint-Ready
 git init
 git add .
 git commit -m "Headz Ain't Ready – new design, booking, staff dashboard"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/headz-aint-ready.git
+git remote add origin https://github.com/visuxlize/Headz-Aint-Ready.git
 git push -u origin main
 ```
 
-Create the repo on GitHub first (e.g. `headz-aint-ready`), then use its URL in `git remote add origin`.
+Repo: [github.com/visuxlize/Headz-Aint-Ready](https://github.com/visuxlize/Headz-Aint-Ready)
 
 ---
 
