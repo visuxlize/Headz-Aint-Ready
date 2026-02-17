@@ -103,3 +103,41 @@ Your app needs these so it can talk to Supabase and the database.
 - [ ] Build succeeded and opened the production URL  
 
 That’s it. The backend (Supabase + DB) works on Netlify as long as those three variables are set and the build succeeds.
+
+---
+
+## Ensure the backend works (booking, login, API)
+
+After the first deploy, do these so booking and staff login work in production.
+
+### 1. Environment variables
+
+- In Netlify: **Site configuration → Environment variables** (or **Site settings → Environment variables**).
+- You must have all three set for **Production** (and **Deploy previews** if you want previews to use the DB):
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `DATABASE_URL`
+- **Redeploy after adding or changing env vars**: **Deploys → Trigger deploy → Deploy site**. Builds use env vars at build time; serverless functions use them at runtime only after a new deploy.
+
+### 2. Database connection string (DATABASE_URL)
+
+- Use Supabase **Session** (connection pooler) if possible, not **Direct**.
+- In Supabase: **Project → Settings → Database → Connection string** → choose **URI** and **Session mode** (port **5432**). Copy that URI and set it as `DATABASE_URL` in Netlify.
+- If you only have Direct and see connection errors (e.g. timeouts or ENETUNREACH) on Netlify, the app will still load but the book page will show “Booking is temporarily unavailable” until the DB is reachable.
+
+### 3. Supabase auth redirect for your Netlify URL
+
+- In Supabase: **Authentication → URL configuration**.
+- Set **Site URL** to your Netlify URL, e.g. `https://your-site-name.netlify.app`.
+- In **Redirect URLs**, add: `https://your-site-name.netlify.app/**` (and your custom domain if you use one).
+- This lets sign-in and callbacks work on the deployed site.
+
+### 4. Confirm Next.js runtime
+
+- Netlify usually detects Next.js and uses the Next.js runtime (SSR + API routes). You don’t need to install `@netlify/plugin-nextjs` manually for standard setups.
+- If API routes or server-rendered pages don’t work, in **Site configuration → Build & deploy → Build settings** ensure the **Build command** is `npm run build` and the framework is detected as **Next.js**.
+
+### 5. Quick backend check
+
+- Open your Netlify URL → **Book** → pick barber, service, date, time. If you can complete a booking, the backend is working.
+- **Staff login**: go to **/auth/login**, sign in with an email that’s in `staff_allowlist` in the DB; you should reach the dashboard.

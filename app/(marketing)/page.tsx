@@ -16,7 +16,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       {/* Hero – urban night / subway vibe with dark overlay */}
-      <section className="relative bg-headz-black text-white min-h-[85vh] flex flex-col justify-center overflow-hidden">
+      <section data-header-dark className="relative bg-headz-black text-white min-h-[85vh] flex flex-col justify-center overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
@@ -51,7 +51,7 @@ export default async function HomePage() {
       </section>
 
       {/* Dream Team – YouTube Short with dark cityscape (style from reference) */}
-      <section className="relative py-20 px-4 sm:px-6 overflow-hidden">
+      <section data-header-dark className="relative py-20 px-4 sm:px-6 overflow-hidden">
         {/* Dark monochromatic cityscape background */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-50"
@@ -109,7 +109,7 @@ export default async function HomePage() {
       </section>
 
       {/* Why book */}
-      <section className="py-20 bg-headz-black text-white px-4 sm:px-6">
+      <section data-header-dark className="py-20 bg-headz-black text-white px-4 sm:px-6">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">Skip the wait</h2>
           <p className="text-white/80 max-w-2xl mx-auto mb-10">
