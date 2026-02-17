@@ -1,4 +1,4 @@
-# Next.js on Netlify – API routes and SSR work with Netlify Next.js runtime
+# Next.js on Netlify – API routes and SSR require the Next.js plugin
 # https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/
 
 [build]
@@ -6,5 +6,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Install devDependencies (e.g. autoprefixer) so the build succeeds
   NPM_FLAGS = "--include=dev"
+
+# Required so API routes, SSR, and serverless functions run (booking, auth, DB)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

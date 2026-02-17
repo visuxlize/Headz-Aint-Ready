@@ -25,11 +25,11 @@ Follow these steps in order. You need your repo on GitHub first (e.g. https://gi
 
 ## Step 3: Configure build (use repo defaults)
 
-The repo’s `netlify.toml` already sets the build. Netlify will detect Next.js. Confirm:
+The repo’s `netlify.toml` sets the build and **includes the Next.js plugin** so API routes and the backend run. Confirm:
 
-- **Build command:** `npm run build` (from `netlify.toml`)
-- **Publish directory:** leave default (Netlify’s Next.js runtime uses this)
-- **Base directory:** leave blank unless the app lives in a subfolder
+- **Build command:** `npm run build`
+- **Publish directory:** leave default (the plugin sets this)
+- **Base directory:** leave blank
 
 Don’t click **"Deploy site"** yet.
 
@@ -128,14 +128,15 @@ After the first deploy, do these so booking and staff login work in production.
 ### 3. Supabase auth redirect for your Netlify URL
 
 - In Supabase: **Authentication → URL configuration**.
-- Set **Site URL** to your Netlify URL, e.g. `https://your-site-name.netlify.app`.
-- In **Redirect URLs**, add: `https://your-site-name.netlify.app/**` (and your custom domain if you use one).
+- Set **Site URL** to: `https://headz-aint-ready.netlify.app`
+- In **Redirect URLs**, add: `https://headz-aint-ready.netlify.app/**` (and your custom domain if you use one later).
 - This lets sign-in and callbacks work on the deployed site.
 
-### 4. Confirm Next.js runtime
+### 4. Next.js plugin (API routes / backend)
 
-- Netlify usually detects Next.js and uses the Next.js runtime (SSR + API routes). You don’t need to install `@netlify/plugin-nextjs` manually for standard setups.
-- If API routes or server-rendered pages don’t work, in **Site configuration → Build & deploy → Build settings** ensure the **Build command** is `npm run build` and the framework is detected as **Next.js**.
+- The repo’s `netlify.toml` includes `@netlify/plugin-nextjs` so Netlify runs the Next.js runtime (SSR + API routes). The plugin is in `package.json` as a devDependency.
+- If the backend still doesn’t work after adding env vars: **trigger a new deploy** (Deploys → Trigger deploy → Deploy site). The plugin runs during build and deploys serverless functions for your API routes.
+- In **Site configuration → Build & deploy → Build settings**, leave **Build command** as `npm run build` and do not set a custom **Publish directory** (the plugin handles it).
 
 ### 5. Quick backend check
 

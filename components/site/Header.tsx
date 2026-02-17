@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
 
 const LOGO_URL = 'https://seller-brand-assets-f.squarecdn.com/ML84BFGQFNRZQ/55115cf1910f30cc84857ca133d806e5.png?height=250'
-const HEADER_HEIGHT = 72
+const HEADER_HEIGHT = 80
 
 const nav = [
   { href: '/', label: 'Home' },
@@ -16,47 +17,59 @@ const nav = [
   { href: '/#contact', label: 'Contact' },
 ]
 
+/** Returns true when the sticky header is over a dark section (so we use white text). */
+function isOverDarkSection(): boolean {
+  if (typeof document === 'undefined') return false
+  const darkSections = document.querySelectorAll('[data-header-dark]')
+  if (darkSections.length === 0) return false
+  for (let i = 0; i < darkSections.length; i++) {
+    const rect = darkSections[i].getBoundingClientRect()
+    if (rect.top < HEADER_HEIGHT && rect.bottom > 0) return true
+  }
+  return false
+}
+
 export function Header() {
-  const [onDark, setOnDark] = useState(false)
+  const pathname = usePathname()
+  const [darkBg, setDarkBg] = useState(false)
 
-  useEffect(() => {
-    const checkAll = () => {
-      const darkSections = document.querySelectorAll('[data-header-dark]')
-      if (darkSections.length === 0) {
-        setOnDark(false)
-        return
-      }
-      let any = false
-      darkSections.forEach((el) => {
-        const rect = el.getBoundingClientRect()
-        if (rect.top < HEADER_HEIGHT && rect.bottom > 0) any = true
-      })
-      setOnDark(any)
-    }
-
-    checkAll()
-    window.addEventListener('scroll', checkAll, { passive: true })
-    window.addEventListener('resize', checkAll)
-    return () => {
-      window.removeEventListener('scroll', checkAll)
-      window.removeEventListener('resize', checkAll)
-    }
+  const update = useCallback(() => {
+    setDarkBg(isOverDarkSection())
   }, [])
 
-  const headerBg = onDark
-    ? 'bg-headz-black/90 backdrop-blur border-b border-white/10'
-    : 'bg-white/90 backdrop-blur border-b border-black/10'
-  const linkClass = onDark
-    ? 'text-white/90 hover:text-white text-sm font-medium transition-colors duration-200'
-    : 'text-headz-black/90 hover:text-headz-black text-sm font-medium transition-colors duration-200'
+  useEffect(() => {
+    update()
+    const raf = requestAnimationFrame(() => update())
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [update, pathname])
+
+  useEffect(() => {
+    const t = setTimeout(update, 50)
+    return () => clearTimeout(t)
+  }, [pathname, update])
+
+  const isDark = darkBg
+  const headerBg = isDark
+    ? 'bg-headz-black/95 backdrop-blur-sm border-b border-white/20'
+    : 'bg-white/95 backdrop-blur-sm border-b border-black/10'
+  const textClass = isDark
+    ? 'text-white hover:text-white'
+    : 'text-headz-black hover:text-headz-black'
+  const linkClass = `text-sm font-medium transition-colors duration-200 ${textClass}`
 
   return (
-    <header className={`sticky top-0 z-50 ${headerBg} transition-colors duration-200`}>
+    <header className={`sticky top-0 z-50 ${headerBg} transition-[background-color,border-color] duration-200`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex justify-between items-center h-16">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
+        <Link href="/" className={`flex items-center gap-2 shrink-0 ${textClass}`} aria-label="Headz Ain't Ready home">
           <Image
             src={LOGO_URL}
-            alt="Headz Ain't Ready Barbershop"
+            alt=""
             width={140}
             height={48}
             className="h-10 w-auto object-contain"
