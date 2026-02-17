@@ -64,7 +64,7 @@ saas-starter-kit/
 │   ├── README.md          ← Complete guide
 │   ├── QUICKSTART.md      ← Start here!
 │   ├── CURSOR_GUIDE.md    ← AI development tips
-│   ├── DEPLOYMENT.md      ← Deploy to Vercel
+│   ├── DEPLOY_NETLIFY.md  ← Deploy to Netlify
 │   └── FILETREE.md        ← File structure explained
 │
 ├── 📱 Application Code
@@ -211,7 +211,7 @@ After that, you're ready to start building! 🚀
 1. **Read CURSOR_GUIDE.md** - Learn how to build with AI
 2. **Customize branding** - Update app name, colors, etc.
 3. **Add your first feature** - Try building a simple CRUD feature
-4. **Deploy to Vercel** - Follow DEPLOYMENT.md
+4. **Deploy to Netlify** - Follow DEPLOY_NETLIFY.md
 
 ## Support
 

@@ -18,7 +18,8 @@ saas-starter-kit/
 │   ├── README.md                 # Complete documentation
 │   ├── QUICKSTART.md             # 5-minute quick start
 │   ├── CURSOR_GUIDE.md           # How to use with Cursor AI
-│   ├── DEPLOYMENT.md             # Vercel deployment guide
+│   ├── DEPLOYMENT.md             # Deployment overview (Netlify)
+│   ├── DEPLOY_NETLIFY.md         # Netlify step-by-step guide
 │   └── FILETREE.md               # This file
 │
 ├── 🔧 Scripts
@@ -102,10 +103,9 @@ saas-starter-kit/
 - Example workflows
 - Pro tips and patterns
 
-**`DEPLOYMENT.md`**
-- Deploy to Vercel
+**`DEPLOYMENT.md`** / **`DEPLOY_NETLIFY.md`**
+- Deploy to Netlify (step-by-step in DEPLOY_NETLIFY.md)
 - Production configuration
-- Monitoring and scaling
 
 ### Application Structure
 

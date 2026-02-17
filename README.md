@@ -114,36 +114,30 @@ npm run dev
 
 This app uses **Next.js server features** (API routes, server components, auth, database). It **cannot run as a static site on GitHub Pages**.
 
+**Recommended: Netlify.** The backend (booking, DB, API routes) is set up to run on Netlify’s Next.js runtime. Use the same GitHub repo and env vars; see **`DEPLOY_NETLIFY.md`** for step-by-step instructions.
+
 | Platform | Use it? | Notes |
 |----------|--------|--------|
 | **GitHub Pages** | ❌ No | Static only; no Node server, no API, no DB. |
-| **Netlify** | ✅ Yes | Use “Next.js on Netlify” (or Netlify’s Next runtime). Add env vars in Netlify UI. |
-| **Vercel** | ✅ Yes | Native Next.js; connect repo and add same env vars. |
+| **Netlify** | ✅ Yes | Use “Next.js on Netlify”; add env vars in Netlify UI. See `DEPLOY_NETLIFY.md`. |
 
 ### Deploying on Netlify
 
 1. Push this repo to GitHub (see “Pushing to GitHub” below).  
 2. In [Netlify](https://app.netlify.com): **Add new site → Import from Git** and select the repo.  
-3. **Build settings** (Netlify usually detects Next.js):  
-   - **Build command:** `npm run build`  
-   - **Publish directory:** leave default (Netlify uses Next.js runtime).  
+3. **Build settings** (from `netlify.toml`): Build command `npm run build`; leave publish directory default.  
 4. **Environment variables** (Site settings → Environment variables):  
    - `NEXT_PUBLIC_SUPABASE_URL`  
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
    - `DATABASE_URL`  
 5. Deploy. Your site URL will be `https://your-site-name.netlify.app` (or your custom domain).
 
-### Deploying on Vercel
-
-1. Push the repo to GitHub.  
-2. In [Vercel](https://vercel.com): **Import** the repo.  
-3. Add the same environment variables as above.  
-4. Deploy. Backend and API routes work out of the box.
+Full walkthrough: **`DEPLOY_NETLIFY.md`**.
 
 ### What You Need for the Backend to Work
 
 - **Supabase project** (same as local): Auth + Database.  
-- **Env vars** set in Netlify/Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`.  
+- **Env vars** set in Netlify: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`.  
 - **Database**: Run the schema (and allowlist) in that Supabase project so production uses the same DB, or a separate one with the same schema.  
 - **Staff allowlist**: Ensure production staff emails are in `staff_allowlist` in the DB you use in production.
 
