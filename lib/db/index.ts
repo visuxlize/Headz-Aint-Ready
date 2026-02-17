@@ -1,6 +1,10 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
+import dns from 'node:dns'
+
+// Prefer IPv4 so serverless (e.g. Vercel) can reach Supabase when IPv6 is unreachable (ENETUNREACH)
+dns.setDefaultResultOrder('ipv4first')
 
 /**
  * Database Connection
