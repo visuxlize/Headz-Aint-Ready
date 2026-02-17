@@ -1,9 +1,15 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SaaS Starter Kit',
-  description: 'Production-ready SaaS application built with Next.js and Supabase',
+  title: "Headz Ain't Ready – Barbershop | Queens, NYC",
+  description: 'Book your cut at Headz Ain\'t Ready in Jackson Heights. Skip the wait – reserve your slot online.',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 }
 
 export default function RootLayout({
@@ -12,8 +18,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="h-full">
+      <body className="min-h-full antialiased bg-[var(--background)] text-[var(--foreground)]">
+        {children}
+      </body>
     </html>
   )
 }

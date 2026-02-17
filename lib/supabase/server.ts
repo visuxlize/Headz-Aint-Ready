@@ -15,7 +15,7 @@ import { cookies } from 'next/headers'
  * import { createClient } from '@/lib/supabase/server'
  * 
  * export default async function Page() {
- *   const supabase = createClient()
+ *   const supabase = await createClient()
  *   const { data: { user } } = await supabase.auth.getUser()
  *   
  *   if (!user) {
@@ -26,8 +26,8 @@ import { cookies } from 'next/headers'
  * }
  * ```
  */
-export function createClient() {
-  const cookieStore = cookies()
+export async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

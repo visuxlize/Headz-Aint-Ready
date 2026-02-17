@@ -48,14 +48,25 @@ import * as schema from './schema'
  * ```
  */
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is not set')
+// Lazy init so the app can load even when DATABASE_URL is missing (e.g. marketing page can render).
+// First actual use of `db` will throw if DATABASE_URL is not set or connection fails.
+let _client: ReturnType<typeof postgres> | null = null
+let _db: ReturnType<typeof drizzle> | null = null
+
+function getDb(): ReturnType<typeof drizzle> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set')
+  }
+  if (!_client) {
+    _client = postgres(process.env.DATABASE_URL, { prepare: false })
+    _db = drizzle(_client, { schema })
+  }
+  return _db as ReturnType<typeof drizzle>
 }
 
-// Create PostgreSQL connection
-// `prepare: false` is required for serverless environments
-const client = postgres(process.env.DATABASE_URL, { prepare: false })
-
-// Create Drizzle instance with schema
-// The schema is imported so Drizzle knows about your tables and relationships
-export const db = drizzle(client, { schema })
+// Create Drizzle instance with schema (lazy: only connects on first use)
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(_, prop) {
+    return (getDb() as unknown as Record<string | symbol, unknown>)[prop]
+  },
+})

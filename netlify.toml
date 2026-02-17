@@ -1,0 +1,8 @@
+# Next.js on Netlify – API routes and SSR work with Netlify Next.js runtime
+# https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/
+
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"

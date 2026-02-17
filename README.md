@@ -1,432 +1,193 @@
-# SaaS Starter Kit
+# Headz Ain't Ready – Barbershop Site & Staff Dashboard
 
-A production-ready SaaS starter kit built with Next.js 14+, Supabase, and Drizzle ORM. Designed to work seamlessly with Cursor AI for rapid development.
+A modern redesign and full-stack rebuild of **[Headz Ain't Ready](https://headzaintready.com/)** (Jackson Heights, Queens, NYC) — public marketing site, online booking, and staff-only dashboard.
 
-## Features
+---
 
-- ✅ **Next.js 14+ App Router** - Modern React framework with server components
-- ✅ **Supabase Authentication** - Secure auth with email/password and OAuth
-- ✅ **Drizzle ORM** - Type-safe database operations
-- ✅ **TypeScript** - Full type safety across the stack
-- ✅ **Tailwind CSS** - Utility-first styling
-- ✅ **Cursor AI Ready** - Pre-configured `.cursorrules` for AI-assisted development
-- ✅ **Protected Routes** - Authentication middleware built-in
-- ✅ **API Route Examples** - Standard patterns for backend logic
-- ✅ **One-Click Deploy** - Ready for Vercel deployment
+## Reference: Current Live Site
+
+**Existing site:** [https://headzaintready.com/](https://headzaintready.com/#)
+
+The current site is the reference for brand, copy, and services. This repo is a **new design and implementation** that keeps the Headz identity while fixing limitations and adding a real backend.
+
+---
+
+## Why This New Design?
+
+### Problems with the Current Site (headzaintready.com)
+
+| Issue | Impact | How This Repo Addresses It |
+|-------|--------|----------------------------|
+| **No real online booking** | Customers can’t reserve a time; they rely on phone or walk-in. | **Full booking flow**: pick barber, service, date, and time slot. Slots respect barber availability and time off. |
+| **No staff tools** | Scheduling and walk-ins are managed offline (paper/phone). | **Staff dashboard**: day view by barber, add walk-ins, see contact info, reschedule/cancel, export to calendar. |
+| **No single source of truth** | Appointments live outside the site. | **Database-backed**: Supabase (PostgreSQL) for barbers, services, appointments, availability, and staff allowlist. |
+| **Limited mobile experience** | Layout and touch targets could be better on phones/tablets. | **Responsive first**: viewport meta, Tailwind breakpoints (sm/md/lg), touch-friendly CTAs. Works on web, mobile, and iPad. |
+| **No employee-only access** | If a “staff” area existed, anyone could try to access it. | **Staff allowlist**: only emails in `staff_allowlist` can use the dashboard; others are signed out with a clear message. |
+| **Static or third-party CMS** | Hard to add features like availability rules or calendar export. | **Next.js + API routes**: server-side auth, slots API, calendar ICS export, and full control over UX. |
+
+### What This Repo Delivers
+
+- **Public site**  
+  Hero (MTA/subway vibe, Queens branding), services, team, prices, contact, and a clear **Book** CTA that goes to a real booking flow.
+
+- **Online booking**  
+  Choose barber → service → date → time. Slots are driven by store hours, barber weekly availability, and time-off/sick days.
+
+- **Staff dashboard** (employees only)  
+  - Schedule view by barber with time blocks (open vs booked).  
+  - Add walk-in with time picker.  
+  - Click an appointment to see client email/phone, reschedule, or cancel.  
+  - Dashboard home: booking counts (day/week/month) and peak hours.  
+  - Barber availability and time-off management.  
+  - Export next day’s appointments to ICS (e.g. Google Calendar).
+
+- **Responsive**  
+  Layout and typography scale for **web, mobile, and iPad** (viewport, breakpoints, and touch-friendly buttons/links).
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| **Framework** | Next.js 14+ (App Router) |
+| **Framework** | Next.js 15 (App Router) |
 | **Database** | Supabase (PostgreSQL) |
 | **ORM** | Drizzle ORM |
-| **Authentication** | Supabase Auth |
-| **Styling** | Tailwind CSS |
+| **Auth** | Supabase Auth (email/password); staff allowlist in DB |
+| **Styling** | Tailwind CSS (Headz palette: black, red, cream) |
 | **Language** | TypeScript |
-| **Deployment** | Vercel |
 
-## Quick Start
+---
 
-### 1. Prerequisites
+## Running Locally
 
-- Node.js 18+ installed
-- A Supabase account (free tier works great)
-- Git installed
+### Prerequisites
 
-### 2. Clone and Install
+- Node.js 18+
+- Supabase project (for auth + database)
+
+### Setup
 
 ```bash
-# If using as template, copy the folder
-cp -r saas-starter-kit my-new-project
-cd my-new-project
-
-# Install dependencies
+git clone https://github.com/YOUR_USERNAME/headz-aint-ready.git
+cd headz-aint-ready
 npm install
-```
-
-### 3. Setup Supabase
-
-1. Go to [https://supabase.com](https://supabase.com) and create a new project
-2. Wait for the database to be ready (takes about 2 minutes)
-3. Go to **Project Settings** → **API**
-4. Copy your project credentials
-
-### 4. Configure Environment Variables
-
-```bash
-# Copy the example file
 cp .env.example .env.local
-
-# Edit .env.local and add your Supabase credentials
 ```
 
-Your `.env.local` should look like this:
+Edit `.env.local` with:
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-DATABASE_URL=postgresql://postgres:your-password@db.your-project.supabase.co:5432/postgres
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
+- `NEXT_PUBLIC_SUPABASE_URL` – Supabase project URL  
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` – Supabase anon key  
+- `DATABASE_URL` – PostgreSQL connection string (Supabase → Database → Connection string)
 
-**Where to find these:**
-- **NEXT_PUBLIC_SUPABASE_URL**: Project Settings → API → Project URL
-- **NEXT_PUBLIC_SUPABASE_ANON_KEY**: Project Settings → API → Project API keys → anon/public
-- **SUPABASE_SERVICE_ROLE_KEY**: Project Settings → API → Project API keys → service_role
-- **DATABASE_URL**: Project Settings → Database → Connection string → URI
+### Database
 
-### 5. Setup Database
+Create tables and (optionally) seed data:
 
 ```bash
-# Generate initial migration
-npm run db:generate
-
-# Apply migration to your database
-npm run db:migrate
+node scripts/run-schema.mjs
 ```
 
-### 6. Run Development Server
+Add staff emails so they can access the dashboard:
+
+```sql
+INSERT INTO staff_allowlist (email) VALUES ('you@example.com')
+ON CONFLICT (email) DO NOTHING;
+```
+
+(Run in Supabase → SQL Editor.)
+
+### Run
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Project Structure
-
-```
-saas-starter-kit/
-├── .cursorrules              # AI instructions for Cursor
-├── app/                      # Next.js app directory
-│   ├── api/                  # API routes
-│   │   └── profile/          # Example: User profile endpoint
-│   ├── auth/                 # Authentication pages
-│   │   ├── login/
-│   │   ├── signup/
-│   │   └── signout/
-│   ├── dashboard/            # Protected dashboard
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Homepage
-├── components/               # Reusable components
-│   └── auth/                 # Auth-related components
-│       ├── LoginForm.tsx
-│       └── SignupForm.tsx
-├── lib/
-│   ├── db/                   # Database configuration
-│   │   ├── index.ts          # Drizzle client
-│   │   └── schema.ts         # Database schema
-│   └── supabase/             # Supabase clients
-│       ├── client.ts         # Client-side
-│       └── server.ts         # Server-side
-├── drizzle/                  # Generated migrations
-├── public/                   # Static files
-├── .env.example              # Environment variables template
-├── .gitignore
-├── drizzle.config.ts         # Drizzle configuration
-├── next.config.js            # Next.js configuration
-├── package.json
-├── postcss.config.js         # PostCSS for Tailwind
-├── tailwind.config.js        # Tailwind configuration
-└── tsconfig.json             # TypeScript configuration
-```
-
-## Using with Cursor
-
-This starter kit includes a comprehensive `.cursorrules` file that teaches Cursor your exact architecture. This means:
-
-1. **Just ask Claude to build features** - Claude knows your tech stack
-2. **Consistent code patterns** - All generated code follows the same structure
-3. **No repetitive explanations** - You don't need to explain "I use Drizzle" every time
-4. **Production-ready code** - Follows best practices automatically
-
-### Example Prompts
-
-```
-"Add a posts table with user relationship"
-"Create an API route to fetch user posts"
-"Build a settings page where users can update their profile"
-"Add pagination to the posts list"
-```
-
-Cursor will generate code that fits perfectly into your existing architecture.
-
-## Common Tasks
-
-### Adding a New Database Table
-
-1. **Update schema** in `lib/db/schema.ts`:
-
-```typescript
-export const posts = pgTable('posts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  content: text('content'),
-  published: boolean('published').default(false).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
-```
-
-2. **Generate migration**:
-```bash
-npm run db:generate
-```
-
-3. **Review migration** in `drizzle/` folder
-
-4. **Apply migration**:
-```bash
-npm run db:migrate
-```
-
-### Creating an API Route
-
-Create file: `app/api/your-endpoint/route.ts`
-
-```typescript
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { db } from '@/lib/db'
-
-export async function GET() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Your logic here
-  return NextResponse.json({ message: 'Success' })
-}
-```
-
-### Protecting a Page
-
-Option 1: Layout-level protection (recommended for multiple pages)
-
-```typescript
-// app/protected/layout.tsx
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-
-export default async function ProtectedLayout({ children }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/auth/login')
-  }
-
-  return <>{children}</>
-}
-```
-
-Option 2: Page-level protection (for individual pages)
-
-```typescript
-// app/protected/page.tsx
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-
-export default async function ProtectedPage() {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/auth/login')
-  }
-
-  return <div>Protected content</div>
-}
-```
-
-### Database Operations
-
-```typescript
-import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-
-// Select all
-const allUsers = await db.select().from(users)
-
-// Select with conditions
-const user = await db.select().from(users).where(eq(users.email, 'test@example.com'))
-
-// Insert
-await db.insert(users).values({ email: 'new@example.com' })
-
-// Update
-await db.update(users).set({ fullName: 'John Doe' }).where(eq(users.id, userId))
-
-// Delete
-await db.delete(users).where(eq(users.id, userId))
-```
-
-## Deployment
-
-### Deploy to Vercel
-
-1. Push your code to GitHub
-2. Go to [vercel.com](https://vercel.com)
-3. Click "New Project"
-4. Import your repository
-5. Add environment variables (copy from `.env.local`)
-6. Click "Deploy"
-
-### Environment Variables for Production
-
-Make sure to add these in Vercel's project settings:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `DATABASE_URL`
-- `NEXT_PUBLIC_APP_URL` (your production URL)
-
-## Available Scripts
-
-```bash
-# Development
-npm run dev          # Start dev server
-
-# Building
-npm run build        # Build for production
-npm run start        # Start production server
-
-# Database
-npm run db:generate  # Generate migration from schema changes
-npm run db:migrate   # Apply migrations to database
-npm run db:push      # Push schema changes directly (use in dev only)
-npm run db:studio    # Open Drizzle Studio (visual database manager)
-
-# Code Quality
-npm run lint         # Run ESLint
-```
-
-## Database Migrations
-
-### When to generate migrations
-
-- After adding/modifying tables in `schema.ts`
-- After adding/removing columns
-- After changing column types or constraints
-
-### Migration workflow
-
-```bash
-# 1. Update your schema in lib/db/schema.ts
-# 2. Generate migration
-npm run db:generate
-
-# 3. Review the SQL in drizzle/ folder
-# 4. Apply migration
-npm run db:migrate
-```
-
-## Security Best Practices
-
-✅ **Never expose service role key** - Keep it server-side only
-✅ **Validate all inputs** - Use Zod for API routes
-✅ **Enable Row Level Security** - Configure RLS policies in Supabase
-✅ **Use HTTPS in production** - Always
-✅ **Rate limit API routes** - Prevent abuse
-✅ **Sanitize user input** - Especially for database queries
-
-## Troubleshooting
-
-### "Database URL not set" error
-
-Make sure `.env.local` exists and contains `DATABASE_URL`.
-
-### "Unauthorized" on protected routes
-
-Clear your cookies and sign in again. Your session may have expired.
-
-### Migration errors
-
-Try:
-```bash
-npm run db:push  # Push schema directly (dev only)
-```
-
-Or drop the database and start fresh (dev only):
-```bash
-# In Supabase SQL Editor
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-
-# Then regenerate and apply migrations
-npm run db:generate
-npm run db:migrate
-```
-
-### Build fails on Vercel
-
-1. Check environment variables are set correctly
-2. Make sure you're using Node 18+
-3. Check build logs for specific errors
-
-## Customization
-
-### Change App Name
-
-1. Update `package.json` → `name`
-2. Update `app/layout.tsx` → `metadata.title`
-3. Update `app/page.tsx` → Header text
-
-### Add More Auth Providers
-
-See [Supabase Auth documentation](https://supabase.com/docs/guides/auth/social-login) for OAuth setup.
-
-### Styling
-
-This kit uses Tailwind CSS. Modify `tailwind.config.js` to customize:
-- Colors
-- Fonts
-- Spacing
-- Breakpoints
-
-## FAQ
-
-**Q: Can I use Prisma instead of Drizzle?**
-A: Yes, but you'll need to update the `.cursorrules` file and replace the database layer.
-
-**Q: How do I add email verification?**
-A: Supabase handles this automatically. Configure email templates in Supabase dashboard.
-
-**Q: Can I use this for a mobile app?**
-A: The backend (API routes + Supabase) can be used with any frontend. For mobile, consider React Native with Supabase client.
-
-**Q: How do I add payments?**
-A: Integrate Stripe. Add API routes for checkout and webhooks. Store subscription data in your database.
-
-## Resources
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Supabase Documentation](https://supabase.com/docs)
-- [Drizzle ORM Documentation](https://orm.drizzle.team)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [TypeScript Documentation](https://www.typescriptlang.org/docs)
-
-## License
-
-MIT - Feel free to use this for your projects.
-
-## Support
-
-For issues or questions:
-1. Check the documentation above
-2. Review the `.cursorrules` file for patterns
-3. Ask Cursor AI for help (it knows your architecture!)
-4. Open an issue on GitHub
+- **Public site:** [http://localhost:3000](http://localhost:3000)  
+- **Book:** [http://localhost:3000/book](http://localhost:3000/book)  
+- **Staff login:** [http://localhost:3000/auth/login](http://localhost:3000/auth/login) (only allowed emails can reach the dashboard)
 
 ---
 
-Built with ❤️ for rapid SaaS development
+## Deployment (Backend Required)
+
+This app uses **Next.js server features** (API routes, server components, auth, database). It **cannot run as a static site on GitHub Pages**.
+
+| Platform | Use it? | Notes |
+|----------|--------|--------|
+| **GitHub Pages** | ❌ No | Static only; no Node server, no API, no DB. |
+| **Netlify** | ✅ Yes | Use “Next.js on Netlify” (or Netlify’s Next runtime). Add env vars in Netlify UI. |
+| **Vercel** | ✅ Yes | Native Next.js; connect repo and add same env vars. |
+
+### Deploying on Netlify
+
+1. Push this repo to GitHub (see “Pushing to GitHub” below).  
+2. In [Netlify](https://app.netlify.com): **Add new site → Import from Git** and select the repo.  
+3. **Build settings** (Netlify usually detects Next.js):  
+   - **Build command:** `npm run build`  
+   - **Publish directory:** leave default (Netlify uses Next.js runtime).  
+4. **Environment variables** (Site settings → Environment variables):  
+   - `NEXT_PUBLIC_SUPABASE_URL`  
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
+   - `DATABASE_URL`  
+5. Deploy. Your site URL will be `https://your-site-name.netlify.app` (or your custom domain).
+
+### Deploying on Vercel
+
+1. Push the repo to GitHub.  
+2. In [Vercel](https://vercel.com): **Import** the repo.  
+3. Add the same environment variables as above.  
+4. Deploy. Backend and API routes work out of the box.
+
+### What You Need for the Backend to Work
+
+- **Supabase project** (same as local): Auth + Database.  
+- **Env vars** set in Netlify/Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`.  
+- **Database**: Run the schema (and allowlist) in that Supabase project so production uses the same DB, or a separate one with the same schema.  
+- **Staff allowlist**: Ensure production staff emails are in `staff_allowlist` in the DB you use in production.
+
+---
+
+## Pushing to GitHub
+
+```bash
+cd headz-aint-ready
+git init
+git add .
+git commit -m "Headz Ain't Ready – new design, booking, staff dashboard"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/headz-aint-ready.git
+git push -u origin main
+```
+
+Create the repo on GitHub first (e.g. `headz-aint-ready`), then use its URL in `git remote add origin`.
+
+---
+
+## Responsive: Web, Mobile, iPad
+
+- **Viewport:** `width=device-width`, `initialScale=1`, `maximumScale=5` in the root layout.  
+- **Breakpoints:** Tailwind `sm:`, `md:`, `lg:` used for hero, nav, booking flow, and dashboard (e.g. schedule table scrolls horizontally on small screens).  
+- **Touch:** Buttons and links are sized for tap targets; forms and CTAs work on phones and tablets.  
+- **Nav:** Header adapts (e.g. “Book” / “Book Now” on smaller screens); dashboard sidebar and main content reflow.
+
+---
+
+## Project Structure (High Level)
+
+- `app/(marketing)/` – Public homepage, layout with header/footer.  
+- `app/book/` – Booking flow (barber → service → date → time).  
+- `app/dashboard/` – Staff-only dashboard (schedule, availability, home stats, calendar export).  
+- `app/auth/` – Login, signup, signout (staff allowlist enforced in dashboard layout).  
+- `app/api/` – Appointments, slots, barbers, calendar ICS, auth callback (if you add OAuth later).  
+- `lib/db/` – Drizzle schema (barbers, services, appointments, availability, time-off, staff_allowlist).  
+- `docs/` – Supabase and staff backend setup (env vars, DB, allowlist).
+
+For full backend and DB setup, see **`docs/SUPABASE_STAFF_BACKEND_SETUP.md`**.
+
+---
+
+## License
+
+Private / for Headz Ain't Ready. All rights reserved.

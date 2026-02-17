@@ -1,7 +1,7 @@
 {
-  "name": "saas-starter-kit",
+  "name": "headz-aint-ready",
   "version": "1.0.0",
-  "description": "Production-ready SaaS starter with Next.js, Supabase, and Drizzle ORM",
+  "description": "Headz Ain't Ready – Queens barbershop site + internal booking",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
