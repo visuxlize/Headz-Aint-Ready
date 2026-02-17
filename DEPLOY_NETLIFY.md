@@ -142,3 +142,16 @@ After the first deploy, do these so booking and staff login work in production.
 
 - Open your Netlify URL → **Book** → pick barber, service, date, time. If you can complete a booking, the backend is working.
 - **Staff login**: go to **/auth/login**, sign in with an email that’s in `staff_allowlist` in the DB; you should reach the dashboard.
+
+### 6. “Booking is temporarily unavailable” – diagnose with /api/health
+
+If the Book page shows **“Booking is temporarily unavailable”**, the server can’t reach the database. Use the health endpoint to see why:
+
+1. Open **https://headz-aint-ready.netlify.app/api/health** in your browser (or your actual Netlify URL + `/api/health`).
+2. You’ll see JSON like:
+   - `{ "ok": true, "hasDatabaseUrl": true, "dbOk": true }` → backend is fine; if Book still fails, do a hard refresh or redeploy.
+   - `{ "ok": false, "hasDatabaseUrl": false }` → **DATABASE_URL is not set** in Netlify. Add it under **Site configuration → Environment variables**, then **Deploys → Trigger deploy**.
+   - `{ "ok": false, "hasDatabaseUrl": true, "dbOk": false, "error": "…" }` → **DATABASE_URL is set but the DB connection failed.** Usually this means:
+     - You’re using the **Direct** connection string. Switch to **Session** (pooler): Supabase → **Settings → Database → Connection string** → **URI** → **Session mode** (port **5432**). Replace `DATABASE_URL` in Netlify with that URI and redeploy.
+     - Wrong password or project ref in the URI; fix the value and redeploy.
+3. After any env change, **trigger a new deploy** so the serverless functions get the new variables.

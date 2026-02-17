@@ -153,7 +153,7 @@ export default async function HomePage() {
             ))
           ) : (
             <p className="col-span-full text-center text-headz-gray text-sm">
-              Run <code className="bg-black/10 px-1 rounded">node scripts/seed-headz-barbers.mjs</code> to load the team.
+              Meet the team when you book — our barbers are ready for you.
             </p>
           )}
         </div>

@@ -62,7 +62,12 @@ function getDb(): ReturnType<typeof drizzle> {
     throw new Error('DATABASE_URL environment variable is not set')
   }
   if (!_client) {
-    _client = postgres(process.env.DATABASE_URL, { prepare: false })
+    _client = postgres(process.env.DATABASE_URL, {
+      prepare: false,
+      max: 1,
+      connect_timeout: 10,
+      idle_timeout: 0,
+    })
     _db = drizzle(_client, { schema })
   }
   return _db as ReturnType<typeof drizzle>
