@@ -244,16 +244,32 @@ export function BookingFlow({
         {/* Step: Barber */}
         {step === 'barber' && (
           <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
-            <h3 className="font-semibold mb-4">Choose your barber</h3>
+            <h3 className="font-semibold mb-2">Choose your barber</h3>
+            <p className="text-headz-gray text-sm mb-4">Available times reflect each barber&apos;s schedule and time off.</p>
             <div className="grid grid-cols-2 gap-3">
               {barbers.map((b) => (
                 <button
                   key={b.id}
                   type="button"
                   onClick={() => onSelectBarber(b)}
-                  className="p-4 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left"
+                  className="flex items-center gap-3 p-4 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left"
                 >
-                  <span className="font-medium">{b.name}</span>
+                  <div className="h-12 w-12 shrink-0 rounded-full overflow-hidden bg-headz-black/10 border border-headz-red/20 flex items-center justify-center">
+                    {b.avatarUrl ? (
+                      <Image
+                        src={b.avatarUrl}
+                        alt=""
+                        width={48}
+                        height={48}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-headz-red font-semibold text-lg">
+                        {b.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-medium truncate">{b.name}</span>
                 </button>
               ))}
             </div>
