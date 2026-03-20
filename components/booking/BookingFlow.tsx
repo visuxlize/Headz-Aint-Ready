@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import type { Barber, Service } from '@/lib/db/schema'
+import { computeNoShowFeeFromServicePrice } from '@/lib/appointments/no-show-fee'
 
 type Step = 'service' | 'barber' | 'date' | 'time' | 'details' | 'done'
 
@@ -78,6 +79,7 @@ export function BookingFlow({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bookingId, setBookingId] = useState<string | null>(null)
+  const [noShowAck, setNoShowAck] = useState(false)
 
   const today = useMemo(() => toDateString(new Date()), [])
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -128,6 +130,10 @@ export function BookingFlow({
       setError('Please fill in your name and ensure a time is selected.')
       return
     }
+    if (!noShowAck) {
+      setError('Please read and acknowledge the no-show policy below.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
@@ -143,6 +149,7 @@ export function BookingFlow({
           clientEmail: clientEmail.trim() || undefined,
           startAt: selectedSlot,
           isWalkIn: false,
+          noShowAcknowledged: true,
         }),
       })
       const json = await res.json()
@@ -483,6 +490,45 @@ export function BookingFlow({
             <p className="mt-4 text-sm text-headz-gray">
               {service?.name} with {barber?.name} · {date} at {selectedSlot ? formatSlot(selectedSlot) : ''}
             </p>
+
+            {service && (
+              <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-left">
+                <div className="flex gap-3">
+                  <div className="shrink-0 text-amber-700 mt-0.5" aria-hidden>
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 space-y-3">
+                    <p className="text-sm text-amber-950 leading-relaxed">
+                      Please note: if you do not show up for your appointment and it has not been cancelled at least 2
+                      hours in advance, a no-show fee of 20% of your service price will be applied on your next visit.
+                      For <strong>{service.name}</strong> this would be{' '}
+                      <strong>
+                        {formatPrice(
+                          parseFloat(
+                            computeNoShowFeeFromServicePrice(
+                              typeof service.price === 'string' ? service.price : String(service.price)
+                            )
+                          )
+                        )}
+                      </strong>
+                      .
+                    </p>
+                    <label className="flex items-start gap-3 cursor-pointer text-sm text-amber-950">
+                      <input
+                        type="checkbox"
+                        checked={noShowAck}
+                        onChange={(e) => setNoShowAck(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-amber-400 text-headz-red focus:ring-headz-red"
+                      />
+                      <span>I understand the no-show policy above.</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 flex gap-3">
               <button type="button" onClick={() => setStep('time')} className="px-4 py-2 border border-black/20 rounded-lg text-sm">
                 ← Back
@@ -490,7 +536,7 @@ export function BookingFlow({
               <button
                 type="button"
                 onClick={() => void submitBooking()}
-                disabled={submitting || !clientName.trim()}
+                disabled={submitting || !clientName.trim() || !noShowAck}
                 className="flex-1 bg-headz-red hover:bg-headz-redDark disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg"
               >
                 {submitting ? 'Booking…' : 'Confirm booking'}

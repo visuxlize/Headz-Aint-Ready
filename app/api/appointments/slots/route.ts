@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { appointments, availability, barberTimeOff, barbers, services } from '@/lib/db/schema'
+import { appointments, availability, barberTimeOff, barbers, services, users } from '@/lib/db/schema'
 import { and, eq, gte, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { appointmentEndUtc, appointmentStartUtc, pgTimeToMinutes } from '@/lib/appointments/time'
@@ -35,6 +35,10 @@ export async function GET(request: Request) {
 
     const [barberRow] = await db.select().from(barbers).where(eq(barbers.id, barberId)).limit(1)
     if (!barberRow?.userId) {
+      return NextResponse.json({ slots: [] })
+    }
+    const [barberUser] = await db.select().from(users).where(eq(users.id, barberRow.userId)).limit(1)
+    if (!barberUser?.isActive) {
       return NextResponse.json({ slots: [] })
     }
     const barberUserId = barberRow.userId

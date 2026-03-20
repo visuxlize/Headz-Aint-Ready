@@ -62,6 +62,8 @@ ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS customer_email text;
 ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS date date;
 ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS time_slot time;
 ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS checked_off boolean NOT NULL DEFAULT false;
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS no_show_acknowledged boolean NOT NULL DEFAULT false;
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS waived_at timestamptz;
 ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS no_show_fee numeric(10, 2) NOT NULL DEFAULT 0;
 
 UPDATE public.appointments SET customer_name = client_name WHERE customer_name IS NULL AND client_name IS NOT NULL;
@@ -140,14 +142,18 @@ SET barber_id = b.user_id
 FROM public.barbers b
 WHERE a.legacy_barber_id = b.id AND a.barber_id IS NULL AND b.user_id IS NOT NULL;
 
+-- Appointments whose barber row has no user_id cannot map to the new FK (barber_id → users).
+-- Option A (before migrate): set barbers.user_id for each staff member, then re-run from the start in a fresh transaction if needed.
+-- Option B: remove only those rows so the migration can finish (historical/test bookings).
 DO $$
 DECLARE
   orphan_count int;
 BEGIN
   SELECT count(*) INTO orphan_count FROM public.appointments WHERE barber_id IS NULL;
   IF orphan_count > 0 THEN
-    RAISE EXCEPTION 'migrate-roles: % appointment(s) have no barber user_id. Link barbers.user_id to staff users, then re-run.',
+    RAISE NOTICE 'migrate-roles: deleting % appointment(s) with no linked barbers.user_id (cannot satisfy barber_id → users). To preserve them, stop, run UPDATE barbers SET user_id = ... WHERE id = ... matching auth users, then restore from backup and re-run.',
       orphan_count;
+    DELETE FROM public.appointments WHERE barber_id IS NULL;
   END IF;
 END $$;
 
@@ -243,6 +249,8 @@ CREATE TABLE IF NOT EXISTS public.time_off_requests (
   reviewed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.time_off_requests ADD COLUMN IF NOT EXISTS denial_reason text;
 
 CREATE TABLE IF NOT EXISTS public.store_hours (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

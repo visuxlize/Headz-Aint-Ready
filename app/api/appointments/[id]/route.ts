@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { appointments } from '@/lib/db/schema'
+import { appointments, services } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { computeNoShowFeeFromServicePrice } from '@/lib/appointments/no-show-fee'
 import { z } from 'zod'
 import { isoToNyDateAndTime } from '@/lib/appointments/time'
 
@@ -55,12 +56,23 @@ export async function PATCH(
       status?: string
       appointmentDate?: string
       timeSlot?: string
+      noShowFee?: string
     } = { updatedAt: now }
     if (data.status != null) setPayload.status = data.status
     if (data.startAt != null) {
       const { date: appointmentDate, timeSlot } = isoToNyDateAndTime(data.startAt)
       setPayload.appointmentDate = appointmentDate
       setPayload.timeSlot = timeSlot
+    }
+
+    if (data.status === 'no_show') {
+      const [existing] = await db.select().from(appointments).where(eq(appointments.id, id)).limit(1)
+      if (existing) {
+        const [svc] = await db.select().from(services).where(eq(services.id, existing.serviceId)).limit(1)
+        if (svc) {
+          setPayload.noShowFee = computeNoShowFeeFromServicePrice(svc.price)
+        }
+      }
     }
 
     const [updated] = await db.update(appointments).set(setPayload).where(eq(appointments.id, id)).returning()

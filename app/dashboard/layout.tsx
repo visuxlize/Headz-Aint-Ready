@@ -1,17 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { DashboardShell } from '@/components/dashboard/DashboardShell'
 import { db } from '@/lib/db'
-import { staffAllowlist } from '@/lib/db/schema'
+import { staffAllowlist, users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
-export default async function DashboardLayout({
+/** Auth + staff allowlist + active account for all /dashboard routes. Shell is provided by nested layouts: (admin) or barber. */
+export default async function DashboardRootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
 
   if (error || !user) {
     redirect('/auth/login')
@@ -33,15 +36,17 @@ export default async function DashboardLayout({
       await supabase.auth.signOut()
       redirect('/auth/login?error=unauthorized')
     }
+
+    const [dbUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1)
+    if (dbUser && !dbUser.isActive) {
+      await supabase.auth.signOut()
+      redirect('/auth/login?error=inactive')
+    }
   } catch (e) {
     console.error('Dashboard allowlist check failed:', e)
     await supabase.auth.signOut()
     redirect('/auth/login?error=unauthorized')
   }
 
-  return (
-    <DashboardShell userEmail={user.email ?? ''}>
-      {children}
-    </DashboardShell>
-  )
+  return <>{children}</>
 }

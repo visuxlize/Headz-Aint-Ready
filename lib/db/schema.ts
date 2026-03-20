@@ -104,7 +104,9 @@ export const appointments = pgTable('appointments', {
   isWalkIn: boolean('is_walk_in').default(false).notNull(),
   status: text('status').notNull().default('pending'),
   checkedOff: boolean('checked_off').default(false).notNull(),
+  noShowAcknowledged: boolean('no_show_acknowledged').default(false).notNull(),
   noShowFee: numeric('no_show_fee', { precision: 10, scale: 2 }).default('0').notNull(),
+  waivedAt: timestamp('waived_at'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -122,6 +124,7 @@ export const timeOffRequests = pgTable('time_off_requests', {
   status: text('status').notNull().default('pending'),
   reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
   reviewedAt: timestamp('reviewed_at'),
+  denialReason: text('denial_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 

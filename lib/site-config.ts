@@ -22,7 +22,7 @@ export const SITE = {
   },
 } as const
 
-/** Price list for display on marketing site (matches booking options) */
+/** Legacy static list — the home page price table reads active rows from `services` in the database. */
 export const PRICE_LIST = [
   { name: 'Kids Haircut', price: '$30.00', duration: '30 min' },
   { name: 'Shape Up', price: '$20.00', duration: '30 min' },

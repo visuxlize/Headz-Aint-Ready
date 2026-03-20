@@ -1,5 +1,6 @@
+import { bookableBarbersCondition } from '@/lib/barbers/public-queries'
 import { db } from '@/lib/db'
-import { barbers, services } from '@/lib/db/schema'
+import { barbers, services, users } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { BookingFlow } from '@/components/booking/BookingFlow'
 import type { Barber, Service } from '@/lib/db/schema'
@@ -20,7 +21,13 @@ export default async function BookPage({
   let backendUnavailable = false
   try {
     const [b, s] = await Promise.all([
-      db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(asc(barbers.sortOrder)),
+      db
+        .select({ barber: barbers })
+        .from(barbers)
+        .innerJoin(users, eq(barbers.userId, users.id))
+        .where(bookableBarbersCondition)
+        .orderBy(asc(barbers.sortOrder))
+        .then((rows) => rows.map((r) => r.barber)),
       db.select().from(services).where(eq(services.isActive, true)).orderBy(asc(services.displayOrder)),
     ])
     barbersList = b

@@ -62,3 +62,8 @@ export function minutesToPgTime(minutes: number): string {
   const m = minutes % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
 }
+
+/** Today's calendar date in store timezone (for comparing `date` columns). */
+export function nyTodayDateString(): string {
+  return format(toZonedTime(new Date(), STORE_TZ), 'yyyy-MM-dd')
+}

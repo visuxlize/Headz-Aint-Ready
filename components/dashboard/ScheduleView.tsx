@@ -408,6 +408,7 @@ function WalkInForm({
           clientPhone: clientPhone.trim() || undefined,
           startAt: slot,
           isWalkIn: true,
+          noShowAcknowledged: true,
         }),
       })
       const json = await res.json()

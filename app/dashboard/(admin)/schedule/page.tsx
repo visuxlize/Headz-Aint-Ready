@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { barbers, services, appointments } from '@/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { ScheduleView } from '@/components/dashboard/ScheduleView'
 import { appointmentStartUtc } from '@/lib/appointments/time'
 
@@ -20,7 +20,7 @@ export default async function SchedulePage() {
   const today = toDateString(new Date())
 
   const [barbersList, servicesList, appointmentsToday] = await Promise.all([
-    db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(barbers.sortOrder),
+    db.select().from(barbers).orderBy(asc(barbers.sortOrder)),
     db.select().from(services).where(eq(services.isActive, true)).orderBy(services.displayOrder),
     db
       .select()

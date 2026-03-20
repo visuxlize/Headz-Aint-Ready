@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { appointments, barbers } from '@/lib/db/schema'
+import { appointments, barbers, users } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { isoToNyDateAndTime } from '@/lib/appointments/time'
@@ -15,6 +15,7 @@ const createSchema = z.object({
   clientEmail: z.string().email().optional().or(z.literal('')),
   startAt: z.string().datetime(),
   isWalkIn: z.boolean().optional(),
+  noShowAcknowledged: z.boolean().optional(),
 })
 
 /** GET /api/appointments?date=YYYY-MM-DD – list appointments for the day (staff only) */
@@ -68,8 +69,21 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+    const [barberUser] = await db.select().from(users).where(eq(users.id, barberRow.userId)).limit(1)
+    if (!barberUser?.isActive) {
+      return NextResponse.json({ error: 'This barber is not available for booking.' }, { status: 400 })
+    }
 
     const { date: appointmentDate, timeSlot } = isoToNyDateAndTime(data.startAt)
+
+    const isWalkIn = data.isWalkIn ?? false
+    const acknowledged = isWalkIn ? true : data.noShowAcknowledged === true
+    if (!acknowledged) {
+      return NextResponse.json(
+        { error: 'You must acknowledge the no-show policy before confirming.' },
+        { status: 400 }
+      )
+    }
 
     const [appt] = await db
       .insert(appointments)
@@ -81,8 +95,9 @@ export async function POST(request: Request) {
         customerEmail: data.clientEmail || null,
         appointmentDate,
         timeSlot,
-        isWalkIn: data.isWalkIn ?? false,
+        isWalkIn,
         status: 'pending',
+        noShowAcknowledged: acknowledged,
       })
       .returning()
 

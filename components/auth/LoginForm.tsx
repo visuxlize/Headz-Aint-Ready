@@ -14,8 +14,12 @@ export function LoginForm() {
   const supabase = createClient()
 
   useEffect(() => {
-    if (searchParams.get('error') === 'unauthorized') {
+    const err = searchParams.get('error')
+    if (err === 'unauthorized') {
       setError('You don’t have access to the staff site. Contact your manager to be added.')
+    }
+    if (err === 'inactive') {
+      setError('This account has been deactivated. Contact your manager.')
     }
   }, [searchParams])
 

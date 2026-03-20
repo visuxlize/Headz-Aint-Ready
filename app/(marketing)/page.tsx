@@ -1,16 +1,38 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { db } from '@/lib/db'
-import { barbers, type Barber } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { SITE, PRICE_LIST } from '@/lib/site-config'
+import { barbersForMarketingCondition } from '@/lib/barbers/public-queries'
+import { barbers, services, users, type Barber } from '@/lib/db/schema'
+import { asc, eq } from 'drizzle-orm'
+import { SITE } from '@/lib/site-config'
 
 export default async function HomePage() {
   let barbersList: Barber[] = []
+  let priceRows: { id: string; name: string; price: string; durationMinutes: number }[] = []
   try {
-    barbersList = await db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(barbers.sortOrder)
+    const [bRows, pRows] = await Promise.all([
+      db
+        .select({ barber: barbers })
+        .from(barbers)
+        .leftJoin(users, eq(barbers.userId, users.id))
+        .where(barbersForMarketingCondition)
+        .orderBy(asc(barbers.sortOrder))
+        .then((rows) => rows.map((r) => r.barber)),
+      db
+        .select({
+          id: services.id,
+          name: services.name,
+          price: services.price,
+          durationMinutes: services.durationMinutes,
+        })
+        .from(services)
+        .where(eq(services.isActive, true))
+        .orderBy(asc(services.displayOrder)),
+    ])
+    barbersList = bRows
+    priceRows = pRows
   } catch (err) {
-    console.error('HomePage: could not load barbers', err)
+    console.error('HomePage: could not load barbers/services', err)
   }
 
   return (
@@ -174,16 +196,27 @@ export default async function HomePage() {
               <div className="text-right">Price</div>
             </div>
             {/* Rows */}
-            {PRICE_LIST.map(({ name, price, duration }) => (
-              <div
-                key={name}
-                className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-4 border-b border-black/5 last:border-b-0 items-center"
-              >
-                <span className="text-headz-black font-medium">{name}</span>
-                <span className="text-headz-gray text-sm text-right">{duration}</span>
-                <span className="text-right font-semibold tabular-nums">{price}</span>
+            {priceRows.length > 0 ? (
+              priceRows.map((row) => {
+                const priceNum = Number.parseFloat(String(row.price))
+                const priceLabel = Number.isFinite(priceNum) ? `$${priceNum.toFixed(2)}` : String(row.price)
+                const durLabel = `${row.durationMinutes} min`
+                return (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-4 border-b border-black/5 last:border-b-0 items-center"
+                  >
+                    <span className="text-headz-black font-medium">{row.name}</span>
+                    <span className="text-headz-gray text-sm text-right">{durLabel}</span>
+                    <span className="text-right font-semibold tabular-nums">{priceLabel}</span>
+                  </div>
+                )
+              })
+            ) : (
+              <div className="px-5 py-8 text-center text-headz-gray text-sm">
+                Pricing is loading — call the shop or book online for current rates.
               </div>
-            ))}
+            )}
           </div>
           <div className="mt-6 text-center text-sm text-headz-gray space-y-1">
             <p>{SITE.hoursShort}</p>
