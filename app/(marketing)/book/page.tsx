@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { barbers, services } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { BookingFlow } from '@/components/booking/BookingFlow'
 import type { Barber, Service } from '@/lib/db/schema'
 
@@ -20,8 +20,8 @@ export default async function BookPage({
   let backendUnavailable = false
   try {
     const [b, s] = await Promise.all([
-      db.select().from(barbers).where(eq(barbers.isActive, true)),
-      db.select().from(services).where(eq(services.isActive, true)),
+      db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(asc(barbers.sortOrder)),
+      db.select().from(services).where(eq(services.isActive, true)).orderBy(asc(services.displayOrder)),
     ])
     barbersList = b
     servicesList = s

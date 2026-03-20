@@ -3,104 +3,88 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { appointments } from '@/lib/db/schema'
-import { and, eq, gte, lt, sql } from 'drizzle-orm'
+import { and, eq, gte, lte, sql } from 'drizzle-orm'
+import { appointmentStartUtc } from '@/lib/appointments/time'
 
 function toDateString(d: Date) {
   return d.toISOString().slice(0, 10)
 }
 
-/** EST-ish boundaries for "today" in store timezone (simplified: use date string) */
-function getDayBounds(dateStr: string) {
-  return {
-    start: new Date(`${dateStr}T09:00:00-05:00`),
-    end: new Date(`${dateStr}T20:00:00-05:00`),
-  }
+function monthBoundsStrings() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const monthStart = `${y}-${pad(m + 1)}-01`
+  const lastDay = new Date(y, m + 1, 0).getDate()
+  const monthEnd = `${y}-${pad(m + 1)}-${pad(lastDay)}`
+  return { monthStart, monthEnd }
 }
 
-function getWeekBounds() {
+function weekBoundsStrings() {
   const now = new Date()
   const day = now.getDay()
   const sun = new Date(now)
   sun.setDate(now.getDate() - day)
   const sat = new Date(sun)
   sat.setDate(sun.getDate() + 6)
-  return {
-    start: new Date(toDateString(sun) + 'T00:00:00-05:00'),
-    end: new Date(toDateString(sat) + 'T23:59:59-05:00'),
-  }
-}
-
-function getMonthBounds() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-  return {
-    start: new Date(start.toISOString().slice(0, 10) + 'T00:00:00-05:00'),
-    end: new Date(end.toISOString().slice(0, 10) + 'T23:59:59-05:00'),
-  }
+  return { start: toDateString(sun), end: toDateString(sat) }
 }
 
 export default async function DashboardOverviewPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
   const today = toDateString(new Date())
-  const { start: dayStart, end: dayEnd } = getDayBounds(today)
-  const { start: weekStart, end: weekEnd } = getWeekBounds()
-  const { start: monthStart, end: monthEnd } = getMonthBounds()
+  const { start: weekStart, end: weekEnd } = weekBoundsStrings()
+  const { monthStart, monthEnd } = monthBoundsStrings()
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const thirtyDaysAgoStr = toDateString(thirtyDaysAgo)
+
+  const pending = eq(appointments.status, 'pending')
 
   const [dailyCount, weeklyCount, monthlyCount, recentAppointments] = await Promise.all([
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(appointments)
+      .where(and(eq(appointments.appointmentDate, today), pending)),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(appointments)
       .where(
         and(
-          gte(appointments.startAt, dayStart),
-          lt(appointments.startAt, dayEnd),
-          eq(appointments.status, 'confirmed')
+          gte(appointments.appointmentDate, weekStart),
+          lte(appointments.appointmentDate, weekEnd),
+          pending
         )
       ),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(appointments)
       .where(
-        and(
-          gte(appointments.startAt, weekStart),
-          lt(appointments.startAt, weekEnd),
-          eq(appointments.status, 'confirmed')
-        )
+        and(gte(appointments.appointmentDate, monthStart), lte(appointments.appointmentDate, monthEnd), pending)
       ),
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({
+        appointmentDate: appointments.appointmentDate,
+        timeSlot: appointments.timeSlot,
+      })
       .from(appointments)
-      .where(
-        and(
-          gte(appointments.startAt, monthStart),
-          lt(appointments.startAt, monthEnd),
-          eq(appointments.status, 'confirmed')
-        )
-      ),
-    db
-      .select({ startAt: appointments.startAt })
-      .from(appointments)
-      .where(
-        and(
-          gte(appointments.startAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
-          eq(appointments.status, 'confirmed')
-        )
-      ),
+      .where(and(gte(appointments.appointmentDate, thirtyDaysAgoStr), pending)),
   ])
 
   const daily = dailyCount[0]?.count ?? 0
   const weekly = weeklyCount[0]?.count ?? 0
   const monthly = monthlyCount[0]?.count ?? 0
 
-  // Peak hours: group by hour (EST) from recent appointments
   const hourCounts: Record<number, number> = {}
   for (let h = 9; h <= 19; h++) hourCounts[h] = 0
   for (const a of recentAppointments) {
-    const d = new Date(a.startAt)
+    const d = appointmentStartUtc(a)
     const estHour = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' })).getHours()
     if (estHour >= 9 && estHour <= 19) hourCounts[estHour] = (hourCounts[estHour] ?? 0) + 1
   }
@@ -128,17 +112,17 @@ export default async function DashboardOverviewPage() {
         <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">Today</p>
           <p className="mt-2 text-3xl font-bold text-headz-black">{daily}</p>
-          <p className="text-xs text-headz-gray mt-1">confirmed bookings</p>
+          <p className="text-xs text-headz-gray mt-1">pending bookings</p>
         </div>
         <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">This week</p>
           <p className="mt-2 text-3xl font-bold text-headz-black">{weekly}</p>
-          <p className="text-xs text-headz-gray mt-1">confirmed bookings</p>
+          <p className="text-xs text-headz-gray mt-1">pending bookings</p>
         </div>
         <div className="rounded-xl border border-black/10 bg-white p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">This month</p>
           <p className="mt-2 text-3xl font-bold text-headz-black">{monthly}</p>
-          <p className="text-xs text-headz-gray mt-1">confirmed bookings</p>
+          <p className="text-xs text-headz-gray mt-1">pending bookings</p>
         </div>
       </div>
 

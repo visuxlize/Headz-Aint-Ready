@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
-import { barbers, barberAvailability, barberTimeOff } from '@/lib/db/schema'
+import { barbers, availability, barberTimeOff } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { AvailabilityEditor } from '@/components/dashboard/AvailabilityEditor'
+import { pgTimeToMinutes } from '@/lib/appointments/time'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -24,21 +25,25 @@ function minutesToTime(m: number) {
 
 export default async function AvailabilityPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
   const [barbersList, allAvailability, allTimeOff] = await Promise.all([
     db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(barbers.sortOrder),
-    db.select().from(barberAvailability),
+    db.select().from(availability),
     db.select().from(barberTimeOff),
   ])
 
   const availabilityByBarber = new Map<string, typeof allAvailability>()
   const timeOffByBarber = new Map<string, typeof allTimeOff>()
   for (const a of allAvailability) {
-    const list = availabilityByBarber.get(a.barberId) ?? []
+    const b = barbersList.find((x) => x.userId === a.barberId)
+    if (!b) continue
+    const list = availabilityByBarber.get(b.id) ?? []
     list.push(a)
-    availabilityByBarber.set(a.barberId, list)
+    availabilityByBarber.set(b.id, list)
   }
   for (const t of allTimeOff) {
     const list = timeOffByBarber.get(t.barberId) ?? []
@@ -47,17 +52,21 @@ export default async function AvailabilityPage() {
   }
 
   const barberData = barbersList.map((b) => {
-    const av = (availabilityByBarber.get(b.id) ?? []).map((a) => ({
-      id: a.id,
-      dayOfWeek: a.dayOfWeek,
-      dayName: DAY_NAMES[a.dayOfWeek],
-      startMinutes: a.startMinutes,
-      endMinutes: a.endMinutes,
-      startTime: minutesToTime(a.startMinutes),
-      endTime: minutesToTime(a.endMinutes),
-      startTime12: minutesTo12h(a.startMinutes),
-      endTime12: minutesTo12h(a.endMinutes),
-    }))
+    const av = (availabilityByBarber.get(b.id) ?? []).map((a) => {
+      const startMinutes = pgTimeToMinutes(String(a.startTime))
+      const endMinutes = pgTimeToMinutes(String(a.endTime))
+      return {
+        id: a.id,
+        dayOfWeek: a.dayOfWeek,
+        dayName: DAY_NAMES[a.dayOfWeek],
+        startMinutes,
+        endMinutes,
+        startTime: minutesToTime(startMinutes),
+        endTime: minutesToTime(endMinutes),
+        startTime12: minutesTo12h(startMinutes),
+        endTime12: minutesTo12h(endMinutes),
+      }
+    })
     const totalMinutes = av.reduce((sum, a) => sum + (a.endMinutes - a.startMinutes), 0)
     return {
       barber: {

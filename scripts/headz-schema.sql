@@ -1,3 +1,5 @@
+-- Legacy bootstrap schema. For roles, RLS, and the current column layout, run scripts/migrate-roles.sql
+-- after this (or use migrate-roles.sql alone against a DB that already has starter tables).
 -- Run this in Supabase SQL Editor if npm run db:generate fails.
 -- Creates barbers, services, appointments. (users table may already exist from starter.)
 

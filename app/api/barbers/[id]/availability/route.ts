@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { barberAvailability } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { availability, barbers } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { minutesToPgTime } from '@/lib/appointments/time'
 
 const bodySchema = z.object({
   dayOfWeek: z.number().min(0).max(6),
@@ -18,10 +19,12 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { id: barberId } = await params
+    const { id: barberProfileId } = await params
     const body = await request.json()
     const parsed = bodySchema.safeParse(body)
     if (!parsed.success) {
@@ -32,9 +35,23 @@ export async function POST(
       return NextResponse.json({ error: 'End must be after start' }, { status: 400 })
     }
 
+    const [barberRow] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
+    if (!barberRow?.userId) {
+      return NextResponse.json(
+        { error: 'Barber must be linked to a staff user before setting availability.' },
+        { status: 400 }
+      )
+    }
+
     const [row] = await db
-      .insert(barberAvailability)
-      .values({ barberId, dayOfWeek, startMinutes, endMinutes })
+      .insert(availability)
+      .values({
+        barberId: barberRow.userId,
+        dayOfWeek,
+        startTime: minutesToPgTime(startMinutes),
+        endTime: minutesToPgTime(endMinutes),
+        isActive: true,
+      })
       .returning()
     return NextResponse.json({ data: row })
   } catch (e) {
@@ -50,23 +67,27 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { id: barberId } = await params
+    const { id: barberProfileId } = await params
     const { searchParams } = new URL(request.url)
     const availabilityId = searchParams.get('id')
     if (!availabilityId) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
+    const [barberRow] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
+    if (!barberRow?.userId) {
+      return NextResponse.json({ error: 'Barber has no linked staff user.' }, { status: 400 })
+    }
+
     await db
-      .delete(barberAvailability)
+      .delete(availability)
       .where(
-        and(
-          eq(barberAvailability.id, availabilityId),
-          eq(barberAvailability.barberId, barberId)
-        )
+        and(eq(availability.id, availabilityId), eq(availability.barberId, barberRow.userId))
       )
     return NextResponse.json({ ok: true })
   } catch (e) {

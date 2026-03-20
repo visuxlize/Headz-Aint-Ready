@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { appointments } from '@/lib/db/schema'
-import { and, eq, gte, lt } from 'drizzle-orm'
+import { appointments, barbers } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { isoToNyDateAndTime } from '@/lib/appointments/time'
 
 const createSchema = z.object({
   barberId: z.string().uuid(),
@@ -20,7 +21,9 @@ const createSchema = z.object({
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -29,16 +32,13 @@ export async function GET(request: Request) {
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json({ error: 'Invalid or missing date' }, { status: 400 })
     }
-    const dayStart = new Date(`${date}T09:00:00-04:00`)
-    const dayEnd = new Date(`${date}T20:00:00-04:00`)
     const list = await db
       .select()
       .from(appointments)
       .where(
         and(
-          gte(appointments.startAt, dayStart),
-          lt(appointments.startAt, dayEnd),
-          eq(appointments.status, 'confirmed')
+          eq(appointments.appointmentDate, date),
+          eq(appointments.status, 'pending')
         )
       )
     return NextResponse.json({ data: list })
@@ -60,21 +60,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
     }
     const data = parsed.data
-    const startAt = new Date(data.startAt)
-    const endAt = new Date(startAt.getTime() + data.durationMinutes * 60 * 1000)
+
+    const [barberRow] = await db.select().from(barbers).where(eq(barbers.id, data.barberId)).limit(1)
+    if (!barberRow?.userId) {
+      return NextResponse.json(
+        { error: 'This barber is not linked to a staff account yet; booking is unavailable.' },
+        { status: 400 }
+      )
+    }
+
+    const { date: appointmentDate, timeSlot } = isoToNyDateAndTime(data.startAt)
 
     const [appt] = await db
       .insert(appointments)
       .values({
-        barberId: data.barberId,
+        barberId: barberRow.userId,
         serviceId: data.serviceId,
-        clientName: data.clientName,
-        clientPhone: data.clientPhone || null,
-        clientEmail: data.clientEmail || null,
-        startAt,
-        endAt,
+        customerName: data.clientName,
+        customerPhone: data.clientPhone || null,
+        customerEmail: data.clientEmail || null,
+        appointmentDate,
+        timeSlot,
         isWalkIn: data.isWalkIn ?? false,
-        status: 'confirmed',
+        status: 'pending',
       })
       .returning()
 

@@ -18,9 +18,10 @@ const STEP_LABELS: Record<Step, string> = {
 const SLOT_INTERVAL = 30
 const MONTHS_AHEAD = 2
 
-function formatPrice(cents: number) {
-  if (cents === 0) return 'Price varies'
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
+function formatPrice(price: string | number) {
+  const n = typeof price === 'string' ? parseFloat(price) : price
+  if (Number.isNaN(n) || n === 0) return 'Price varies'
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
 
 function toDateString(d: Date) {
@@ -187,13 +188,13 @@ export function BookingFlow({
         </div>
         <div className="min-w-0 text-center md:text-left">
           <p className="font-medium truncate">{service?.name}</p>
-          <p className="text-headz-gray text-sm">{formatPrice(service?.priceCents ?? 0)} · {service?.durationMinutes} min</p>
+          <p className="text-headz-gray text-sm">{formatPrice(service?.price ?? 0)} · {service?.durationMinutes} min</p>
         </div>
       </div>
       <p className="text-sm text-headz-gray border-t border-black/10 pt-3 text-center md:text-left">
         {service?.name} with {barber?.name}
       </p>
-      <p className="font-medium mt-1 text-center md:text-left">{formatPrice(service?.priceCents ?? 0)}</p>
+      <p className="font-medium mt-1 text-center md:text-left">{formatPrice(service?.price ?? 0)}</p>
     </div>
   )
 
@@ -234,7 +235,7 @@ export function BookingFlow({
                   className="w-full flex justify-between items-center p-3 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left gap-3"
                 >
                   <span className="text-left">{s.name}</span>
-                  <span className="text-headz-gray text-sm shrink-0">{formatPrice(s.priceCents)} · {s.durationMinutes} min</span>
+                  <span className="text-headz-gray text-sm shrink-0">{formatPrice(s.price)} · {s.durationMinutes} min</span>
                 </button>
               ))}
             </div>

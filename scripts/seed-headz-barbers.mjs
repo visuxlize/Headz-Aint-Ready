@@ -54,10 +54,10 @@ async function main() {
     const [{ count: servicesCount }] = await sql`SELECT COUNT(*)::int FROM services`;
     if (servicesCount === 0) {
       await sql`
-        INSERT INTO services (name, slug, duration_minutes, price_cents, category, sort_order) VALUES
-          ('Kids cut', 'kids-cut', 30, 2000, 'kids', 0),
-          ('Adult cut', 'adult-cut', 30, 3000, 'adults', 1),
-          ('Senior cut', 'senior-cut', 30, 2500, 'seniors', 2)
+        INSERT INTO services (name, slug, duration_minutes, price, category, display_order) VALUES
+          ('Kids cut', 'kids-cut', 30, 20.00, 'kids', 0),
+          ('Adult cut', 'adult-cut', 30, 30.00, 'adults', 1),
+          ('Senior cut', 'senior-cut', 30, 25.00, 'seniors', 2)
       `;
       console.log('Inserted 3 services: Kids cut, Adult cut, Senior cut');
     } else {

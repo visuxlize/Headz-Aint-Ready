@@ -8,7 +8,7 @@ import { SITE, PRICE_LIST } from '@/lib/site-config'
 export default async function HomePage() {
   let barbersList: Barber[] = []
   try {
-    barbersList = await db.select().from(barbers).where(eq(barbers.isActive, true))
+    barbersList = await db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(barbers.sortOrder)
   } catch (err) {
     console.error('HomePage: could not load barbers', err)
   }

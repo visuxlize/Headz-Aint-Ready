@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { Barber, Service, Appointment } from '@/lib/db/schema'
+import { appointmentEndUtc, appointmentStartUtc } from '@/lib/appointments/time'
 
 const OPEN_HOUR = 9
 const CLOSE_HOUR = 20
@@ -34,6 +35,7 @@ export function ScheduleView({
   services: Service[]
   appointmentsByBarber: Record<string, Appointment[]>
   serviceMap: Record<string, Service>
+  /** Keyed by barber auth user id */
   barberMap: Record<string, Barber>
   defaultDate: string
 }) {
@@ -71,16 +73,18 @@ export function ScheduleView({
 
   const byBarber = new Map<string, Appointment[]>()
   for (const a of appointments) {
-    const list = byBarber.get(a.barberId) ?? []
+    const b = barbers.find((x) => x.userId === a.barberId)
+    if (!b) continue
+    const list = byBarber.get(b.id) ?? []
     list.push(a)
-    byBarber.set(a.barberId, list)
+    byBarber.set(b.id, list)
   }
   for (const b of barbers) {
     if (!byBarber.has(b.id)) byBarber.set(b.id, [])
   }
   barbers.forEach((b) => {
     const list = (byBarber.get(b.id) ?? []).sort(
-      (x, y) => new Date(x.startAt).getTime() - new Date(y.startAt).getTime()
+      (x, y) => appointmentStartUtc(x).getTime() - appointmentStartUtc(y).getTime()
     )
     byBarber.set(b.id, list)
   })
@@ -190,8 +194,9 @@ function BarberRow({
   const dayStart = new Date(`${date}T${String(OPEN_HOUR).padStart(2, '0')}:00:00-05:00`).getTime()
   const blocks: { startSlot: number; endSlot: number; appointment: Appointment }[] = []
   for (const a of appointments) {
-    const start = new Date(a.startAt).getTime()
-    const end = new Date(a.endAt).getTime()
+    const dur = serviceMap[a.serviceId]?.durationMinutes ?? 30
+    const start = appointmentStartUtc(a).getTime()
+    const end = appointmentEndUtc(a, dur).getTime()
     const startSlot = Math.max(0, Math.floor((start - dayStart) / (SLOT_MINUTES * 60 * 1000)))
     const endSlot = Math.min(TOTAL_SLOTS, Math.ceil((end - dayStart) / (SLOT_MINUTES * 60 * 1000)))
     blocks.push({ startSlot, endSlot, appointment: a })
@@ -207,7 +212,7 @@ function BarberRow({
           key={i}
           colSpan={span}
           className="border-l border-black/5 bg-headz-red/10 p-2 align-top"
-          title={`${block.appointment.clientName} · ${serviceMap[block.appointment.serviceId]?.name ?? '—'} · ${formatTime(block.appointment.startAt)} · Click for details`}
+          title={`${block.appointment.customerName} · ${serviceMap[block.appointment.serviceId]?.name ?? '—'} · ${formatTime(appointmentStartUtc(block.appointment))} · Click for details`}
         >
           <button
             type="button"
@@ -215,10 +220,10 @@ function BarberRow({
             className="w-full text-left rounded-md px-2 py-1 bg-white/90 border border-headz-red/20 hover:border-headz-red/50 hover:shadow-sm transition cursor-pointer"
           >
             <div className="text-xs font-semibold text-headz-black truncate">
-              {block.appointment.clientName}
+              {block.appointment.customerName}
             </div>
             <div className="text-[10px] text-headz-gray truncate mt-0.5">
-              {serviceMap[block.appointment.serviceId]?.name ?? '—'} · {formatTime(block.appointment.startAt)}
+              {serviceMap[block.appointment.serviceId]?.name ?? '—'} · {formatTime(appointmentStartUtc(block.appointment))}
             </div>
             {block.appointment.isWalkIn && (
               <span className="inline-block mt-1 text-[10px] bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">
@@ -547,17 +552,15 @@ function AppointmentDetailModal({
 
   const service = serviceMap[appointment.serviceId]
   const barber = barberMap[appointment.barberId]
-  const durationMinutes = Math.round(
-    (new Date(appointment.endAt).getTime() - new Date(appointment.startAt).getTime()) / 60000
-  )
+  const durationMinutes = service?.durationMinutes ?? 30
 
   const loadRescheduleSlots = async () => {
-    if (!appointment.barberId || !rescheduleDate) return
+    if (!barber?.id || !rescheduleDate) return
     setRescheduleLoading(true)
     setError(null)
     try {
       const res = await fetch(
-        `/api/appointments/slots?barberId=${encodeURIComponent(appointment.barberId)}&date=${rescheduleDate}&durationMinutes=${durationMinutes}`
+        `/api/appointments/slots?barberId=${encodeURIComponent(barber.id)}&date=${rescheduleDate}&durationMinutes=${durationMinutes}`
       )
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to load slots')
@@ -605,14 +608,12 @@ function AppointmentDetailModal({
     setError(null)
     try {
       const startAt = new Date(rescheduleSlot)
-      const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000)
       const res = await fetch(`/api/appointments/${appointment.id}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
         }),
       })
       if (!res.ok) {
@@ -645,27 +646,28 @@ function AppointmentDetailModal({
           </div>
         )}
         <div className="space-y-3 text-sm">
-          <p><span className="font-medium text-headz-gray">Client</span> {appointment.clientName}</p>
-          {appointment.clientEmail && (
+          <p><span className="font-medium text-headz-gray">Client</span> {appointment.customerName}</p>
+          {appointment.customerEmail && (
             <p>
               <span className="font-medium text-headz-gray">Email</span>{' '}
-              <a href={`mailto:${appointment.clientEmail}`} className="text-headz-red hover:underline">
-                {appointment.clientEmail}
+              <a href={`mailto:${appointment.customerEmail}`} className="text-headz-red hover:underline">
+                {appointment.customerEmail}
               </a>
             </p>
           )}
-          {appointment.clientPhone && (
+          {appointment.customerPhone && (
             <p>
               <span className="font-medium text-headz-gray">Phone</span>{' '}
-              <a href={`tel:${appointment.clientPhone}`} className="text-headz-red hover:underline">
-                {appointment.clientPhone}
+              <a href={`tel:${appointment.customerPhone}`} className="text-headz-red hover:underline">
+                {appointment.customerPhone}
               </a>
             </p>
           )}
           <p><span className="font-medium text-headz-gray">Service</span> {service?.name ?? '—'}</p>
           <p>
             <span className="font-medium text-headz-gray">Time</span>{' '}
-            {formatTime(appointment.startAt)} – {formatTime(appointment.endAt)}
+            {formatTime(appointmentStartUtc(appointment))} –{' '}
+            {formatTime(appointmentEndUtc(appointment, durationMinutes))}
           </p>
           <p><span className="font-medium text-headz-gray">Barber</span> {barber?.name ?? '—'}</p>
           {appointment.isWalkIn && (

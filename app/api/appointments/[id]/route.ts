@@ -4,11 +4,12 @@ import { db } from '@/lib/db'
 import { appointments } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { isoToNyDateAndTime } from '@/lib/appointments/time'
 
 const updateSchema = z.object({
   startAt: z.string().optional(),
   endAt: z.string().optional(),
-  status: z.enum(['confirmed', 'completed', 'cancelled', 'no_show']).optional(),
+  status: z.enum(['pending', 'completed', 'cancelled', 'no_show']).optional(),
 }).refine(
   (data) => {
     if (data.startAt != null && data.endAt != null) {
@@ -26,7 +27,9 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -50,18 +53,17 @@ export async function PATCH(
     const setPayload: {
       updatedAt: Date
       status?: string
-      startAt?: Date
-      endAt?: Date
+      appointmentDate?: string
+      timeSlot?: string
     } = { updatedAt: now }
     if (data.status != null) setPayload.status = data.status
-    if (data.startAt != null) setPayload.startAt = new Date(data.startAt)
-    if (data.endAt != null) setPayload.endAt = new Date(data.endAt)
+    if (data.startAt != null) {
+      const { date: appointmentDate, timeSlot } = isoToNyDateAndTime(data.startAt)
+      setPayload.appointmentDate = appointmentDate
+      setPayload.timeSlot = timeSlot
+    }
 
-    const [updated] = await db
-      .update(appointments)
-      .set(setPayload)
-      .where(eq(appointments.id, id))
-      .returning()
+    const [updated] = await db.update(appointments).set(setPayload).where(eq(appointments.id, id)).returning()
 
     if (!updated) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })

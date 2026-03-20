@@ -1,9 +1,12 @@
-import { pgTable, text, timestamp, uuid, boolean, integer, date } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, uuid, boolean, integer, date, time, numeric } from 'drizzle-orm/pg-core'
 
 /**
  * Database Schema – Headz Ain't Ready
- * Barbers, services, appointments. Staff use Supabase Auth (users).
+ * Staff use Supabase Auth; `users.id` matches auth.users.
  */
+
+export const userRoles = ['admin', 'barber'] as const
+export type UserRole = (typeof userRoles)[number]
 
 /** Staff / dashboard users – id matches Supabase Auth */
 export const users = pgTable('users', {
@@ -12,11 +15,12 @@ export const users = pgTable('users', {
   fullName: text('full_name'),
   avatarUrl: text('avatar_url'),
   isActive: boolean('is_active').default(true).notNull(),
+  role: text('role').notNull().default('barber'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-/** Emails allowed to access the staff dashboard. Only these users can sign in and use /dashboard. */
+/** Emails allowed to access the staff dashboard. */
 export const staffAllowlist = pgTable('staff_allowlist', {
   email: text('email').primaryKey(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -25,13 +29,14 @@ export const staffAllowlist = pgTable('staff_allowlist', {
 export type StaffAllowlist = typeof staffAllowlist.$inferSelect
 export type NewStaffAllowlist = typeof staffAllowlist.$inferInsert
 
-/** Barbers – each has a display name and optional auth user link */
+/** Barbers – public profile; optional link to auth user for appointments & RLS */
 export const barbers = pgTable('barbers', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }).unique(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   avatarUrl: text('avatar_url'),
-  email: text('email'), // for calendar / schedule emails
+  email: text('email'),
   bio: text('bio'),
   sortOrder: integer('sort_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
@@ -39,71 +44,107 @@ export const barbers = pgTable('barbers', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-/** Barber recurring weekly availability (minutes from midnight, store timezone).
- * If none for a day, barber is unavailable that day. Within store open/close. */
-export const barberAvailability = pgTable('barber_availability', {
+/** Weekly availability per barber (auth user). Times are local wall-clock (store TZ). */
+export const availability = pgTable('availability', {
   id: uuid('id').primaryKey().defaultRandom(),
-  barberId: uuid('barber_id').notNull().references(() => barbers.id, { onDelete: 'cascade' }),
-  dayOfWeek: integer('day_of_week').notNull(), // 0 = Sunday, 1 = Monday, ... 6 = Saturday
-  startMinutes: integer('start_minutes').notNull(), // e.g. 540 = 9:00
-  endMinutes: integer('end_minutes').notNull(),   // e.g. 1200 = 20:00
+  barberId: uuid('barber_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  dayOfWeek: integer('day_of_week').notNull(),
+  startTime: time('start_time').notNull(),
+  endTime: time('end_time').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-/** Barber time off / sick days – date range. Booking slots exclude these. */
+/** Blocks booking for a date range (barber profile id) */
 export const barberTimeOff = pgTable('barber_time_off', {
   id: uuid('id').primaryKey().defaultRandom(),
   barberId: uuid('barber_id').notNull().references(() => barbers.id, { onDelete: 'cascade' }),
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
-  type: text('type').notNull().default('time_off'), // 'time_off' | 'sick' | 'other'
+  type: text('type').notNull().default('time_off'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-/** Services (Kids, Adults, Seniors, etc.) with duration in minutes and price in cents */
 export const services = pgTable('services', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   description: text('description'),
   durationMinutes: integer('duration_minutes').notNull(),
-  priceCents: integer('price_cents').notNull(),
-  category: text('category'), // 'kids' | 'adults' | 'seniors'
-  sortOrder: integer('sort_order').default(0).notNull(),
+  price: numeric('price', { precision: 10, scale: 2 }).notNull(),
+  category: text('category'),
+  displayOrder: integer('display_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-/** Appointments – booked or walk-in, linked to barber + service */
+export const appointmentStatuses = ['pending', 'completed', 'no_show', 'cancelled'] as const
+export type AppointmentStatus = (typeof appointmentStatuses)[number]
+
+/** Appointments – barber_id is the staff auth user (users.id) */
 export const appointments = pgTable('appointments', {
   id: uuid('id').primaryKey().defaultRandom(),
-  barberId: uuid('barber_id').notNull().references(() => barbers.id, { onDelete: 'cascade' }),
-  serviceId: uuid('service_id').notNull().references(() => services.id, { onDelete: 'cascade' }),
-  clientName: text('client_name').notNull(),
-  clientPhone: text('client_phone'),
-  clientEmail: text('client_email'),
-  startAt: timestamp('start_at', { withTimezone: true }).notNull(),
-  endAt: timestamp('end_at', { withTimezone: true }).notNull(),
+  barberId: uuid('barber_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  serviceId: uuid('service_id')
+    .notNull()
+    .references(() => services.id, { onDelete: 'cascade' }),
+  customerName: text('customer_name').notNull(),
+  customerPhone: text('customer_phone'),
+  customerEmail: text('customer_email'),
+  appointmentDate: date('date', { mode: 'string' }).notNull(),
+  timeSlot: time('time_slot').notNull(),
   isWalkIn: boolean('is_walk_in').default(false).notNull(),
-  status: text('status').notNull().default('confirmed'), // confirmed | completed | cancelled | no_show
+  status: text('status').notNull().default('pending'),
+  checkedOff: boolean('checked_off').default(false).notNull(),
+  noShowFee: numeric('no_show_fee', { precision: 10, scale: 2 }).default('0').notNull(),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const timeOffRequestStatuses = ['pending', 'approved', 'denied'] as const
+
+export const timeOffRequests = pgTable('time_off_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  barberId: uuid('barber_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  requestedDate: date('requested_date', { mode: 'string' }).notNull(),
+  reason: text('reason'),
+  status: text('status').notNull().default('pending'),
+  reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+  reviewedAt: timestamp('reviewed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const storeHours = pgTable('store_hours', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  dayOfWeek: integer('day_of_week').notNull(),
+  openTime: time('open_time').notNull(),
+  closeTime: time('close_time').notNull(),
+  isOpen: boolean('is_open').default(true).notNull(),
 })
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Barber = typeof barbers.$inferSelect
 export type NewBarber = typeof barbers.$inferInsert
-export type BarberAvailability = typeof barberAvailability.$inferSelect
-export type NewBarberAvailability = typeof barberAvailability.$inferInsert
+export type Availability = typeof availability.$inferSelect
+export type NewAvailability = typeof availability.$inferInsert
 export type BarberTimeOff = typeof barberTimeOff.$inferSelect
 export type NewBarberTimeOff = typeof barberTimeOff.$inferInsert
 export type Service = typeof services.$inferSelect
 export type NewService = typeof services.$inferInsert
 export type Appointment = typeof appointments.$inferSelect
 export type NewAppointment = typeof appointments.$inferInsert
+export type TimeOffRequest = typeof timeOffRequests.$inferSelect
+export type NewTimeOffRequest = typeof timeOffRequests.$inferInsert
+export type StoreHourRow = typeof storeHours.$inferSelect

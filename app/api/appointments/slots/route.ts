@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { appointments, barberAvailability, barberTimeOff } from '@/lib/db/schema'
+import { appointments, availability, barberTimeOff, barbers, services } from '@/lib/db/schema'
 import { and, eq, gte, lte } from 'drizzle-orm'
 import { z } from 'zod'
+import { appointmentEndUtc, appointmentStartUtc, pgTimeToMinutes } from '@/lib/appointments/time'
 
 const querySchema = z.object({
   barberId: z.string().uuid(),
@@ -10,14 +11,14 @@ const querySchema = z.object({
   durationMinutes: z.coerce.number().min(15).max(120),
 })
 
-const OPEN_HOUR = 9   // 9am EST – store open
-const CLOSE_HOUR = 20 // 8pm EST – store close
+const OPEN_HOUR = 9
+const CLOSE_HOUR = 20
 const STORE_OPEN_MINUTES = OPEN_HOUR * 60
 const STORE_CLOSE_MINUTES = CLOSE_HOUR * 60
 const SLOT_MINUTES = 30
 
 /** GET /api/appointments/slots?barberId=&date=&durationMinutes=
- * Returns available start times within store hours, respecting barber availability and time off.
+ * barberId is the barbers table id (public profile).
  */
 export async function GET(request: Request) {
   try {
@@ -32,9 +33,15 @@ export async function GET(request: Request) {
     }
     const { barberId, date, durationMinutes } = parsed.data
 
-    const dayOfWeek = new Date(date + 'T12:00:00').getDay() // 0=Sun .. 6=Sat
+    const [barberRow] = await db.select().from(barbers).where(eq(barbers.id, barberId)).limit(1)
+    if (!barberRow?.userId) {
+      return NextResponse.json({ slots: [] })
+    }
+    const barberUserId = barberRow.userId
 
-    const [timeOffRows, availabilityRows, existing] = await Promise.all([
+    const dayOfWeek = new Date(date + 'T12:00:00').getDay()
+
+    const [timeOffRows, availabilityRows, existingAppts, serviceRows] = await Promise.all([
       db
         .select()
         .from(barberTimeOff)
@@ -47,25 +54,28 @@ export async function GET(request: Request) {
         ),
       db
         .select()
-        .from(barberAvailability)
+        .from(availability)
         .where(
           and(
-            eq(barberAvailability.barberId, barberId),
-            eq(barberAvailability.dayOfWeek, dayOfWeek)
+            eq(availability.barberId, barberUserId),
+            eq(availability.dayOfWeek, dayOfWeek),
+            eq(availability.isActive, true)
           )
         ),
       db
-        .select({ startAt: appointments.startAt, endAt: appointments.endAt })
+        .select()
         .from(appointments)
         .where(
           and(
-            eq(appointments.barberId, barberId),
-            gte(appointments.startAt, new Date(`${date}T00:00:00-05:00`)),
-            lte(appointments.startAt, new Date(`${date}T23:59:59-05:00`)),
-            eq(appointments.status, 'confirmed')
+            eq(appointments.barberId, barberUserId),
+            eq(appointments.appointmentDate, date),
+            eq(appointments.status, 'pending')
           )
         ),
+      db.select().from(services),
     ])
+
+    const serviceDuration = new Map(serviceRows.map((s) => [s.id, s.durationMinutes]))
 
     if (timeOffRows.length > 0) {
       return NextResponse.json({ slots: [] })
@@ -78,8 +88,8 @@ export async function GET(request: Request) {
     } else {
       windows = availabilityRows
         .map((r) => ({
-          start: Math.max(STORE_OPEN_MINUTES, r.startMinutes),
-          end: Math.min(STORE_CLOSE_MINUTES, r.endMinutes),
+          start: Math.max(STORE_OPEN_MINUTES, pgTimeToMinutes(String(r.startTime))),
+          end: Math.min(STORE_CLOSE_MINUTES, pgTimeToMinutes(String(r.endTime))),
         }))
         .filter((w) => w.end > w.start)
         .sort((a, b) => a.start - b.start)
@@ -90,13 +100,19 @@ export async function GET(request: Request) {
     const baseMs = dayStart.getTime()
     const slots: string[] = []
 
+    const existingBounds = existingAppts.map((a) => {
+      const dur = serviceDuration.get(a.serviceId) ?? durationMinutes
+      return {
+        start: appointmentStartUtc(a).getTime(),
+        end: appointmentEndUtc(a, dur).getTime(),
+      }
+    })
+
     for (const w of windows) {
       for (let minutes = w.start; minutes <= w.end - durationMinutes; minutes += SLOT_MINUTES) {
         const start = new Date(baseMs + minutes * 60 * 1000)
         const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
-        const overlaps = existing.some(
-          (a) => start < new Date(a.endAt) && end > new Date(a.startAt)
-        )
+        const overlaps = existingBounds.some((b) => start.getTime() < b.end && end.getTime() > b.start)
         if (!overlaps) slots.push(start.toISOString())
       }
     }

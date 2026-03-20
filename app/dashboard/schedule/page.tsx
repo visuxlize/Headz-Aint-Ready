@@ -2,8 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { barbers, services, appointments } from '@/lib/db/schema'
-import { eq, and, gte, lt } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { ScheduleView } from '@/components/dashboard/ScheduleView'
+import { appointmentStartUtc } from '@/lib/appointments/time'
 
 function toDateString(d: Date) {
   return d.toISOString().slice(0, 10)
@@ -11,36 +12,34 @@ function toDateString(d: Date) {
 
 export default async function SchedulePage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
   const today = toDateString(new Date())
-  const dayStart = new Date(`${today}T09:00:00-05:00`)
-  const dayEnd = new Date(`${today}T20:00:00-05:00`)
 
   const [barbersList, servicesList, appointmentsToday] = await Promise.all([
     db.select().from(barbers).where(eq(barbers.isActive, true)).orderBy(barbers.sortOrder),
-    db.select().from(services).where(eq(services.isActive, true)),
+    db.select().from(services).where(eq(services.isActive, true)).orderBy(services.displayOrder),
     db
       .select()
       .from(appointments)
-      .where(
-        and(
-          gte(appointments.startAt, dayStart),
-          lt(appointments.startAt, dayEnd),
-          eq(appointments.status, 'confirmed')
-        )
-      ),
+      .where(and(eq(appointments.appointmentDate, today), eq(appointments.status, 'pending'))),
   ])
 
-  const byBarber = new Map<string, typeof appointmentsToday>()
+  const byBarberProfile = new Map<string, typeof appointmentsToday>()
   for (const a of appointmentsToday) {
-    const list = byBarber.get(a.barberId) ?? []
+    const barber = barbersList.find((b) => b.userId === a.barberId)
+    if (!barber) continue
+    const list = byBarberProfile.get(barber.id) ?? []
     list.push(a)
-    byBarber.set(a.barberId, list)
+    byBarberProfile.set(barber.id, list)
   }
   const serviceMap = new Map(servicesList.map((s) => [s.id, s]))
-  const barberMap = new Map(barbersList.map((b) => [b.id, b]))
+  const barberByUserId = Object.fromEntries(
+    barbersList.filter((b) => b.userId).map((b) => [b.userId as string, b])
+  )
 
   return (
     <div className="space-y-6">
@@ -56,13 +55,13 @@ export default async function SchedulePage() {
         appointmentsByBarber={Object.fromEntries(
           barbersList.map((b) => [
             b.id,
-            (byBarber.get(b.id) ?? []).sort(
-              (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+            (byBarberProfile.get(b.id) ?? []).sort(
+              (a, b) => appointmentStartUtc(a).getTime() - appointmentStartUtc(b).getTime()
             ),
           ])
         )}
         serviceMap={Object.fromEntries(serviceMap)}
-        barberMap={Object.fromEntries(barberMap)}
+        barberMap={barberByUserId}
         defaultDate={today}
       />
     </div>
