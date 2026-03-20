@@ -297,6 +297,8 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
     )
   }
 
+  const noStaffBarbers = services.length > 0 && barbers.length === 0
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -316,6 +318,23 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
           </button>
         )}
       </div>
+
+      {noStaffBarbers && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 text-sm">
+          <strong>No barber accounts for checkout.</strong> The register only lists staff who have a linked barber
+          profile and active login. An admin should open <strong>Dashboard → Settings → Barbers</strong> and invite
+          barbers, or run <code className="text-xs bg-amber-100 px-1 rounded">npm run seed:all</code> in development
+          (demo users + Dream Team + full pricelist).
+        </div>
+      )}
+
+      {services.length === 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 text-sm">
+          <strong>No services in the database.</strong> An admin can add them under{' '}
+          <strong>Dashboard → Settings → Services</strong>, or run{' '}
+          <code className="text-xs bg-amber-100 px-1 rounded">npm run restore:services</code>.
+        </div>
+      )}
 
       {terminalWarning && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 text-sm">

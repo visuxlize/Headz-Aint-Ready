@@ -5,41 +5,66 @@
  *
  *   npm run seed:dev-users
  *
- * (Uses Node’s --env-file so JWT values with "=" padding load correctly; do not use the
- * hand-rolled parser from older scripts.)
+ * Loads `.env.local` via scripts/load-env-local.mjs so JWT values with `=` (padding) are not
+ * truncated — Node's --env-file can break on `=` inside values.
  *
  * Do not use weak passwords in production.
  */
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import { loadEnvLocal } from './load-env-local.mjs'
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-const DATABASE_URL = process.env.DATABASE_URL?.trim()
+loadEnvLocal()
+
+function normalizeKey(raw) {
+  if (!raw) return ''
+  let s = String(raw).trim()
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1).trim()
+  }
+  if (s.toLowerCase().startsWith('bearer ')) s = s.slice(7).trim()
+  return s
+}
+
+const url = normalizeKey(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '')
+const serviceKey = normalizeKey(process.env.SUPABASE_SERVICE_ROLE_KEY ?? '')
+const DATABASE_URL = normalizeKey(process.env.DATABASE_URL ?? '')
 
 if (!url || !serviceKey) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.')
-  console.error('Run: npm run seed:dev-users (loads .env.local). Or: node --env-file=.env.local scripts/seed-dev-users.mjs')
+  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY after loading .env.local.')
+  console.error('Ensure .env.local exists in the project root and contains both variables.')
   process.exit(1)
 }
 
 try {
   const parts = serviceKey.split('.')
-  if (parts.length === 3) {
-    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
-    const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'))
-    if (payload.role !== 'service_role') {
-      console.error(
-        `Wrong API key: JWT "role" is "${payload.role ?? 'missing'}" but must be "service_role".`
-      )
-      console.error('Use the "service_role" secret from Supabase → Project Settings → API (not the anon / public key).')
-      process.exit(1)
-    }
+  if (parts.length !== 3) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY does not look like a JWT (expected three dot-separated segments).')
+    process.exit(1)
   }
-} catch {
-  console.warn('Could not decode SUPABASE_SERVICE_ROLE_KEY as a JWT — paste the full service_role string (no spaces or line breaks).')
+  const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+  const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'))
+  if (payload.role !== 'service_role') {
+    console.error(
+      `Wrong API key: JWT "role" is "${payload.role ?? 'missing'}" but must be "service_role".`
+    )
+    console.error('Use the "service_role" secret from Supabase → Project Settings → API (not the anon / public key).')
+    process.exit(1)
+  }
+  const hostRef = new URL(url).hostname.replace('.supabase.co', '').split('.')[0]
+  if (payload.ref && hostRef && payload.ref !== hostRef) {
+    console.error(
+      `URL/key mismatch: JWT project ref "${payload.ref}" does not match URL host "${hostRef}.supabase.co".`
+    )
+    console.error('Use the service_role key from the same project as NEXT_PUBLIC_SUPABASE_URL.')
+    process.exit(1)
+  }
+} catch (e) {
+  console.error('Could not validate SUPABASE_SERVICE_ROLE_KEY:', e?.message ?? e)
+  process.exit(1)
 }
+
 if (!DATABASE_URL) {
   console.error('Missing DATABASE_URL')
   process.exit(1)
@@ -120,11 +145,13 @@ async function main() {
     // Avoid unique conflicts on slug or user_id (dev-only cleanup)
     await sql`DELETE FROM barbers WHERE user_id = ${barberId}`
     await sql`DELETE FROM barbers WHERE slug = ${'barber-test'}`
+    const barberAvatar =
+      'https://headzaintready.com/wp-content/uploads/2023/02/LOUIELIVE.jpg'
     await sql`
-      INSERT INTO barbers (user_id, name, slug, email, is_active, sort_order)
-      VALUES (${barberId}, ${'Barber Test'}, ${'barber-test'}, ${barberEmail}, true, 99)
+      INSERT INTO barbers (user_id, name, slug, email, avatar_url, is_active, sort_order)
+      VALUES (${barberId}, ${'Barber Test'}, ${'barber-test'}, ${barberEmail}, ${barberAvatar}, true, 99)
     `
-    console.log('  DB: users + staff_allowlist + barbers OK')
+    console.log('  DB: users + staff_allowlist + barbers (with avatar) OK')
 
     console.log('\nDone. Sign in at /auth/login with either account.')
   } catch (e) {

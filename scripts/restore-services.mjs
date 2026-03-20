@@ -5,9 +5,12 @@
  *   npm run restore:services
  *
  * Upserts by slug. Run `scripts/add-price-display-override.sql` once if the column is missing.
- * Requires DATABASE_URL in .env.local (via --env-file in package.json).
+ * Loads DATABASE_URL from `.env.local` (handles `=` in connection string safely).
  */
 import postgres from 'postgres'
+import { loadEnvLocal } from './load-env-local.mjs'
+
+loadEnvLocal()
 
 const DATABASE_URL = process.env.DATABASE_URL?.trim()
 if (!DATABASE_URL) {

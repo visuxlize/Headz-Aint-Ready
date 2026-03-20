@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Restore / upsert barber rows (names, slugs, avatar URLs from headzaintready.com).
+ * Restore / upsert Dream Team barber rows (names, slugs, avatar URLs from headzaintready.com).
+ * Rows have no user_id until you invite barbers in Admin → Barbers (needed for booking/POS).
  *
  * Usage:
- *   node scripts/seed-headz-barbers.mjs
+ *   npm run seed:barbers
  *   node scripts/seed-headz-barbers.mjs --wipe-appointments   # deletes all appointments first (dangerous)
  *
- * Loads DATABASE_URL from .env.local.
- * Does NOT create auth users — use Dashboard → Settings → Barbers to invite staff; booking needs a linked user.
+ * Services are NOT touched here — use npm run restore:services for the full pricelist.
+ * For a one-shot local/staging reset: npm run seed:all
  */
 import postgres from 'postgres'
 import { readFileSync } from 'fs'
@@ -65,26 +66,6 @@ async function main() {
       `
     }
     console.log('Upserted barbers:', BARBERS.map((x) => x.name).join(', '))
-
-    for (const r of [
-      { name: 'Kids cut', slug: 'kids-cut', duration: 30, price: '20.00', category: 'kids', order: 0 },
-      { name: 'Adult cut', slug: 'adult-cut', duration: 30, price: '30.00', category: 'adults', order: 1 },
-      { name: 'Senior cut', slug: 'senior-cut', duration: 30, price: '25.00', category: 'seniors', order: 2 },
-    ]) {
-      await sql`
-        INSERT INTO services (name, slug, duration_minutes, price, category, display_order, is_active)
-        VALUES (${r.name}, ${r.slug}, ${r.duration}, ${r.price}, ${r.category}, ${r.order}, true)
-        ON CONFLICT (slug) DO UPDATE SET
-          name = EXCLUDED.name,
-          duration_minutes = EXCLUDED.duration_minutes,
-          price = EXCLUDED.price,
-          category = EXCLUDED.category,
-          display_order = EXCLUDED.display_order,
-          is_active = true,
-          updated_at = now()
-      `
-    }
-    console.log('Upserted services: Kids cut ($20), Adult cut ($30), Senior cut ($25)')
   } catch (e) {
     console.error('Error:', e.message)
     process.exit(1)

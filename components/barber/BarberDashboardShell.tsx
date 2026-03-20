@@ -38,10 +38,12 @@ export function BarberDashboardShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   useEffect(() => {
-    setMenuOpen(false)
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setSidebarOpen(false)
+    }
   }, [pathname])
 
   return (
@@ -49,15 +51,15 @@ export function BarberDashboardShell({
       <button
         type="button"
         aria-label="Close menu"
-        onClick={() => setMenuOpen(false)}
+        onClick={() => setSidebarOpen(false)}
         className={`fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden ${
-          menuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
 
       <aside
-        className={`fixed md:relative inset-y-0 left-0 z-50 w-64 md:w-56 shrink-0 bg-headz-black border-r border-white/10 flex flex-col transition-transform duration-200 ease-out md:translate-x-0 ${
-          menuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`fixed inset-y-0 left-0 z-50 w-64 shrink-0 bg-headz-black border-r border-white/10 flex flex-col transition-transform duration-200 ease-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="p-4 md:p-5 border-b border-white/10">
@@ -80,9 +82,9 @@ export function BarberDashboardShell({
             </div>
             <button
               type="button"
-              aria-label="Close menu"
-              onClick={() => setMenuOpen(false)}
-              className="md:hidden p-2 text-white/70 hover:text-white rounded-lg shrink-0"
+              aria-label="Close sidebar"
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 text-white/70 hover:text-white rounded-lg shrink-0"
             >
               <CloseIcon className="w-5 h-5" />
             </button>
@@ -121,17 +123,22 @@ export function BarberDashboardShell({
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        <header className="h-14 shrink-0 bg-white border-b border-black/10 flex items-center px-4 sm:px-6 gap-4">
+      <div
+        className={`flex-1 flex flex-col min-w-0 min-h-screen transition-[padding] duration-200 ease-out ${
+          sidebarOpen ? 'md:pl-64' : 'pl-0'
+        }`}
+      >
+        <header className="h-14 shrink-0 bg-white border-b border-black/10 flex items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
-            aria-label="Open menu"
-            onClick={() => setMenuOpen(true)}
-            className="md:hidden p-2 -ml-2 text-headz-black hover:bg-black/5 rounded-lg"
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="p-2 -ml-1 text-headz-black hover:bg-black/5 rounded-lg shrink-0"
           >
-            <MenuIcon className="w-6 h-6" />
+            {sidebarOpen ? <CloseIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
           </button>
-          <h1 className="text-sm font-medium text-headz-gray md:hidden">Headz — Barber</h1>
+          <h1 className="text-sm font-medium text-headz-gray md:hidden truncate">Headz — Barber</h1>
         </header>
         <main className="flex-1 p-4 sm:p-6 overflow-auto">
           <div className="max-w-4xl mx-auto w-full">{children}</div>

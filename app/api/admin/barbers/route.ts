@@ -37,6 +37,7 @@ export async function GET() {
       isActive: users.isActive,
       createdAt: users.createdAt,
       barberName: barbers.name,
+      avatarUrl: barbers.avatarUrl,
     })
     .from(users)
     .leftJoin(barbers, eq(barbers.userId, users.id))
@@ -48,6 +49,7 @@ export async function GET() {
     barberProfileId: r.barberProfileId,
     email: r.email,
     displayName: r.barberName ?? r.fullName ?? r.email,
+    avatarUrl: r.avatarUrl,
     isActive: r.isActive,
     createdAt: r.createdAt,
   }))

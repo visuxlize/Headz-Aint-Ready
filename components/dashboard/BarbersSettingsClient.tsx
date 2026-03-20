@@ -8,6 +8,7 @@ type BarberRow = {
   id: string
   email: string
   displayName: string
+  avatarUrl?: string | null
   isActive: boolean
   createdAt: string
 }
@@ -203,11 +204,20 @@ export function BarbersSettingsClient() {
         {loading ? (
           <div className="p-10 text-center text-headz-gray text-sm">Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-headz-gray text-sm">No barbers yet.</div>
+          <div className="p-10 text-center text-headz-gray text-sm space-y-2">
+            <p>No barber accounts yet.</p>
+            <p className="text-xs max-w-md mx-auto">
+              From your machine with <code className="bg-black/5 px-1 rounded">DATABASE_URL</code> in{' '}
+              <code className="bg-black/5 px-1 rounded">.env.local</code>, run{' '}
+              <code className="bg-black/5 px-1 rounded">npm run seed:all</code> to restore demo logins, Dream Team
+              profiles with photos, and the full service list — or use <strong>Add barber</strong> to send invites.
+            </p>
+          </div>
         ) : (
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-black/10 bg-headz-black/[0.03] text-left text-xs font-semibold uppercase tracking-wider text-headz-gray">
+                <th className="py-3 px-4 w-14" aria-hidden />
                 <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Email</th>
                 <th className="py-3 px-4">Status</th>
@@ -218,6 +228,18 @@ export function BarbersSettingsClient() {
             <tbody>
               {rows.map((b) => (
                 <tr key={b.id} className="border-b border-black/5 hover:bg-headz-cream/40">
+                  <td className="py-3 pl-4 pr-0">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-headz-black/10 border border-black/10 shrink-0">
+                      {b.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={b.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-headz-gray text-xs font-medium">
+                          {b.displayName.slice(0, 2)}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 font-medium text-headz-black">{b.displayName}</td>
                   <td className="py-3 px-4 text-headz-gray">{b.email}</td>
                   <td className="py-3 px-4">
