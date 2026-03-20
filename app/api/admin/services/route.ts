@@ -11,6 +11,8 @@ const serviceCategories = ['kids', 'adults', 'seniors'] as const
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional().nullable(),
+  /** Shown instead of formatted price (e.g. "$45.00 & Up"). Numeric `price` is still the base for fees/POS. */
+  priceDisplayOverride: z.string().max(80).optional().nullable(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/),
   durationMinutes: z.coerce.number().int().min(5).max(480),
   category: z.enum(serviceCategories).optional().default('adults'),
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
       name: d.name.trim(),
       slug,
       description: d.description?.trim() || null,
+      priceDisplayOverride: d.priceDisplayOverride?.trim() || null,
       durationMinutes: d.durationMinutes,
       price,
       category: d.category ?? 'adults',

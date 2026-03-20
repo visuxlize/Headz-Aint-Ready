@@ -5,31 +5,17 @@ import { barbersForMarketingCondition } from '@/lib/barbers/public-queries'
 import { barbers, services, users, type Barber } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { SITE } from '@/lib/site-config'
-
-const PRICE_CATEGORIES = [
-  { key: 'kids', label: 'Kids' },
-  { key: 'adults', label: 'Adults' },
-  { key: 'seniors', label: 'Seniors' },
-] as const
-
-function normalizePriceCategory(c: string | null) {
-  return (c || 'adults').toLowerCase()
-}
-
-function formatPriceLabel(price: string) {
-  const n = Number.parseFloat(String(price))
-  return Number.isFinite(n) ? `$${n.toFixed(2)}` : String(price)
-}
+import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
 export default async function HomePage() {
   let barbersList: Barber[] = []
   let priceRows: {
     id: string
     name: string
+    description: string | null
     price: string
+    priceDisplayOverride: string | null
     durationMinutes: number
-    category: string | null
-    displayOrder: number
   }[] = []
   try {
     const [bRows, pRows] = await Promise.all([
@@ -44,10 +30,10 @@ export default async function HomePage() {
         .select({
           id: services.id,
           name: services.name,
+          description: services.description,
           price: services.price,
+          priceDisplayOverride: services.priceDisplayOverride,
           durationMinutes: services.durationMinutes,
-          category: services.category,
-          displayOrder: services.displayOrder,
         })
         .from(services)
         .where(eq(services.isActive, true))
@@ -205,49 +191,40 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Price list — three columns (Kids / Adults / Seniors) like the original site */}
+      {/* Price list — matches in-shop flyer: title, description under service, price in red */}
       <section id="prices" className="py-20 bg-white border-t border-black/10 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-2">Price list</h2>
-          <p className="text-headz-gray text-center text-sm mb-10 max-w-xl mx-auto">
-            Clear pricing. No surprises when you book.
+        <div className="max-w-2xl mx-auto">
+          <h2 className="font-serif text-3xl sm:text-4xl text-headz-black text-left mb-2 tracking-tight">
+            Headz Ain&apos;t Ready Pricelist
+          </h2>
+          <p className="text-headz-gray text-sm mb-10">
+            Clear pricing — same list you&apos;ll see in the chair. Edited from admin when rates change.
           </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {PRICE_CATEGORIES.map(({ key, label }) => {
-              const items = priceRows
-                .filter((r) => normalizePriceCategory(r.category) === key)
-                .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
-              return (
+          <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
+            {priceRows.length > 0 ? (
+              priceRows.map((row) => (
                 <div
-                  key={key}
-                  className="rounded-xl border border-black/10 bg-white p-8 shadow-sm text-center flex flex-col"
+                  key={row.id}
+                  className="flex gap-4 justify-between items-start px-5 sm:px-6 py-4 border-b border-black/5 last:border-b-0"
                 >
-                  <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">{label}</p>
-                  {items.length > 0 ? (
-                    <div className="mt-6 space-y-6 flex-1">
-                      {items.map((row) => (
-                        <div key={row.id}>
-                          <p className="text-4xl font-bold text-headz-black tabular-nums">{formatPriceLabel(row.price)}</p>
-                          <p className="text-sm text-headz-gray mt-2">
-                            {row.durationMinutes} min · {row.name}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-headz-gray text-sm mt-6 flex-1">Rates on request — call or book online.</p>
-                  )}
-                  <Link
-                    href={`/book?category=${key}`}
-                    className="mt-8 inline-flex items-center justify-center text-headz-red font-medium hover:underline text-sm"
-                  >
-                    Book {label.toLowerCase()} →
-                  </Link>
+                  <div className="min-w-0 pr-2">
+                    <p className="text-headz-black font-semibold leading-snug">{row.name}</p>
+                    {row.description?.trim() ? (
+                      <p className="text-headz-black/80 text-sm mt-1 leading-snug">{row.description}</p>
+                    ) : null}
+                  </div>
+                  <p className="text-headz-red font-semibold tabular-nums shrink-0 text-right pt-0.5">
+                    {formatServicePriceDisplay(row)}
+                  </p>
                 </div>
-              )
-            })}
+              ))
+            ) : (
+              <div className="px-5 py-8 text-center text-headz-gray text-sm">
+                Pricing is loading — call the shop or book online for current rates.
+              </div>
+            )}
           </div>
-          <div className="mt-10 text-center text-sm text-headz-gray space-y-1">
+          <div className="mt-6 text-center text-sm text-headz-gray space-y-1">
             <p>{SITE.hoursShort}</p>
             <p>
               <a href={`tel:${SITE.phoneTel}`} className="text-headz-red hover:underline">{SITE.phone}</a>

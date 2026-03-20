@@ -66,18 +66,25 @@ async function main() {
     }
     console.log('Upserted barbers:', BARBERS.map((x) => x.name).join(', '))
 
-    const [{ count: servicesCount }] = await sql`SELECT COUNT(*)::int FROM services`
-    if (servicesCount === 0) {
+    for (const r of [
+      { name: 'Kids cut', slug: 'kids-cut', duration: 30, price: '20.00', category: 'kids', order: 0 },
+      { name: 'Adult cut', slug: 'adult-cut', duration: 30, price: '30.00', category: 'adults', order: 1 },
+      { name: 'Senior cut', slug: 'senior-cut', duration: 30, price: '25.00', category: 'seniors', order: 2 },
+    ]) {
       await sql`
-        INSERT INTO services (name, slug, duration_minutes, price, category, display_order) VALUES
-          ('Kids cut', 'kids-cut', 30, 20.00, 'kids', 0),
-          ('Adult cut', 'adult-cut', 30, 30.00, 'adults', 1),
-          ('Senior cut', 'senior-cut', 30, 25.00, 'seniors', 2)
+        INSERT INTO services (name, slug, duration_minutes, price, category, display_order, is_active)
+        VALUES (${r.name}, ${r.slug}, ${r.duration}, ${r.price}, ${r.category}, ${r.order}, true)
+        ON CONFLICT (slug) DO UPDATE SET
+          name = EXCLUDED.name,
+          duration_minutes = EXCLUDED.duration_minutes,
+          price = EXCLUDED.price,
+          category = EXCLUDED.category,
+          display_order = EXCLUDED.display_order,
+          is_active = true,
+          updated_at = now()
       `
-      console.log('Inserted 3 services: Kids cut, Adult cut, Senior cut')
-    } else {
-      console.log('Services already exist, skipping.')
     }
+    console.log('Upserted services: Kids cut ($20), Adult cut ($30), Senior cut ($25)')
   } catch (e) {
     console.error('Error:', e.message)
     process.exit(1)

@@ -8,6 +8,7 @@ import { z } from 'zod'
 const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional().nullable(),
+  priceDisplayOverride: z.string().max(80).optional().nullable(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
   durationMinutes: z.coerce.number().int().min(5).max(480).optional(),
   category: z.enum(['kids', 'adults', 'seniors']).optional(),
@@ -54,6 +55,9 @@ export async function PATCH(
     .set({
       ...(d.name != null ? { name: d.name.trim() } : {}),
       ...(d.description !== undefined ? { description: d.description?.trim() || null } : {}),
+      ...(d.priceDisplayOverride !== undefined
+        ? { priceDisplayOverride: d.priceDisplayOverride?.trim() || null }
+        : {}),
       ...(price != null ? { price } : {}),
       ...(d.durationMinutes != null ? { durationMinutes: d.durationMinutes } : {}),
       ...(d.category != null ? { category: d.category } : {}),

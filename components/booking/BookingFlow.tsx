@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import Image from 'next/image'
 import type { Barber, Service } from '@/lib/db/schema'
 import { computeNoShowFeeFromServicePrice } from '@/lib/appointments/no-show-fee'
+import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
 type Step = 'service' | 'barber' | 'date' | 'time' | 'details' | 'done'
 
@@ -195,13 +196,17 @@ export function BookingFlow({
         </div>
         <div className="min-w-0 text-center md:text-left">
           <p className="font-medium truncate">{service?.name}</p>
-          <p className="text-headz-gray text-sm">{formatPrice(service?.price ?? 0)} · {service?.durationMinutes} min</p>
+          <p className="text-headz-gray text-sm">
+            {service ? formatServicePriceDisplay(service) : ''} · {service?.durationMinutes} min
+          </p>
         </div>
       </div>
       <p className="text-sm text-headz-gray border-t border-black/10 pt-3 text-center md:text-left">
         {service?.name} with {barber?.name}
       </p>
-      <p className="font-medium mt-1 text-center md:text-left">{formatPrice(service?.price ?? 0)}</p>
+      <p className="font-medium mt-1 text-center md:text-left">
+        {service ? formatServicePriceDisplay(service) : ''}
+      </p>
     </div>
   )
 
@@ -239,10 +244,17 @@ export function BookingFlow({
                   key={s.id}
                   type="button"
                   onClick={() => { setService(s); setStep('barber') }}
-                  className="w-full flex justify-between items-center p-3 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left gap-3"
+                  className="w-full flex justify-between items-start p-3 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left gap-3"
                 >
-                  <span className="text-left">{s.name}</span>
-                  <span className="text-headz-gray text-sm shrink-0">{formatPrice(s.price)} · {s.durationMinutes} min</span>
+                  <span className="text-left min-w-0">
+                    <span className="font-medium block">{s.name}</span>
+                    {s.description?.trim() ? (
+                      <span className="text-headz-gray text-xs font-normal block mt-0.5">{s.description}</span>
+                    ) : null}
+                  </span>
+                  <span className="text-headz-gray text-sm shrink-0 text-right">
+                    {formatServicePriceDisplay(s)} · {s.durationMinutes} min
+                  </span>
                 </button>
               ))}
             </div>

@@ -22,6 +22,7 @@ function CloseIcon({ className }: { className?: string }) {
 
 const nav = [
   { href: '/dashboard/barber', label: 'Schedule' },
+  { href: '/dashboard/barber/pos', label: 'POS' },
   { href: '/dashboard/barber/availability', label: 'Availability' },
   { href: '/dashboard/barber/time-off', label: 'Time off' },
   { href: '/dashboard/barber/profile', label: 'Profile' },

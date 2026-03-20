@@ -1,4 +1,15 @@
-import { pgTable, text, timestamp, uuid, boolean, integer, date, time, numeric } from 'drizzle-orm/pg-core'
+import {
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  boolean,
+  integer,
+  date,
+  time,
+  numeric,
+  jsonb,
+} from 'drizzle-orm/pg-core'
 
 /**
  * Database Schema – Headz Ain't Ready
@@ -75,6 +86,8 @@ export const services = pgTable('services', {
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   description: text('description'),
+  /** When set (e.g. "$45.00 & Up"), shown on site/POS instead of formatting `price`. Numeric `price` is still used for booking/POS math. */
+  priceDisplayOverride: text('price_display_override'),
   durationMinutes: integer('duration_minutes').notNull(),
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   category: text('category'),
@@ -108,8 +121,34 @@ export const appointments = pgTable('appointments', {
   noShowFee: numeric('no_show_fee', { precision: 10, scale: 2 }).default('0').notNull(),
   waivedAt: timestamp('waived_at'),
   notes: text('notes'),
+  tipAmount: numeric('tip_amount', { precision: 10, scale: 2 }),
+  paymentMethod: text('payment_method'),
+  paymentStatus: text('payment_status'),
+  receiptSentAt: timestamp('receipt_sent_at'),
+  stripeChargeId: text('stripe_charge_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export type PosLineItem = { serviceId: string; name: string; price: string }
+
+/** Walk-in / POS sales not tied to a prior appointment */
+export const posTransactions = pgTable('pos_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  customerName: text('customer_name').notNull(),
+  barberId: uuid('barber_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  serviceId: uuid('service_id').references(() => services.id, { onDelete: 'set null' }),
+  items: jsonb('items').$type<PosLineItem[] | null>(),
+  subtotal: numeric('subtotal', { precision: 10, scale: 2 }).notNull(),
+  tipAmount: numeric('tip_amount', { precision: 10, scale: 2 }).default('0').notNull(),
+  total: numeric('total', { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text('payment_method').notNull(),
+  paymentStatus: text('payment_status').notNull().default('paid'),
+  stripeChargeId: text('stripe_charge_id'),
+  receiptSentAt: timestamp('receipt_sent_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
 export const timeOffRequestStatuses = ['pending', 'approved', 'denied'] as const
@@ -148,6 +187,8 @@ export type Service = typeof services.$inferSelect
 export type NewService = typeof services.$inferInsert
 export type Appointment = typeof appointments.$inferSelect
 export type NewAppointment = typeof appointments.$inferInsert
+export type PosTransaction = typeof posTransactions.$inferSelect
+export type NewPosTransaction = typeof posTransactions.$inferInsert
 export type TimeOffRequest = typeof timeOffRequests.$inferSelect
 export type NewTimeOffRequest = typeof timeOffRequests.$inferInsert
 export type StoreHourRow = typeof storeHours.$inferSelect

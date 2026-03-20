@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
 const CATEGORIES = [
   { value: 'kids', label: 'Kids' },
@@ -13,6 +14,7 @@ type ServiceRow = {
   id: string
   name: string
   description: string | null
+  priceDisplayOverride?: string | null
   price: string
   durationMinutes: number
   category: string | null
@@ -25,6 +27,7 @@ type FormState = {
   description: string
   category: (typeof CATEGORIES)[number]['value']
   price: string
+  priceDisplayOverride: string
   durationMinutes: number
   isActive: boolean
   displayOrder: number
@@ -47,6 +50,7 @@ function emptyForm(): FormState {
     description: '',
     category: 'adults',
     price: '0.00',
+    priceDisplayOverride: '',
     durationMinutes: 30,
     isActive: true,
     displayOrder: 0,
@@ -96,6 +100,7 @@ export function ServicesSettingsClient() {
       description: svc.description ?? '',
       category,
       price: formatMoney(svc.price),
+      priceDisplayOverride: svc.priceDisplayOverride ?? '',
       durationMinutes: svc.durationMinutes,
       isActive: svc.isActive,
       displayOrder: svc.displayOrder,
@@ -125,6 +130,7 @@ export function ServicesSettingsClient() {
                 ...x,
                 name,
                 description: form.description || null,
+                priceDisplayOverride: form.priceDisplayOverride.trim() || null,
                 category: form.category,
                 price: priceStr,
                 durationMinutes: form.durationMinutes,
@@ -143,6 +149,7 @@ export function ServicesSettingsClient() {
           body: JSON.stringify({
             name,
             description: form.description || null,
+            priceDisplayOverride: form.priceDisplayOverride.trim() || null,
             category: form.category,
             price: priceStr,
             durationMinutes: form.durationMinutes,
@@ -173,6 +180,7 @@ export function ServicesSettingsClient() {
         body: JSON.stringify({
           name,
           description: form.description || null,
+          priceDisplayOverride: form.priceDisplayOverride.trim() || null,
           category: form.category,
           price: priceStr,
           durationMinutes: form.durationMinutes,
@@ -264,7 +272,7 @@ export function ServicesSettingsClient() {
               <tr className="border-b border-black/10 bg-headz-black/[0.03] text-left text-xs font-semibold uppercase tracking-wider text-headz-gray">
                 <th className="py-3 px-3">Name</th>
                 <th className="py-3 px-3">Category</th>
-                <th className="py-3 px-3 text-right">Price</th>
+                <th className="py-3 px-3 text-right">Shown price</th>
                 <th className="py-3 px-3 text-right">Duration</th>
                 <th className="py-3 px-3">Order</th>
                 <th className="py-3 px-3">Status</th>
@@ -276,7 +284,9 @@ export function ServicesSettingsClient() {
                 <tr key={svc.id} className="border-b border-black/5 hover:bg-headz-cream/40">
                   <td className="py-3 px-3 font-medium text-headz-black">{svc.name}</td>
                   <td className="py-3 px-3 text-headz-gray">{categoryLabel(svc.category)}</td>
-                  <td className="py-3 px-3 text-right tabular-nums">${formatMoney(svc.price)}</td>
+                  <td className="py-3 px-3 text-right tabular-nums text-headz-black">
+                    {formatServicePriceDisplay(svc)}
+                  </td>
                   <td className="py-3 px-3 text-right">{svc.durationMinutes} min</td>
                   <td className="py-3 px-3 tabular-nums text-headz-gray">{svc.displayOrder}</td>
                   <td className="py-3 px-3">
@@ -362,9 +372,23 @@ export function ServicesSettingsClient() {
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-headz-black mb-1">
+                  Price label override (optional)
+                </label>
+                <input
+                  className="w-full px-3 py-2 border border-black/15 rounded-lg"
+                  placeholder='e.g. $45.00 & Up — leave empty to use numeric price'
+                  value={form.priceDisplayOverride}
+                  onChange={(e) => setForm((f) => ({ ...f, priceDisplayOverride: e.target.value }))}
+                />
+                <p className="text-xs text-headz-gray mt-1">
+                  Numeric price below is still used for booking fees and card charges.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-headz-black mb-1">Price (USD)</label>
+                  <label className="block text-sm font-medium text-headz-black mb-1">Price (USD, base)</label>
                   <input
                     type="number"
                     step="0.01"
