@@ -11,7 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed:barbers": "node scripts/seed-headz-barbers.mjs"
+    "seed:barbers": "node scripts/seed-headz-barbers.mjs",
+    "seed:dev-users": "node --env-file=.env.local scripts/seed-dev-users.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
