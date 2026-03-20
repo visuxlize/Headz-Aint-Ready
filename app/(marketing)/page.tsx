@@ -6,9 +6,31 @@ import { barbers, services, users, type Barber } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { SITE } from '@/lib/site-config'
 
+const PRICE_CATEGORIES = [
+  { key: 'kids', label: 'Kids' },
+  { key: 'adults', label: 'Adults' },
+  { key: 'seniors', label: 'Seniors' },
+] as const
+
+function normalizePriceCategory(c: string | null) {
+  return (c || 'adults').toLowerCase()
+}
+
+function formatPriceLabel(price: string) {
+  const n = Number.parseFloat(String(price))
+  return Number.isFinite(n) ? `$${n.toFixed(2)}` : String(price)
+}
+
 export default async function HomePage() {
   let barbersList: Barber[] = []
-  let priceRows: { id: string; name: string; price: string; durationMinutes: number }[] = []
+  let priceRows: {
+    id: string
+    name: string
+    price: string
+    durationMinutes: number
+    category: string | null
+    displayOrder: number
+  }[] = []
   try {
     const [bRows, pRows] = await Promise.all([
       db
@@ -24,6 +46,8 @@ export default async function HomePage() {
           name: services.name,
           price: services.price,
           durationMinutes: services.durationMinutes,
+          category: services.category,
+          displayOrder: services.displayOrder,
         })
         .from(services)
         .where(eq(services.isActive, true))
@@ -181,44 +205,49 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Price list */}
+      {/* Price list — three columns (Kids / Adults / Seniors) like the original site */}
       <section id="prices" className="py-20 bg-white border-t border-black/10 px-4 sm:px-6">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-2">Price list</h2>
-          <p className="text-headz-gray text-center text-sm mb-10">
+          <p className="text-headz-gray text-center text-sm mb-10 max-w-xl mx-auto">
             Clear pricing. No surprises when you book.
           </p>
-          <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-3 bg-headz-black/5 border-b border-black/10 text-xs font-semibold uppercase tracking-wider text-headz-gray">
-              <div>Service</div>
-              <div className="text-right">Time</div>
-              <div className="text-right">Price</div>
-            </div>
-            {/* Rows */}
-            {priceRows.length > 0 ? (
-              priceRows.map((row) => {
-                const priceNum = Number.parseFloat(String(row.price))
-                const priceLabel = Number.isFinite(priceNum) ? `$${priceNum.toFixed(2)}` : String(row.price)
-                const durLabel = `${row.durationMinutes} min`
-                return (
-                  <div
-                    key={row.id}
-                    className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-4 border-b border-black/5 last:border-b-0 items-center"
+          <div className="grid md:grid-cols-3 gap-8">
+            {PRICE_CATEGORIES.map(({ key, label }) => {
+              const items = priceRows
+                .filter((r) => normalizePriceCategory(r.category) === key)
+                .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
+              return (
+                <div
+                  key={key}
+                  className="rounded-xl border border-black/10 bg-white p-8 shadow-sm text-center flex flex-col"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">{label}</p>
+                  {items.length > 0 ? (
+                    <div className="mt-6 space-y-6 flex-1">
+                      {items.map((row) => (
+                        <div key={row.id}>
+                          <p className="text-4xl font-bold text-headz-black tabular-nums">{formatPriceLabel(row.price)}</p>
+                          <p className="text-sm text-headz-gray mt-2">
+                            {row.durationMinutes} min · {row.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-headz-gray text-sm mt-6 flex-1">Rates on request — call or book online.</p>
+                  )}
+                  <Link
+                    href={`/book?category=${key}`}
+                    className="mt-8 inline-flex items-center justify-center text-headz-red font-medium hover:underline text-sm"
                   >
-                    <span className="text-headz-black font-medium">{row.name}</span>
-                    <span className="text-headz-gray text-sm text-right">{durLabel}</span>
-                    <span className="text-right font-semibold tabular-nums">{priceLabel}</span>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="px-5 py-8 text-center text-headz-gray text-sm">
-                Pricing is loading — call the shop or book online for current rates.
-              </div>
-            )}
+                    Book {label.toLowerCase()} →
+                  </Link>
+                </div>
+              )
+            })}
           </div>
-          <div className="mt-6 text-center text-sm text-headz-gray space-y-1">
+          <div className="mt-10 text-center text-sm text-headz-gray space-y-1">
             <p>{SITE.hoursShort}</p>
             <p>
               <a href={`tel:${SITE.phoneTel}`} className="text-headz-red hover:underline">{SITE.phone}</a>

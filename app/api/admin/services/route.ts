@@ -6,11 +6,14 @@ import { requireAdminApi } from '@/lib/admin/require-admin'
 import { z } from 'zod'
 import { slugifyName } from '@/lib/utils/slug'
 
+const serviceCategories = ['kids', 'adults', 'seniors'] as const
+
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional().nullable(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/),
   durationMinutes: z.coerce.number().int().min(5).max(480),
+  category: z.enum(serviceCategories).optional().default('adults'),
   isActive: z.boolean().optional().default(true),
   displayOrder: z.coerce.number().int().optional().default(0),
 })
@@ -62,6 +65,7 @@ export async function POST(request: Request) {
       description: d.description?.trim() || null,
       durationMinutes: d.durationMinutes,
       price,
+      category: d.category ?? 'adults',
       displayOrder: d.displayOrder ?? 0,
       isActive: d.isActive ?? true,
     })

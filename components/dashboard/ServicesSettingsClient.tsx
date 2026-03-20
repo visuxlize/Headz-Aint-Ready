@@ -1,24 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+
+const CATEGORIES = [
+  { value: 'kids', label: 'Kids' },
+  { value: 'adults', label: 'Adults' },
+  { value: 'seniors', label: 'Seniors' },
+] as const
 
 type ServiceRow = {
   id: string
@@ -26,6 +15,7 @@ type ServiceRow = {
   description: string | null
   price: string
   durationMinutes: number
+  category: string | null
   isActive: boolean
   displayOrder: number
 }
@@ -33,6 +23,7 @@ type ServiceRow = {
 type FormState = {
   name: string
   description: string
+  category: (typeof CATEGORIES)[number]['value']
   price: string
   durationMinutes: number
   isActive: boolean
@@ -45,79 +36,16 @@ function formatMoney(p: string) {
   return n.toFixed(2)
 }
 
-function SortableRow({
-  svc,
-  onEdit,
-  onToggleActive,
-}: {
-  svc: ServiceRow
-  onEdit: () => void
-  onToggleActive: () => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: svc.id,
-  })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.7 : 1,
-  }
-
-  return (
-    <tr ref={setNodeRef} style={style} className="border-b border-black/5 hover:bg-headz-cream/40">
-      <td className="py-3 px-2 w-10">
-        <button
-          type="button"
-          className="cursor-grab active:cursor-grabbing p-1 text-headz-gray hover:text-headz-black touch-none"
-          aria-label="Drag to reorder"
-          {...attributes}
-          {...listeners}
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path d="M8 6h2v2H8V6zm0 5h2v2H8v-2zm0 5h2v2H8v-2zm5-10h2v2h-2V6zm0 5h2v2h-2v-2zm0 5h2v2h-2v-2z" />
-          </svg>
-        </button>
-      </td>
-      <td className="py-3 px-2 font-medium text-headz-black">{svc.name}</td>
-      <td className="py-3 px-2 text-sm text-headz-gray max-w-[200px] truncate" title={svc.description ?? ''}>
-        {svc.description || '—'}
-      </td>
-      <td className="py-3 px-2 text-right tabular-nums">${formatMoney(svc.price)}</td>
-      <td className="py-3 px-2 text-right">{svc.durationMinutes} min</td>
-      <td className="py-3 px-2">
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-            svc.isActive ? 'bg-emerald-100 text-emerald-900' : 'bg-black/10 text-headz-gray'
-          }`}
-        >
-          {svc.isActive ? 'Active' : 'Inactive'}
-        </span>
-      </td>
-      <td className="py-3 px-2 text-right tabular-nums">{svc.displayOrder}</td>
-      <td className="py-3 px-2 text-right space-x-2 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="text-sm font-medium text-headz-red hover:underline"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={onToggleActive}
-          className="text-sm font-medium text-headz-gray hover:text-headz-black"
-        >
-          {svc.isActive ? 'Deactivate' : 'Activate'}
-        </button>
-      </td>
-    </tr>
-  )
+function categoryLabel(c: string | null) {
+  const v = (c || 'adults').toLowerCase()
+  return CATEGORIES.find((x) => x.value === v)?.label ?? 'Adults'
 }
 
 function emptyForm(): FormState {
   return {
     name: '',
     description: '',
+    category: 'adults',
     price: '0.00',
     durationMinutes: 30,
     isActive: true,
@@ -131,11 +59,6 @@ export function ServicesSettingsClient() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -156,37 +79,6 @@ export function ServicesSettingsClient() {
     void load()
   }, [load])
 
-  const orderedIds = useMemo(() => rows.map((r) => r.id), [rows])
-
-  const onDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIndex = rows.findIndex((r) => r.id === active.id)
-    const newIndex = rows.findIndex((r) => r.id === over.id)
-    if (oldIndex < 0 || newIndex < 0) return
-
-    const previous = rows
-    const next = arrayMove(rows, oldIndex, newIndex)
-    setRows(next)
-
-    const orderedIds = next.map((r) => r.id)
-    try {
-      const res = await fetch('/api/admin/services/reorder', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderedIds }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Reorder failed')
-      toast.success('Order saved')
-      setRows(next.map((r, i) => ({ ...r, displayOrder: i })))
-    } catch (e) {
-      setRows(previous)
-      toast.error(e instanceof Error ? e.message : 'Could not save order')
-    }
-  }
-
   const openCreate = () => {
     setEditingId(null)
     setForm(emptyForm())
@@ -195,9 +87,14 @@ export function ServicesSettingsClient() {
 
   const openEdit = (svc: ServiceRow) => {
     setEditingId(svc.id)
+    const cat = (svc.category || 'adults').toLowerCase()
+    const category = CATEGORIES.some((c) => c.value === cat)
+      ? (cat as FormState['category'])
+      : 'adults'
     setForm({
       name: svc.name,
       description: svc.description ?? '',
+      category,
       price: formatMoney(svc.price),
       durationMinutes: svc.durationMinutes,
       isActive: svc.isActive,
@@ -228,6 +125,7 @@ export function ServicesSettingsClient() {
                 ...x,
                 name,
                 description: form.description || null,
+                category: form.category,
                 price: priceStr,
                 durationMinutes: form.durationMinutes,
                 isActive: form.isActive,
@@ -245,6 +143,7 @@ export function ServicesSettingsClient() {
           body: JSON.stringify({
             name,
             description: form.description || null,
+            category: form.category,
             price: priceStr,
             durationMinutes: form.durationMinutes,
             isActive: form.isActive,
@@ -274,6 +173,7 @@ export function ServicesSettingsClient() {
         body: JSON.stringify({
           name,
           description: form.description || null,
+          category: form.category,
           price: priceStr,
           durationMinutes: form.durationMinutes,
           isActive: form.isActive,
@@ -312,13 +212,36 @@ export function ServicesSettingsClient() {
     }
   }
 
+  const deleteService = async (svc: ServiceRow) => {
+    if (
+      !window.confirm(
+        `Delete “${svc.name}”? Only allowed if no appointments use this service. Otherwise deactivate it instead.`
+      )
+    ) {
+      return
+    }
+    try {
+      const res = await fetch(`/api/admin/services/${svc.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Delete failed')
+      toast.success('Service removed')
+      setRows((r) => r.filter((x) => x.id !== svc.id))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Delete failed')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-headz-black">Services &amp; pricing</h1>
           <p className="text-sm text-headz-gray mt-1">
-            Changes apply immediately to booking, no-show fees (20% of price), and the public price list.
+            Set category (Kids / Adults / Seniors) for the homepage price list. Order controls listing within each
+            column.
           </p>
         </div>
         <button
@@ -336,34 +259,62 @@ export function ServicesSettingsClient() {
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-headz-gray text-sm">No services yet.</div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="border-b border-black/10 bg-headz-black/[0.03] text-left text-xs font-semibold uppercase tracking-wider text-headz-gray">
-                  <th className="py-3 px-2 w-10" aria-hidden />
-                  <th className="py-3 px-2">Name</th>
-                  <th className="py-3 px-2">Description</th>
-                  <th className="py-3 px-2 text-right">Price</th>
-                  <th className="py-3 px-2 text-right">Duration</th>
-                  <th className="py-3 px-2">Status</th>
-                  <th className="py-3 px-2 text-right">Sort</th>
-                  <th className="py-3 px-2 text-right">Actions</th>
+          <table className="w-full text-sm min-w-[640px]">
+            <thead>
+              <tr className="border-b border-black/10 bg-headz-black/[0.03] text-left text-xs font-semibold uppercase tracking-wider text-headz-gray">
+                <th className="py-3 px-3">Name</th>
+                <th className="py-3 px-3">Category</th>
+                <th className="py-3 px-3 text-right">Price</th>
+                <th className="py-3 px-3 text-right">Duration</th>
+                <th className="py-3 px-3">Order</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((svc) => (
+                <tr key={svc.id} className="border-b border-black/5 hover:bg-headz-cream/40">
+                  <td className="py-3 px-3 font-medium text-headz-black">{svc.name}</td>
+                  <td className="py-3 px-3 text-headz-gray">{categoryLabel(svc.category)}</td>
+                  <td className="py-3 px-3 text-right tabular-nums">${formatMoney(svc.price)}</td>
+                  <td className="py-3 px-3 text-right">{svc.durationMinutes} min</td>
+                  <td className="py-3 px-3 tabular-nums text-headz-gray">{svc.displayOrder}</td>
+                  <td className="py-3 px-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        svc.isActive ? 'bg-emerald-100 text-emerald-900' : 'bg-black/10 text-headz-gray'
+                      }`}
+                    >
+                      {svc.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right space-x-2 whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(svc)}
+                      className="text-sm font-medium text-headz-red hover:underline"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void toggleActive(svc)}
+                      className="text-sm font-medium text-headz-gray hover:text-headz-black"
+                    >
+                      {svc.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteService(svc)}
+                      className="text-sm font-medium text-red-700 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                  {rows.map((svc) => (
-                    <SortableRow
-                      key={svc.id}
-                      svc={svc}
-                      onEdit={() => openEdit(svc)}
-                      onToggleActive={() => void toggleActive(svc)}
-                    />
-                  ))}
-                </SortableContext>
-              </tbody>
-            </table>
-          </DndContext>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -388,7 +339,23 @@ export function ServicesSettingsClient() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-headz-black mb-1">Description</label>
+                <label className="block text-sm font-medium text-headz-black mb-1">Category (homepage column)</label>
+                <select
+                  className="w-full px-3 py-2 border border-black/15 rounded-lg bg-white"
+                  value={form.category}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, category: e.target.value as FormState['category'] }))
+                  }
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-headz-black mb-1">Description (optional)</label>
                 <textarea
                   className="w-full px-3 py-2 border border-black/15 rounded-lg min-h-[80px]"
                   value={form.description ?? ''}
