@@ -9,6 +9,11 @@ import type { Handler } from '@netlify/functions'
 import { isAmericaNewYork2359 } from '../../lib/no-show/is-america-new-york-2359'
 import { processNoShows } from '../../lib/no-show/process-no-shows'
 
+/** Netlify scheduled function — cannot use [[functions]] in netlify.toml alongside [functions] (TOML conflict). */
+export const config = {
+  schedule: '59 * * * *',
+}
+
 export const handler: Handler = async () => {
   try {
     if (!isAmericaNewYork2359()) {

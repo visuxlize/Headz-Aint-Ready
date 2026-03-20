@@ -12,11 +12,7 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# No-show job: cron is UTC-only; we use hourly "59 * * * *" and gate on America/New_York 23:59
-# in no-show-checker.ts so it runs exactly 11:59 PM Eastern every calendar night (DST-safe).
+# Scheduled no-show job: schedule is set in netlify/functions/no-show-checker.ts (export const config).
+# Cron is hourly UTC; the function exits unless America/New_York is 23:59 (11:59 PM Eastern, DST-safe).
 [functions]
   directory = "netlify/functions"
-
-[[functions]]
-  name = "no-show-checker"
-  schedule = "59 * * * *"
