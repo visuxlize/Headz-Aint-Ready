@@ -1,16 +1,18 @@
 # Next.js on Netlify – API routes and SSR require the Next.js plugin
-# https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/
+# https://docs.netlify.com/frameworks/next-js/overview/
 #
-# Do NOT set "Publish directory" to `.next` in the Netlify UI (Site settings → Build & deploy).
-# Leave the publish directory blank / default so @netlify/plugin-nextjs can deploy correctly.
-# Setting publish to `.next` manually often breaks the build.
+# Publish directory `.next` matches Netlify’s Next starter and overrides stray UI values.
+# See: https://github.com/netlify-templates/next-platform-starter/blob/main/netlify.toml
 
 [build]
   command = "npm run build"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--include=dev"
+  # Avoid OOM during `next build` on smaller Netlify build runners
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
 # Required so API routes, SSR, and serverless functions run (booking, auth, DB)
 [[plugins]]
