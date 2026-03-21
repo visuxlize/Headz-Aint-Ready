@@ -3,6 +3,22 @@ import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { staffAllowlist, users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { linkPlaceholderBarberIfNeeded } from '@/lib/staff/link-placeholder-barber'
+
+async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      last = e
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 200 * (i + 1)))
+      }
+    }
+  }
+  throw last
+}
 
 /** Auth + staff allowlist + active account for all /dashboard routes. Shell is provided by nested layouts: (admin) or barber. */
 export default async function DashboardRootLayout({
@@ -27,25 +43,35 @@ export default async function DashboardRootLayout({
   }
 
   try {
-    const [allowed] = await db
-      .select()
-      .from(staffAllowlist)
-      .where(eq(staffAllowlist.email, email))
-      .limit(1)
+    // Only select `email` — some DBs have an older `staff_allowlist` without `created_at`; full select() fails there.
+    const [allowed] = await withDbRetry(() =>
+      db.select({ email: staffAllowlist.email }).from(staffAllowlist).where(eq(staffAllowlist.email, email)).limit(1)
+    )
     if (!allowed) {
       await supabase.auth.signOut()
       redirect('/auth/login?error=unauthorized')
     }
 
-    const [dbUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1)
-    if (dbUser && !dbUser.isActive) {
+    let [dbUser] = await withDbRetry(() => db.select().from(users).where(eq(users.id, user.id)).limit(1))
+    if (!dbUser) {
+      const linked = await withDbRetry(() => linkPlaceholderBarberIfNeeded(user.id, email))
+      if (linked) {
+        ;[dbUser] = await withDbRetry(() => db.select().from(users).where(eq(users.id, user.id)).limit(1))
+      }
+    }
+    if (!dbUser) {
+      await supabase.auth.signOut()
+      redirect('/auth/login?error=no_profile')
+    }
+    if (!dbUser.isActive) {
       await supabase.auth.signOut()
       redirect('/auth/login?error=inactive')
     }
   } catch (e) {
-    console.error('Dashboard allowlist check failed:', e)
-    await supabase.auth.signOut()
-    redirect('/auth/login?error=unauthorized')
+    const cause = e instanceof Error ? e.cause : undefined
+    console.error('Dashboard allowlist check failed:', e, cause != null ? { cause } : '')
+    // Keep Supabase session — transient DB issues were signing users out and looking like "login failed".
+    redirect('/auth/service-unavailable')
   }
 
   return <>{children}</>

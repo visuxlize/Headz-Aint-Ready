@@ -144,6 +144,7 @@ Full walkthrough: **`DEPLOY_NETLIFY.md`**.
 - **Env vars** set in Netlify: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`.  
 - **Database**: Run the schema (and allowlist) in that Supabase project so production uses the same DB, or a separate one with the same schema.  
 - **Staff allowlist**: Ensure production staff emails are in `staff_allowlist` in the DB you use in production.
+- **“Not on the staff allow list”** after signing in: your email must exist in `staff_allowlist`. For dev (`test@test.com`), run `scripts/ensure-staff-allowlist.sql` in the Supabase SQL Editor, or `npm run seed:dev-users` (creates auth user + allowlist + `users` row).
 
 ---
 

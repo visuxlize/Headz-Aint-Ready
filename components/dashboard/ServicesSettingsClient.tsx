@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
 const CATEGORIES = [
   { value: 'kids', label: 'Kids' },
   { value: 'adults', label: 'Adults' },
   { value: 'seniors', label: 'Seniors' },
+  { value: 'add-ons', label: 'Add-ons' },
 ] as const
 
 type ServiceRow = {
@@ -60,6 +61,9 @@ function emptyForm(): FormState {
 export function ServicesSettingsClient() {
   const [rows, setRows] = useState<ServiceRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [categoryFilter, setCategoryFilter] = useState<
+    'all' | 'kids' | 'adults' | 'seniors' | 'add-ons'
+  >('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
@@ -242,89 +246,125 @@ export function ServicesSettingsClient() {
     }
   }
 
+  const filteredRows =
+    categoryFilter === 'all'
+      ? rows
+      : rows.filter((r) => (r.category || 'adults').toLowerCase() === categoryFilter)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pt-2 sm:pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-headz-black">Services &amp; pricing</h1>
-          <p className="text-sm text-headz-gray mt-1">
-            Set category (Kids / Adults / Seniors) for the homepage price list. Order controls listing within each
-            column.
+          <h1 className="font-serif text-2xl font-bold text-headz-black md:text-3xl">Services &amp; pricing</h1>
+          <p className="text-sm text-headz-gray mt-1 max-w-xl">
+            Categories drive the homepage and booking filters. Order sets sort order; inactive services stay hidden
+            from guests.
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center rounded-lg bg-headz-red px-4 py-2.5 text-sm font-medium text-white hover:bg-headz-redDark shadow-sm"
+          className="inline-flex items-center rounded-xl bg-headz-red px-4 py-2.5 text-sm font-medium text-white hover:bg-headz-redDark shadow-sm"
         >
           Add service
         </button>
       </div>
 
-      <div className="rounded-xl border border-black/10 bg-white shadow-sm overflow-x-auto">
+      <div className="flex flex-wrap gap-2">
+        {(['all', 'kids', 'adults', 'seniors', 'add-ons'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setCategoryFilter(key)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+              categoryFilter === key
+                ? 'bg-headz-black text-white'
+                : 'bg-white border border-black/10 text-headz-gray hover:border-headz-red/40'
+            }`}
+          >
+            {key === 'all'
+              ? 'All'
+              : key === 'add-ons'
+                ? 'Add-ons'
+                : CATEGORIES.find((c) => c.value === key)?.label ?? key}
+          </button>
+        ))}
+      </div>
+
+      <div>
         {loading ? (
-          <div className="p-10 text-center text-headz-gray text-sm">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-headz-gray text-sm">No services yet.</div>
+          <div className="rounded-2xl border border-black/10 bg-white p-12 text-center text-headz-gray text-sm">
+            Loading…
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-black/15 bg-white p-12 text-center text-headz-gray text-sm">
+            {rows.length === 0 ? 'No services yet.' : 'No services in this category.'}
+          </div>
         ) : (
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="border-b border-black/10 bg-headz-black/[0.03] text-left text-xs font-semibold uppercase tracking-wider text-headz-gray">
-                <th className="py-3 px-3">Name</th>
-                <th className="py-3 px-3">Category</th>
-                <th className="py-3 px-3 text-right">Shown price</th>
-                <th className="py-3 px-3 text-right">Duration</th>
-                <th className="py-3 px-3">Order</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((svc) => (
-                <tr key={svc.id} className="border-b border-black/5 hover:bg-headz-cream/40">
-                  <td className="py-3 px-3 font-medium text-headz-black">{svc.name}</td>
-                  <td className="py-3 px-3 text-headz-gray">{categoryLabel(svc.category)}</td>
-                  <td className="py-3 px-3 text-right tabular-nums text-headz-black">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredRows.map((svc) => (
+              <div
+                key={svc.id}
+                className="group flex flex-col rounded-2xl border border-black/[0.08] bg-white p-6 shadow-sm transition-all hover:border-headz-red/20 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold leading-snug text-headz-black">{svc.name}</p>
+                    {svc.description?.trim() ? (
+                      <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-headz-gray">{svc.description}</p>
+                    ) : null}
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                      svc.isActive ? 'bg-emerald-100 text-emerald-900' : 'bg-black/[0.06] text-headz-gray'
+                    }`}
+                  >
+                    {svc.isActive ? 'Active' : 'Off'}
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="inline-flex rounded-md bg-headz-cream/90 px-2.5 py-1 text-[11px] font-medium text-headz-black/70">
+                    {categoryLabel(svc.category)}
+                  </span>
+                  <span className="inline-flex rounded-md bg-black/[0.04] px-2.5 py-1 text-[11px] font-medium text-headz-gray">
+                    Sort {svc.displayOrder}
+                  </span>
+                </div>
+                <div className="mt-5 border-t border-black/[0.06] pt-5">
+                  <p className="text-2xl font-bold tabular-nums leading-none text-headz-red">
                     {formatServicePriceDisplay(svc)}
-                  </td>
-                  <td className="py-3 px-3 text-right">{svc.durationMinutes} min</td>
-                  <td className="py-3 px-3 tabular-nums text-headz-gray">{svc.displayOrder}</td>
-                  <td className="py-3 px-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        svc.isActive ? 'bg-emerald-100 text-emerald-900' : 'bg-black/10 text-headz-gray'
-                      }`}
-                    >
-                      {svc.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-right space-x-2 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(svc)}
-                      className="text-sm font-medium text-headz-red hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void toggleActive(svc)}
-                      className="text-sm font-medium text-headz-gray hover:text-headz-black"
-                    >
-                      {svc.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void deleteService(svc)}
-                      className="text-sm font-medium text-red-700 hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </p>
+                  <p className="mt-2 text-xs text-headz-gray">{svc.durationMinutes} minutes</p>
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-black/[0.06] pt-4">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(svc)}
+                    className="text-sm font-semibold text-headz-red hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <span className="text-headz-gray/30" aria-hidden>
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void toggleActive(svc)}
+                    className="text-sm font-medium text-headz-black/70 hover:text-headz-black"
+                  >
+                    {svc.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deleteService(svc)}
+                    className="ml-auto text-sm font-medium text-red-700 hover:underline"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

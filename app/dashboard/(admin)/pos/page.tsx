@@ -1,9 +1,6 @@
-import { HeadzPOS } from '@/components/pos/HeadzPOS'
+import { redirect } from 'next/navigation'
 
-export const metadata = {
-  title: 'POS | Headz Staff',
-}
-
-export default function AdminPosPage() {
-  return <HeadzPOS />
+/** Card payments use Square Terminal — settings live under Devices. */
+export default function AdminPosRedirectPage() {
+  redirect('/dashboard/settings/devices')
 }

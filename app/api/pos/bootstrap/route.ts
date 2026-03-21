@@ -56,11 +56,21 @@ export async function GET() {
     isWalkIn: r.appointment.isWalkIn,
   }))
 
-  const barbersOut = barberRows.map((b) => ({
-    id: b.userId,
-    name: b.barberName,
-    email: b.email,
-  }))
+  const barbersOut = barberRows.map((b) => {
+    const parts = b.barberName.split(/\s+/).filter(Boolean)
+    const initials =
+      parts
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase() || '?'
+    return {
+      id: b.userId,
+      name: b.barberName,
+      email: b.email,
+      initials,
+    }
+  })
 
   return NextResponse.json({
     today,

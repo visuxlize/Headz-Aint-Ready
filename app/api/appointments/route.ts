@@ -16,6 +16,8 @@ const createSchema = z.object({
   startAt: z.string().datetime(),
   isWalkIn: z.boolean().optional(),
   noShowAcknowledged: z.boolean().optional(),
+  /** Client preference so staff know how they plan to pay */
+  paymentMethod: z.enum(['cash', 'card']),
 })
 
 /** GET /api/appointments?date=YYYY-MM-DD – list appointments for the day (staff only) */
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
         isWalkIn,
         status: 'pending',
         noShowAcknowledged: acknowledged,
+        paymentMethod: data.paymentMethod,
       })
       .returning()
 

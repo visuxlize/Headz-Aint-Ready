@@ -27,18 +27,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Invalid params', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const [profile] = await db.select().from(barbers).where(eq(barbers.userId, auth.user.id)).limit(1)
-  if (!profile) {
-    return NextResponse.json({ slots: [] })
+  try {
+    const [profile] = await db.select().from(barbers).where(eq(barbers.userId, auth.user.id)).limit(1)
+    if (!profile) {
+      return NextResponse.json({
+        slots: [] as string[],
+        warning: 'No roster profile linked to your account.',
+      })
+    }
+
+    const slots = await computeBarberSlotIsoStrings({
+      barberProfileId: profile.id,
+      barberUserId: auth.user.id,
+      date: parsed.data.date,
+      durationMinutes: parsed.data.durationMinutes,
+      excludeAppointmentId: parsed.data.excludeAppointmentId ?? null,
+    })
+
+    return NextResponse.json({ slots })
+  } catch (e) {
+    console.error('GET /api/barber/slots:', e)
+    const msg = e instanceof Error ? e.message : 'Server error'
+    return NextResponse.json({ error: msg, slots: [] as string[] }, { status: 500 })
   }
-
-  const slots = await computeBarberSlotIsoStrings({
-    barberProfileId: profile.id,
-    barberUserId: auth.user.id,
-    date: parsed.data.date,
-    durationMinutes: parsed.data.durationMinutes,
-    excludeAppointmentId: parsed.data.excludeAppointmentId ?? null,
-  })
-
-  return NextResponse.json({ slots })
 }

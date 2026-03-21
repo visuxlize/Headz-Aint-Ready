@@ -54,23 +54,50 @@ dns.setDefaultResultOrder('ipv4first')
 
 // Lazy init so the app can load even when DATABASE_URL is missing (e.g. marketing page can render).
 // First actual use of `db` will throw if DATABASE_URL is not set or connection fails.
-let _client: ReturnType<typeof postgres> | null = null
-let _db: ReturnType<typeof drizzle> | null = null
+//
+// Cache on globalThis so Next.js dev (HMR) does not open a new postgres client on every reload.
+// Without this, Session pooler (:5432) hits "MaxClientsInSessionMode: max clients reached" quickly.
+const globalForDb = globalThis as unknown as {
+  __headzPostgres?: ReturnType<typeof postgres>
+  __headzDrizzle?: ReturnType<typeof drizzle>
+  __headzSessionPoolerWarned?: boolean
+}
+
+function warnIfSupabaseSessionPooler(url: string) {
+  if (globalForDb.__headzSessionPoolerWarned) return
+  try {
+    const normalized = url.replace(/^postgresql:/i, 'http:').replace(/^postgres:/i, 'http:')
+    const u = new URL(normalized)
+    if (u.hostname.includes('pooler.supabase.com') && (u.port === '5432' || u.port === '')) {
+      globalForDb.__headzSessionPoolerWarned = true
+      console.warn(
+        '[db] DATABASE_URL uses Supabase Session pooler (port 5432). It allows very few concurrent clients and often fails in Next dev. Prefer the Transaction pooler on port 6543 (Dashboard → Connect → Transaction pool). `prepare: false` is already set for PgBouncer.'
+      )
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 function getDb(): ReturnType<typeof drizzle> {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL environment variable is not set')
   }
-  if (!_client) {
-    _client = postgres(process.env.DATABASE_URL, {
+  if (process.env.NODE_ENV === 'development') {
+    warnIfSupabaseSessionPooler(process.env.DATABASE_URL)
+  }
+
+  if (!globalForDb.__headzPostgres) {
+    globalForDb.__headzPostgres = postgres(process.env.DATABASE_URL, {
+      // Required for Supabase Transaction pooler (PgBouncer).
       prepare: false,
       max: 1,
       connect_timeout: 10,
-      idle_timeout: 0,
+      idle_timeout: 20,
     })
-    _db = drizzle(_client, { schema })
+    globalForDb.__headzDrizzle = drizzle(globalForDb.__headzPostgres, { schema })
   }
-  return _db as ReturnType<typeof drizzle>
+  return globalForDb.__headzDrizzle as ReturnType<typeof drizzle>
 }
 
 // Create Drizzle instance with schema (lazy: only connects on first use)

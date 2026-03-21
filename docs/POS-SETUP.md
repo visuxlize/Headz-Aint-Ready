@@ -1,41 +1,45 @@
-# POS, Stripe Terminal & receipts
+# POS, Square Terminal & receipts
+
+Card-present payments use **Square** (Terminal API + optional webhooks). Stripe has been removed from this app.
 
 ## Database
 
-Apply schema (new columns + `pos_transactions`):
+Apply schema (`pos_transactions`, `square_devices`, etc.):
 
 ```bash
 # Option A: Drizzle
 npm run db:push
 
-# Option B: Supabase SQL Editor — run `scripts/add-pos-schema.sql`
+# Option B: Supabase SQL Editor — run `scripts/add-pos-schema.sql` and `scripts/ensure-pos-payments-schema.sql` / `scripts/square-pos-integration.sql` as needed
 ```
 
 ## Environment variables
 
-Add to `.env.local` and Netlify:
+Add to `.env.local` and your host (e.g. Netlify). See root **`.env.example`** for a template.
 
 | Variable | Purpose |
 |----------|---------|
-| `STRIPE_SECRET_KEY` | Server-side Stripe API (`sk_live_…` / `sk_test_…`) |
-| `STRIPE_TERMINAL_LOCATION_ID` | Terminal location ID (Dashboard → Terminal → Locations) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Optional; Terminal JS loads SDK; useful if you extend with Elements |
-| `RESEND_API_KEY` | Receipt emails |
-| `RESEND_FROM` | Verified sender, e.g. `Headz <receipts@yourdomain.com>` (Resend requires domain verification in production) |
+| `SQUARE_ACCESS_TOKEN` | **Required.** Sandbox or Production access token from [Square Developer](https://developer.squareup.com/) → *Applications* → your app → *Credentials*. |
+| `SQUARE_LOCATION_ID` | **Required** for pairing a Terminal and recording cash against a location. **Locations** in [Square Dashboard](https://squareup.com/dashboard/) or Locations API — ID often starts with `L`. |
+| `SQUARE_ENVIRONMENT` | Optional. Set to `production` for live; otherwise Sandbox is used. |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY` | Optional. For verifying `POST /api/square/webhook` in production. |
+| `SQUARE_WEBHOOK_NOTIFICATION_URL` | Must match the webhook URL configured in Square **exactly** (e.g. `https://your-domain.com/api/square/webhook`). |
+| `RESEND_API_KEY` | Optional. Receipt emails. |
+| `RESEND_FROM` | Verified sender, e.g. `Headz <receipts@yourdomain.com>` |
 
-`SUPABASE_SERVICE_ROLE_KEY` is already used elsewhere for server jobs; POS routes use the logged-in user session + Drizzle (no service role required for these API routes).
+POS API routes use the logged-in staff session + Drizzle (no Supabase service role required for normal flows).
 
 ## Routes
 
-- **Admin:** `/dashboard/pos`
-- **Barber:** `/dashboard/barber/pos`
+- **Square Terminal pairing (admin):** `/dashboard/settings/devices` (legacy `/dashboard/pos` redirects here)
+- **Barber schedule:** `/dashboard/barber` (legacy `/dashboard/barber/pos` redirects here)
 
-## Stripe Terminal (test)
+## Square Terminal (test)
 
-1. Enable Terminal in the Stripe Dashboard and create a **Location**.
-2. Use **simulated reader** (`discoverReaders({ simulated: true })`) — already wired in the POS.
-3. Use test mode keys until you go live.
+1. Create a **Sandbox** application and access token in Square Developer.
+2. Create or pick a **Sandbox location**; copy its **Location ID** into `SQUARE_LOCATION_ID`.
+3. Pair a physical Terminal or use Sandbox flows from the Devices page.
 
 ## Receipts
 
-If `RESEND_API_KEY` is missing, the sale still completes; email is skipped and `receipt_sent_at` stays null when email fails.
+If `RESEND_API_KEY` is missing, the sale can still complete; email is skipped when sending fails.

@@ -27,18 +27,32 @@ export async function getStoreWindowForDay(dayOfWeek: number): Promise<StoreDayW
   }
 }
 
+function defaultWeek(): StoreDayWindow[] {
+  return Array.from({ length: 7 }, (_, dayOfWeek) => ({
+    dayOfWeek,
+    openMin: DEFAULT_OPEN,
+    closeMin: DEFAULT_CLOSE,
+    isOpen: true,
+  }))
+}
+
 /** All 7 days (0=Sun … 6=Sat). */
 export async function getAllStoreWindows(): Promise<StoreDayWindow[]> {
-  const rows = await db.select().from(storeHours)
-  const byDay = new Map(rows.map((r) => [r.dayOfWeek, r]))
-  return Array.from({ length: 7 }, (_, dayOfWeek) => {
-    const row = byDay.get(dayOfWeek)
-    if (!row) return { dayOfWeek, openMin: DEFAULT_OPEN, closeMin: DEFAULT_CLOSE, isOpen: true }
-    return {
-      dayOfWeek,
-      openMin: pgTimeToMinutes(String(row.openTime)),
-      closeMin: pgTimeToMinutes(String(row.closeTime)),
-      isOpen: row.isOpen,
-    }
-  })
+  try {
+    const rows = await db.select().from(storeHours)
+    const byDay = new Map(rows.map((r) => [r.dayOfWeek, r]))
+    return Array.from({ length: 7 }, (_, dayOfWeek) => {
+      const row = byDay.get(dayOfWeek)
+      if (!row) return { dayOfWeek, openMin: DEFAULT_OPEN, closeMin: DEFAULT_CLOSE, isOpen: true }
+      return {
+        dayOfWeek,
+        openMin: pgTimeToMinutes(String(row.openTime)),
+        closeMin: pgTimeToMinutes(String(row.closeTime)),
+        isOpen: row.isOpen,
+      }
+    })
+  } catch (e) {
+    console.error('getAllStoreWindows: falling back to defaults', e)
+    return defaultWeek()
+  }
 }

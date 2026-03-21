@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Kids Haircut",
+    "slug": "kids-haircut",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "30.00",
+    "priceDisplayOverride": null,
+    "category": "kids",
+    "displayOrder": 0
+  },
+  {
+    "name": "Shape Up",
+    "slug": "shape-up",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "20.00",
+    "priceDisplayOverride": null,
+    "category": "adults",
+    "displayOrder": 1
+  },
+  {
+    "name": "Shape Up & Beard",
+    "slug": "shape-up-beard",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "30.00",
+    "priceDisplayOverride": null,
+    "category": "adults",
+    "displayOrder": 2
+  },
+  {
+    "name": "Senior Citizens",
+    "slug": "senior-citizens",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "30.00",
+    "priceDisplayOverride": null,
+    "category": "seniors",
+    "displayOrder": 3
+  },
+  {
+    "name": "Haircut Adult",
+    "slug": "haircut-adult",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "40.00",
+    "priceDisplayOverride": null,
+    "category": "adults",
+    "displayOrder": 4
+  },
+  {
+    "name": "Haircut & Beard",
+    "slug": "haircut-beard",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "50.00",
+    "priceDisplayOverride": null,
+    "category": "adults",
+    "displayOrder": 5
+  },
+  {
+    "name": "Haircut / Beard / Hot Towel",
+    "slug": "haircut-beard-hot-towel",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "55.00",
+    "priceDisplayOverride": null,
+    "category": "adults",
+    "displayOrder": 6
+  },
+  {
+    "name": "Enhancement beard color black/brown",
+    "slug": "enhancement-beard-color",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "0.00",
+    "priceDisplayOverride": "Price varies",
+    "category": "add-ons",
+    "displayOrder": 7
+  },
+  {
+    "name": "Braids",
+    "slug": "braids",
+    "description": null,
+    "durationMinutes": 30,
+    "price": "50.00",
+    "priceDisplayOverride": null,
+    "category": "adults",
+    "displayOrder": 8
+  }
+]

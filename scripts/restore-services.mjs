@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /**
- * Restore the full Headz pricelist (11 services from the official flyer).
+ * Upserts the canonical Headz pricelist (9 services — same as Feb 2026 marketing PRICE_LIST, commit 671a5b8).
  *
  *   npm run restore:services
  *
- * Upserts by slug. Run `scripts/add-price-display-override.sql` once if the column is missing.
+ * Data source: lib/services/default-headz-services.json (keep in sync with lib/services/default-price-list.ts).
+ * Run `scripts/add-price-display-override.sql` once if the column is missing.
  * Loads DATABASE_URL from `.env.local` (handles `=` in connection string safely).
  */
+import { readFileSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 import postgres from 'postgres'
 import { loadEnvLocal } from './load-env-local.mjs'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 loadEnvLocal()
 
@@ -20,118 +26,8 @@ if (!DATABASE_URL) {
 
 const sql = postgres(DATABASE_URL, { prepare: false, max: 1 })
 
-const ROWS = [
-  {
-    name: 'Haircut',
-    slug: 'haircut',
-    description: 'Clippers, Scissor & Blade Finish',
-    duration: 30,
-    price: '35.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 0,
-  },
-  {
-    name: 'Haircut & Beard',
-    slug: 'haircut-beard',
-    description: 'Clippers, Scissor & Blade Finish',
-    duration: 30,
-    price: '45.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 1,
-  },
-  {
-    name: 'Haircut & Design',
-    slug: 'haircut-design',
-    description: 'Clippers, Scissor, Blade & Design',
-    duration: 30,
-    price: '45.00',
-    price_display_override: '$45.00 & Up',
-    category: 'adults',
-    order: 2,
-  },
-  {
-    name: 'Full VIP Service',
-    slug: 'full-vip-service',
-    description: 'Clippers, Scissor, Blade & Hot Towel',
-    duration: 30,
-    price: '55.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 3,
-  },
-  {
-    name: 'Senior Special',
-    slug: 'senior-special',
-    description: 'Clippers, Scissor & Blade Finish ( 62+ Yrs )',
-    duration: 30,
-    price: '25.00',
-    price_display_override: null,
-    category: 'seniors',
-    order: 4,
-  },
-  {
-    name: 'Shape-Up',
-    slug: 'shape-up',
-    description: 'T-Liner & Blade Finish',
-    duration: 30,
-    price: '25.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 5,
-  },
-  {
-    name: 'Shape-Up & Beard',
-    slug: 'shape-up-beard',
-    description: 'T-Liner & Blade Finish',
-    duration: 30,
-    price: '30.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 6,
-  },
-  {
-    name: 'Clean Shave & Hot Towel',
-    slug: 'clean-shave-hot-towel',
-    description: 'T-Liner & Blade Finish',
-    duration: 30,
-    price: '25.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 7,
-  },
-  {
-    name: '1st Haircut Special',
-    slug: 'first-haircut-special',
-    description: '3 Years Old & Younger',
-    duration: 30,
-    price: '20.00',
-    price_display_override: null,
-    category: 'kids',
-    order: 8,
-  },
-  {
-    name: 'Kids Special',
-    slug: 'kids-special',
-    description: '12 Years Old & Younger',
-    duration: 30,
-    price: '25.00',
-    price_display_override: null,
-    category: 'kids',
-    order: 9,
-  },
-  {
-    name: 'Student Special',
-    slug: 'student-special',
-    description: 'Mon - Tues ( With School ID )',
-    duration: 30,
-    price: '25.00',
-    price_display_override: null,
-    category: 'adults',
-    order: 10,
-  },
-]
+const jsonPath = join(__dirname, '../lib/services/default-headz-services.json')
+const ROWS = JSON.parse(readFileSync(jsonPath, 'utf8'))
 
 async function main() {
   try {
@@ -152,11 +48,11 @@ async function main() {
           ${r.name},
           ${r.slug},
           ${r.description},
-          ${r.duration},
+          ${r.durationMinutes},
           ${r.price},
-          ${r.price_display_override},
+          ${r.priceDisplayOverride},
           ${r.category},
-          ${r.order},
+          ${r.displayOrder},
           true
         )
         ON CONFLICT (slug) DO UPDATE SET

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { cn } from '@/lib/utils/cn'
 import { DashboardNav } from './DashboardNav'
 
 function MenuIcon({ className }: { className?: string }) {
@@ -29,6 +30,32 @@ function ExternalIcon({ className }: { className?: string }) {
   )
 }
 
+function DashboardMain({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const calendarFullBleed =
+    (pathname === '/dashboard' && searchParams.get('view') === 'calendar') ||
+    pathname === '/dashboard/schedule'
+
+  return (
+    <main
+      className={cn(
+        'flex min-h-0 flex-1 flex-col',
+        calendarFullBleed ? 'overflow-hidden p-0' : 'overflow-auto px-4 pb-6 pt-8 sm:px-6 sm:pb-8 sm:pt-10'
+      )}
+    >
+      <div
+        className={cn(
+          'flex min-h-0 w-full flex-1 flex-col',
+          calendarFullBleed ? 'max-w-none' : 'mx-auto max-w-6xl'
+        )}
+      >
+        {children}
+      </div>
+    </main>
+  )
+}
+
 export function DashboardShell({
   userEmail,
   children,
@@ -46,7 +73,7 @@ export function DashboardShell({
   }, [pathname])
 
   return (
-    <div className="min-h-screen w-full flex bg-headz-cream">
+    <div className="flex h-screen min-h-0 w-full overflow-hidden bg-[#FAFAF8]">
       {/* Mobile: tap outside to close */}
       <button
         type="button"
@@ -59,14 +86,16 @@ export function DashboardShell({
 
       {/* Sidebar: fixed; hamburger toggles on all breakpoints */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 shrink-0 bg-headz-black border-r border-white/10 flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 shrink-0 bg-[#0F0F0F] border-r border-white/10 flex flex-col transition-transform duration-200 ease-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="p-4 md:p-5 border-b border-white/10 flex items-center justify-between gap-2">
-          <Link href="/dashboard" className="flex items-center gap-2 min-w-0" onClick={() => setSidebarOpen(false)}>
-            <span className="text-headz-red font-bold text-lg">Headz</span>
-            <span className="text-white/70 text-sm">Staff</span>
+          <Link href="/dashboard" className="flex flex-col min-w-0 leading-tight" onClick={() => setSidebarOpen(false)}>
+            <span className="font-serif text-lg text-white tracking-tight">
+              HEADZ <span className="text-headz-red">●</span>
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/50">Ain&apos;t Ready</span>
           </Link>
           <button
             type="button"
@@ -78,7 +107,9 @@ export function DashboardShell({
           </button>
         </div>
         <nav className="flex-1 p-3 overflow-y-auto">
-          <DashboardNav />
+          <Suspense fallback={<div className="text-white/40 text-sm px-3">Loading…</div>}>
+            <DashboardNav />
+          </Suspense>
         </nav>
         <div className="p-3 border-t border-white/10 space-y-1">
           <Link
@@ -94,20 +125,24 @@ export function DashboardShell({
 
       {/* Main: offset when sidebar open on md+; mobile stays full width (sidebar overlays) */}
       <div
-        className={`flex-1 flex flex-col min-w-0 min-h-screen transition-[padding] duration-200 ease-out ${
+        className={`flex min-h-0 min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-out ${
           sidebarOpen ? 'md:pl-64' : 'pl-0'
         }`}
       >
         <header className="h-14 shrink-0 bg-white border-b border-black/10 flex items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="p-2 -ml-1 text-headz-black hover:bg-black/5 rounded-lg shrink-0"
-          >
-            {sidebarOpen ? <CloseIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
-          </button>
+          {!sidebarOpen ? (
+            <button
+              type="button"
+              aria-label="Open menu"
+              aria-expanded={false}
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 -ml-1 text-headz-black hover:bg-black/5 rounded-lg shrink-0"
+            >
+              <MenuIcon className="w-6 h-6" />
+            </button>
+          ) : (
+            <div className="w-10 shrink-0" aria-hidden />
+          )}
           <div className="flex-1 min-w-0 flex items-center justify-end gap-3">
             <span className="text-sm text-headz-gray truncate max-w-[140px] sm:max-w-[200px]" title={userEmail}>
               {userEmail}
@@ -122,9 +157,15 @@ export function DashboardShell({
             </form>
           </div>
         </header>
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          <div className="max-w-6xl mx-auto w-full">{children}</div>
-        </main>
+        <Suspense
+          fallback={
+            <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+              <div className="mx-auto w-full max-w-6xl">{children}</div>
+            </main>
+          }
+        >
+          <DashboardMain>{children}</DashboardMain>
+        </Suspense>
       </div>
     </div>
   )

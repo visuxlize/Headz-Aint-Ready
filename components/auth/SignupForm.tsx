@@ -32,7 +32,7 @@ export function SignupForm() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -45,8 +45,13 @@ export function SignupForm() {
         return
       }
 
-      // Success! You may want to show a message about checking email
-      router.push('/dashboard')
+      if (data.session) {
+        router.push('/dashboard')
+        router.refresh()
+        return
+      }
+
+      router.push('/auth/login?message=confirm_email')
       router.refresh()
     } catch (err) {
       setError('An unexpected error occurred')

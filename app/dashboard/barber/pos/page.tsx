@@ -1,9 +1,5 @@
-import { HeadzPOS } from '@/components/pos/HeadzPOS'
+import { redirect } from 'next/navigation'
 
-export const metadata = {
-  title: 'POS | Headz Barber',
-}
-
-export default function BarberPosPage() {
-  return <HeadzPOS />
+export default function BarberPosRedirectPage() {
+  redirect('/dashboard/barber')
 }

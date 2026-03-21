@@ -350,6 +350,7 @@ function WalkInForm({
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash')
 
   const service = services.find((s) => s.id === serviceId)
   const durationMinutes = service?.durationMinutes ?? 30
@@ -500,6 +501,33 @@ function WalkInForm({
                 ))}
               </select>
             )}
+          </div>
+          <div>
+            <span className="block text-sm font-medium mb-2">Payment type</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('cash')}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
+                  paymentMethod === 'cash'
+                    ? 'border-headz-red bg-headz-red/10 text-headz-black'
+                    : 'border-black/15 text-headz-gray hover:border-black/30'
+                }`}
+              >
+                Cash
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('card')}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
+                  paymentMethod === 'card'
+                    ? 'border-headz-red bg-headz-red/10 text-headz-black'
+                    : 'border-black/15 text-headz-gray hover:border-black/30'
+                }`}
+              >
+                Card
+              </button>
+            </div>
           </div>
         </div>
         <div className="mt-6 flex gap-3">
@@ -671,6 +699,19 @@ function AppointmentDetailModal({
             {formatTime(appointmentEndUtc(appointment, durationMinutes))}
           </p>
           <p><span className="font-medium text-headz-gray">Barber</span> {barber?.name ?? '—'}</p>
+          <p>
+            <span className="font-medium text-headz-gray">Payment</span>{' '}
+            {appointment.paymentMethod === 'cash'
+              ? 'Cash'
+              : appointment.paymentMethod === 'card'
+                ? 'Card'
+                : '—'}
+          </p>
+          {appointment.notes?.trim() ? (
+            <p>
+              <span className="font-medium text-headz-gray">Notes</span> {appointment.notes}
+            </p>
+          ) : null}
           {appointment.isWalkIn && (
             <span className="inline-block text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">Walk-in</span>
           )}

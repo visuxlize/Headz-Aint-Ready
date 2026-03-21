@@ -6,13 +6,12 @@ import type { Barber, Service } from '@/lib/db/schema'
 import { computeNoShowFeeFromServicePrice } from '@/lib/appointments/no-show-fee'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
-type Step = 'service' | 'barber' | 'date' | 'time' | 'details' | 'done'
+type Step = 'service' | 'barber' | 'schedule' | 'details' | 'done'
 
 const STEP_LABELS: Record<Step, string> = {
   service: 'Service',
   barber: 'Barber',
-  date: 'Date',
-  time: 'Time',
+  schedule: 'Date & time',
   details: 'Your info',
   done: 'Confirmed',
 }
@@ -81,6 +80,7 @@ export function BookingFlow({
   const [error, setError] = useState<string | null>(null)
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [noShowAck, setNoShowAck] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('card')
 
   const today = useMemo(() => toDateString(new Date()), [])
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -91,6 +91,14 @@ export function BookingFlow({
   const filteredServices = defaultCategory
     ? services.filter((s) => s.category?.toLowerCase() === defaultCategory.toLowerCase())
     : services
+
+  const maxBookStr = useMemo(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() + MONTHS_AHEAD)
+    return toDateString(d)
+  }, [])
+
+  const stepOrder = ['service', 'barber', 'schedule', 'details'] as const
 
   const loadSlots = async (barberId: string, dateStr: string, durationMinutes: number) => {
     setLoadingSlots(true)
@@ -112,18 +120,16 @@ export function BookingFlow({
 
   const onSelectBarber = (b: Barber) => {
     setBarber(b)
-    setStep('date')
+    setStep('schedule')
   }
 
   const onSelectDate = (d: string) => {
     setDate(d)
     if (barber && service) void loadSlots(barber.id, d, service.durationMinutes)
-    setStep('time')
   }
 
   const onSelectSlot = (slot: string) => {
     setSelectedSlot(slot)
-    setStep('details')
   }
 
   const submitBooking = async () => {
@@ -151,6 +157,7 @@ export function BookingFlow({
           startAt: selectedSlot,
           isWalkIn: false,
           noShowAcknowledged: true,
+          paymentMethod,
         }),
       })
       const json = await res.json()
@@ -164,7 +171,7 @@ export function BookingFlow({
     }
   }
 
-  const showSummary = (step === 'date' || step === 'time' || step === 'details') && service && barber
+  const showSummary = (step === 'schedule' || step === 'details') && service && barber
   const groupedSlots = useMemo(() => groupSlots(slots), [slots])
 
   if (step === 'done') {
@@ -172,7 +179,8 @@ export function BookingFlow({
       <div className="rounded-xl bg-white border border-black/10 p-8 text-center">
         <h2 className="text-xl font-semibold text-headz-red mb-2">You&apos;re booked</h2>
         <p className="text-headz-gray mb-4">
-          {service?.name} with {barber?.name} on {date} at {selectedSlot ? formatSlot(selectedSlot) : ''}.
+          {service?.name} with {barber?.name} on {date} at {selectedSlot ? formatSlot(selectedSlot) : ''}.{' '}
+          Payment: <strong>{paymentMethod === 'cash' ? 'Cash' : 'Card'}</strong>.
         </p>
         <p className="text-sm text-headz-gray">
           We&apos;ll see you at 81-13 37th Ave, Jackson Heights. If you need to change or cancel, call us at (718) 429-6841.
@@ -211,20 +219,38 @@ export function BookingFlow({
   )
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 md:gap-10 w-full max-w-full">
+    <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 w-full max-w-full">
       <div className="flex-1 min-w-0 space-y-6 w-full">
-        {/* Progress */}
-        <div className="flex gap-2 flex-wrap justify-center md:justify-start">
-          {(['service', 'barber', 'date', 'time', 'details'] as const).map((s) => (
-            <span
-              key={s}
-              className={`text-xs px-2 py-1 rounded ${
-                step === s ? 'bg-headz-red text-white' : 'bg-black/10 text-headz-gray'
-              }`}
-            >
-              {STEP_LABELS[s]}
-            </span>
-          ))}
+        {/* Progress — numbered stepper */}
+        <div className="flex items-center justify-center md:justify-start gap-0 flex-wrap">
+          {stepOrder.map((s, i) => {
+            const active = step === s
+            const currentIndex = stepOrder.indexOf(step)
+            const past = currentIndex > i
+            return (
+              <div key={s} className="flex items-center">
+                <div
+                  className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shrink-0 ${
+                    active
+                      ? 'bg-headz-red text-white ring-2 ring-headz-red/30'
+                      : past
+                        ? 'bg-headz-black text-white'
+                        : 'bg-black/10 text-headz-gray'
+                  }`}
+                >
+                  {i + 1}
+                </div>
+                <span
+                  className={`hidden sm:inline text-xs ml-2 mr-3 max-w-[5.5rem] ${
+                    active ? 'font-semibold text-headz-black' : 'text-headz-gray'
+                  }`}
+                >
+                  {STEP_LABELS[s]}
+                </span>
+                {i < 3 && <div className="hidden sm:block w-6 h-px bg-black/15 -mx-1" aria-hidden />}
+              </div>
+            )
+          })}
         </div>
 
         {error && (
@@ -263,203 +289,241 @@ export function BookingFlow({
 
         {/* Step: Barber */}
         {step === 'barber' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
-            <h3 className="font-semibold mb-2">Choose your barber</h3>
-            <p className="text-headz-gray text-sm mb-4">Available times reflect each barber&apos;s schedule and time off.</p>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-white border border-black/10 shadow-sm p-6 text-center md:text-left">
+            <h3 className="font-semibold text-lg mb-2">Choose your barber</h3>
+            <p className="text-headz-gray text-sm mb-4">Available times follow each barber&apos;s schedule and time off.</p>
+            <div className="flex flex-wrap justify-center gap-3">
               {barbers.map((b) => (
                 <button
                   key={b.id}
                   type="button"
                   onClick={() => onSelectBarber(b)}
-                  className="flex items-center gap-3 p-4 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left"
+                  className="flex w-32 shrink-0 flex-col items-center gap-2 rounded-xl border border-black/10 p-4 text-center transition hover:border-headz-red hover:bg-headz-red/5 sm:w-36 md:w-40"
                 >
-                  <div className="h-12 w-12 shrink-0 rounded-full overflow-hidden bg-headz-black/10 border border-headz-red/20 flex items-center justify-center">
+                  <div className="h-16 w-16 shrink-0 rounded-full overflow-hidden bg-headz-cream border-2 border-headz-red/15 flex items-center justify-center">
                     {b.avatarUrl ? (
                       <Image
                         src={b.avatarUrl}
                         alt=""
-                        width={48}
-                        height={48}
+                        width={64}
+                        height={64}
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <span className="text-headz-red font-semibold text-lg">
+                      <span className="text-headz-red font-semibold text-xl">
                         {b.name.slice(0, 2).toUpperCase()}
                       </span>
                     )}
                   </div>
-                  <span className="font-medium truncate">{b.name}</span>
+                  <span className="font-medium text-sm leading-tight">{b.name}</span>
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Step: Date – calendar style */}
-        {step === 'date' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
-            <h3 className="font-semibold mb-4">Pick a date</h3>
-            <div className="inline-block mx-auto md:mx-0">
-              <div className="flex items-center justify-between mb-3">
-                <button
-                  type="button"
-                  onClick={() => setCalendarMonth((m) => {
-                    const d = new Date(m.year, m.month - 1, 1)
-                    return { year: d.getFullYear(), month: d.getMonth() }
-                  })}
-                  className="p-2 rounded hover:bg-black/5 text-headz-gray hover:text-black"
-                  aria-label="Previous month"
-                >
-                  ←
-                </button>
-                <span className="text-sm font-medium">
-                  {new Date(calendarMonth.year, calendarMonth.month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCalendarMonth((m) => {
-                    const d = new Date(m.year, m.month + 1, 1)
-                    const max = new Date()
-                    max.setMonth(max.getMonth() + MONTHS_AHEAD)
-                    if (d > max) return m
-                    return { year: d.getFullYear(), month: d.getMonth() }
-                  })}
-                  className="p-2 rounded hover:bg-black/5 text-headz-gray hover:text-black"
-                  aria-label="Next month"
-                >
-                  →
-                </button>
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs text-headz-gray mb-1">
-                {WEEKDAYS.map((day) => (
-                  <div key={day} className="py-1 font-medium">{day}</div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {(() => {
-                  const first = new Date(calendarMonth.year, calendarMonth.month, 1)
-                  const startPad = first.getDay()
-                  const daysInMonth = new Date(calendarMonth.year, calendarMonth.month + 1, 0).getDate()
-                  const maxDate = new Date()
-                  maxDate.setDate(maxDate.getDate() + 30)
-                  const cells: React.ReactNode[] = []
-                  for (let i = 0; i < startPad; i++) cells.push(<div key={`pad-${i}`} />)
-                  for (let day = 1; day <= daysInMonth; day++) {
-                    const dateStr = toDateString(new Date(calendarMonth.year, calendarMonth.month, day))
-                    const isPast = dateStr < today
-                    const isFuture = dateStr > toDateString(maxDate)
-                    const isSelected = dateStr === date
-                    const disabled = isPast || isFuture
-                    cells.push(
-                      <button
-                        key={day}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => !disabled && onSelectDate(dateStr)}
-                        className={`w-9 h-9 rounded text-sm ${
-                          disabled ? 'text-black/30 cursor-not-allowed' : 'hover:bg-black/10'
-                        } ${isSelected ? 'bg-headz-black text-white hover:bg-headz-black' : ''}`}
-                      >
-                        {day}
-                      </button>
-                    )
-                  }
-                  return cells
-                })()}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step: Time – Morning / Afternoon / Evening, EST note */}
-        {step === 'time' && (
-          <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
-            <h3 className="font-semibold mb-1">Pick a time</h3>
-            {date && (
-              <p className="text-headz-gray text-sm mb-2">
-                {new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-              </p>
-            )}
-            <p className="text-headz-gray text-xs mb-4">Times are shown in <strong>EST</strong>.</p>
-            {loadingSlots ? (
-              <p className="text-headz-gray">Loading times…</p>
-            ) : slots.length === 0 ? (
-              <p className="text-headz-gray">No available slots this day. Try another date.</p>
-            ) : (
-              <div className="space-y-6 flex flex-col items-center md:items-stretch">
-                {groupedSlots.morning.length > 0 && (
-                  <div className="w-full">
-                    <p className="text-xs font-medium text-headz-gray uppercase tracking-wide mb-2">Morning</p>
-                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                      {groupedSlots.morning.map((slot) => (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => onSelectSlot(slot)}
-                          className={`px-4 py-2.5 rounded-lg text-sm font-medium transition ${
-                            selectedSlot === slot
-                              ? 'bg-headz-black text-white'
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-200'
-                          }`}
-                        >
-                          {formatSlot(slot)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedSlots.afternoon.length > 0 && (
-                  <div className="w-full">
-                    <p className="text-xs font-medium text-headz-gray uppercase tracking-wide mb-2">Afternoon</p>
-                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                      {groupedSlots.afternoon.map((slot) => (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => onSelectSlot(slot)}
-                          className={`px-4 py-2.5 rounded-lg text-sm font-medium transition ${
-                            selectedSlot === slot
-                              ? 'bg-headz-black text-white'
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-200'
-                          }`}
-                        >
-                          {formatSlot(slot)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {groupedSlots.evening.length > 0 && (
-                  <div className="w-full">
-                    <p className="text-xs font-medium text-headz-gray uppercase tracking-wide mb-2">Evening</p>
-                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                      {groupedSlots.evening.map((slot) => (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => onSelectSlot(slot)}
-                          className={`px-4 py-2.5 rounded-lg text-sm font-medium transition ${
-                            selectedSlot === slot
-                              ? 'bg-headz-black text-white'
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-200'
-                          }`}
-                        >
-                          {formatSlot(slot)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
             <button
               type="button"
-              onClick={() => setStep('date')}
-              className="mt-4 text-sm text-headz-red hover:underline"
+              onClick={() => setStep('service')}
+              className="mt-6 text-sm text-headz-red hover:underline"
             >
-              ← Change date
+              ← Change service
             </button>
+          </div>
+        )}
+
+        {/* Step: Schedule — calendar + time slots (like a booking app) */}
+        {step === 'schedule' && (
+          <div className="rounded-2xl border border-black/10 bg-white shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-headz-cream to-white border-b border-black/10 px-4 sm:px-6 py-4">
+              <h3 className="font-semibold text-lg text-headz-black">Pick a date &amp; time</h3>
+              <p className="text-sm text-headz-gray mt-1">
+                Select a day, then choose a slot. All times are <strong>Eastern (US)</strong>.
+              </p>
+            </div>
+            <div className="p-4 sm:p-6 lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
+              <div className="text-center lg:text-left">
+                <div className="inline-block mx-auto lg:mx-0">
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth((m) => {
+                          const d = new Date(m.year, m.month - 1, 1)
+                          return { year: d.getFullYear(), month: d.getMonth() }
+                        })
+                      }
+                      className="p-2 rounded-lg hover:bg-black/5 text-headz-gray hover:text-black"
+                      aria-label="Previous month"
+                    >
+                      ←
+                    </button>
+                    <span className="text-sm font-semibold">
+                      {new Date(calendarMonth.year, calendarMonth.month, 1).toLocaleDateString('en-US', {
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth((m) => {
+                          const d = new Date(m.year, m.month + 1, 1)
+                          const max = new Date()
+                          max.setMonth(max.getMonth() + MONTHS_AHEAD)
+                          if (d > max) return m
+                          return { year: d.getFullYear(), month: d.getMonth() }
+                        })
+                      }
+                      className="p-2 rounded-lg hover:bg-black/5 text-headz-gray hover:text-black"
+                      aria-label="Next month"
+                    >
+                      →
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs text-headz-gray mb-1 font-medium">
+                    {WEEKDAYS.map((day) => (
+                      <div key={day} className="py-1">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {(() => {
+                      const first = new Date(calendarMonth.year, calendarMonth.month, 1)
+                      const startPad = first.getDay()
+                      const daysInMonth = new Date(calendarMonth.year, calendarMonth.month + 1, 0).getDate()
+                      const cells: React.ReactNode[] = []
+                      for (let i = 0; i < startPad; i++) cells.push(<div key={`pad-${i}`} />)
+                      for (let day = 1; day <= daysInMonth; day++) {
+                        const dateStr = toDateString(new Date(calendarMonth.year, calendarMonth.month, day))
+                        const isPast = dateStr < today
+                        const isFuture = dateStr > maxBookStr
+                        const isSelected = dateStr === date
+                        const disabled = isPast || isFuture
+                        cells.push(
+                          <button
+                            key={day}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => !disabled && onSelectDate(dateStr)}
+                            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition ${
+                              disabled ? 'text-black/25 cursor-not-allowed' : 'hover:bg-headz-red/10'
+                            } ${isSelected ? 'bg-headz-red text-white shadow-md hover:bg-headz-red' : ''}`}
+                          >
+                            {day}
+                          </button>
+                        )
+                      }
+                      return cells
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 lg:mt-0 border-t lg:border-t-0 lg:border-l border-black/10 pt-6 lg:pt-0 lg:pl-8">
+                {!date ? (
+                  <p className="text-headz-gray text-sm text-center lg:text-left">Select a date to see open times.</p>
+                ) : loadingSlots ? (
+                  <div className="space-y-3 animate-pulse">
+                    <div className="h-4 bg-black/10 rounded w-1/3" />
+                    <div className="h-10 bg-black/5 rounded-lg" />
+                    <div className="h-10 bg-black/5 rounded-lg" />
+                  </div>
+                ) : slots.length === 0 ? (
+                  <p className="text-headz-gray text-sm text-center lg:text-left">
+                    No open slots on this day — try another date.
+                  </p>
+                ) : (
+                  <div className="space-y-5">
+                    <p className="text-sm font-medium text-headz-black">
+                      {new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    {groupedSlots.morning.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-headz-gray uppercase tracking-wider mb-2">Morning</p>
+                        <div className="flex flex-wrap gap-2">
+                          {groupedSlots.morning.map((slot) => (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => onSelectSlot(slot)}
+                              className={`min-w-[4.5rem] px-3 py-2 rounded-lg text-sm font-medium transition ${
+                                selectedSlot === slot
+                                  ? 'bg-headz-black text-white shadow'
+                                  : 'bg-headz-cream text-headz-black border border-black/10 hover:border-headz-red'
+                              }`}
+                            >
+                              {formatSlot(slot)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {groupedSlots.afternoon.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-headz-gray uppercase tracking-wider mb-2">Afternoon</p>
+                        <div className="flex flex-wrap gap-2">
+                          {groupedSlots.afternoon.map((slot) => (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => onSelectSlot(slot)}
+                              className={`min-w-[4.5rem] px-3 py-2 rounded-lg text-sm font-medium transition ${
+                                selectedSlot === slot
+                                  ? 'bg-headz-black text-white shadow'
+                                  : 'bg-headz-cream text-headz-black border border-black/10 hover:border-headz-red'
+                              }`}
+                            >
+                              {formatSlot(slot)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {groupedSlots.evening.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-semibold text-headz-gray uppercase tracking-wider mb-2">Evening</p>
+                        <div className="flex flex-wrap gap-2">
+                          {groupedSlots.evening.map((slot) => (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => onSelectSlot(slot)}
+                              className={`min-w-[4.5rem] px-3 py-2 rounded-lg text-sm font-medium transition ${
+                                selectedSlot === slot
+                                  ? 'bg-headz-black text-white shadow'
+                                  : 'bg-headz-cream text-headz-black border border-black/10 hover:border-headz-red'
+                              }`}
+                            >
+                              {formatSlot(slot)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-4 sm:px-6 py-4 bg-headz-cream/50 border-t border-black/10 flex flex-wrap gap-3 justify-between items-center">
+              <button
+                type="button"
+                onClick={() => setStep('barber')}
+                className="text-sm font-medium text-headz-red hover:underline"
+              >
+                ← Change barber
+              </button>
+              <button
+                type="button"
+                disabled={!selectedSlot}
+                onClick={() => selectedSlot && setStep('details')}
+                className="ml-auto px-5 py-2.5 rounded-lg bg-headz-red text-white text-sm font-semibold hover:bg-headz-redDark disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Continue
+              </button>
+            </div>
           </div>
         )}
 
@@ -497,6 +561,34 @@ export function BookingFlow({
                   placeholder="you@example.com"
                   className="w-full px-3 py-2 border border-black/20 rounded-lg"
                 />
+              </div>
+              <div>
+                <span className="block text-sm font-medium mb-2">How will you pay?</span>
+                <p className="text-xs text-headz-gray mb-2">So your barber knows what to expect at checkout.</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('cash')}
+                    className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                      paymentMethod === 'cash'
+                        ? 'border-headz-red bg-headz-red/10 text-headz-black'
+                        : 'border-black/15 text-headz-gray hover:border-black/30'
+                    }`}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('card')}
+                    className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                      paymentMethod === 'card'
+                        ? 'border-headz-red bg-headz-red/10 text-headz-black'
+                        : 'border-black/15 text-headz-gray hover:border-black/30'
+                    }`}
+                  >
+                    Card
+                  </button>
+                </div>
               </div>
             </div>
             <p className="mt-4 text-sm text-headz-gray">
@@ -542,7 +634,7 @@ export function BookingFlow({
             )}
 
             <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setStep('time')} className="px-4 py-2 border border-black/20 rounded-lg text-sm">
+              <button type="button" onClick={() => setStep('schedule')} className="px-4 py-2 border border-black/20 rounded-lg text-sm">
                 ← Back
               </button>
               <button

@@ -3,29 +3,13 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-function MenuIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  )
-}
-
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  )
-}
+import { Calendar, CalendarOff, Clock, User } from 'lucide-react'
 
 const nav = [
-  { href: '/dashboard/barber', label: 'Schedule' },
-  { href: '/dashboard/barber/pos', label: 'POS' },
-  { href: '/dashboard/barber/availability', label: 'Availability' },
-  { href: '/dashboard/barber/time-off', label: 'Time off' },
-  { href: '/dashboard/barber/profile', label: 'Profile' },
+  { href: '/dashboard/barber', label: 'My Schedule', icon: Calendar },
+  { href: '/dashboard/barber/availability', label: 'Availability', icon: Clock },
+  { href: '/dashboard/barber/time-off', label: 'Time off', icon: CalendarOff },
+  { href: '/dashboard/barber/profile', label: 'Profile', icon: User },
 ]
 
 export function BarberDashboardShell({
@@ -58,7 +42,7 @@ export function BarberDashboardShell({
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 shrink-0 bg-headz-black border-r border-white/10 flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 shrink-0 bg-[#0F0F0F] border-r border-white/10 flex flex-col transition-transform duration-200 ease-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -86,30 +70,36 @@ export function BarberDashboardShell({
               onClick={() => setSidebarOpen(false)}
               className="p-2 text-white/70 hover:text-white rounded-lg shrink-0"
             >
-              <CloseIcon className="w-5 h-5" />
+              <span className="sr-only">Close</span>×
             </button>
           </div>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {nav.map(({ href, label }) => {
+          {nav.map(({ href, label, icon: Icon }) => {
             const isActive =
-              href === '/dashboard/barber'
-                ? pathname === '/dashboard/barber'
-                : pathname.startsWith(href)
+              href === '/dashboard/barber' ? pathname === '/dashboard/barber' : pathname.startsWith(href)
             return (
               <Link
                 key={href}
                 href={href}
-                className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition border-l-2 ${
                   isActive
-                    ? 'bg-headz-red text-white'
-                    : 'text-white/70 hover:text-white hover:bg-white/5'
+                    ? 'border-headz-red bg-white/5 text-headz-red'
+                    : 'border-transparent text-[#666] hover:text-white hover:bg-white/5'
                 }`}
               >
+                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-headz-red' : ''}`} />
                 {label}
               </Link>
             )
           })}
+          <Link
+            href="/dashboard/barber/availability"
+            className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-headz-red/40 px-3 py-2.5 text-sm font-medium text-headz-red hover:bg-headz-red/10"
+          >
+            <Clock className="w-4 h-4" />
+            Edit Availability
+          </Link>
         </nav>
         <div className="p-3 border-t border-white/10">
           <form action="/auth/signout" method="post">
@@ -129,19 +119,37 @@ export function BarberDashboardShell({
         }`}
       >
         <header className="h-14 shrink-0 bg-white border-b border-black/10 flex items-center gap-3 px-4 sm:px-6">
-          <button
-            type="button"
-            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="p-2 -ml-1 text-headz-black hover:bg-black/5 rounded-lg shrink-0"
-          >
-            {sidebarOpen ? <CloseIcon className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
-          </button>
+          {!sidebarOpen ? (
+            <button
+              type="button"
+              aria-label="Open menu"
+              aria-expanded={false}
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 -ml-1 text-headz-black hover:bg-black/5 rounded-lg shrink-0"
+            >
+              ☰
+            </button>
+          ) : (
+            <div className="w-10 shrink-0" aria-hidden />
+          )}
           <h1 className="text-sm font-medium text-headz-gray md:hidden truncate">Headz — Barber</h1>
         </header>
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          <div className="max-w-4xl mx-auto w-full">{children}</div>
+        <main
+          className={`flex-1 overflow-auto ${
+            pathname === '/dashboard/barber' || pathname === '/dashboard/barber/availability'
+              ? 'p-0 sm:p-0'
+              : 'px-4 pb-6 pt-8 sm:px-6 sm:pb-8 sm:pt-10'
+          }`}
+        >
+          <div
+            className={
+              pathname === '/dashboard/barber' || pathname === '/dashboard/barber/availability'
+                ? 'w-full max-w-none'
+                : 'max-w-4xl mx-auto w-full'
+            }
+          >
+            {children}
+          </div>
         </main>
       </div>
     </div>

@@ -9,6 +9,7 @@ import {
   time,
   numeric,
   jsonb,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 
 /**
@@ -69,6 +70,24 @@ export const availability = pgTable('availability', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
+/** Per-day mode: N/A (unavailable), Open (shop hours), or Custom (interval rows in `availability`). */
+export const barberDayModes = pgTable(
+  'barber_day_modes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    barberId: uuid('barber_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    dayOfWeek: integer('day_of_week').notNull(),
+    mode: text('mode').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => ({
+    barberDayUnique: uniqueIndex('barber_day_modes_barber_day').on(t.barberId, t.dayOfWeek),
+  })
+)
+
 /** Blocks booking for a date range (barber profile id) */
 export const barberTimeOff = pgTable('barber_time_off', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -126,6 +145,8 @@ export const appointments = pgTable('appointments', {
   paymentStatus: text('payment_status'),
   receiptSentAt: timestamp('receipt_sent_at'),
   stripeChargeId: text('stripe_charge_id'),
+  squarePaymentId: text('square_payment_id'),
+  squareTerminalCheckoutId: text('square_terminal_checkout_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
@@ -139,6 +160,7 @@ export const posTransactions = pgTable('pos_transactions', {
   barberId: uuid('barber_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  appointmentId: uuid('appointment_id').references(() => appointments.id, { onDelete: 'set null' }),
   serviceId: uuid('service_id').references(() => services.id, { onDelete: 'set null' }),
   items: jsonb('items').$type<PosLineItem[] | null>(),
   subtotal: numeric('subtotal', { precision: 10, scale: 2 }).notNull(),
@@ -147,7 +169,25 @@ export const posTransactions = pgTable('pos_transactions', {
   paymentMethod: text('payment_method').notNull(),
   paymentStatus: text('payment_status').notNull().default('paid'),
   stripeChargeId: text('stripe_charge_id'),
+  squarePaymentId: text('square_payment_id'),
+  squareTerminalCheckoutId: text('square_terminal_checkout_id'),
+  cardBrand: text('card_brand'),
+  cardLastFour: text('card_last_four'),
+  refundedAt: timestamp('refunded_at'),
+  refundReason: text('refund_reason'),
+  refundAmount: numeric('refund_amount', { precision: 10, scale: 2 }),
   receiptSentAt: timestamp('receipt_sent_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+/** Paired Square Terminal devices (device codes → device_id after pairing). */
+export const squareDevices = pgTable('square_devices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  deviceId: text('device_id'),
+  deviceCodeId: text('device_code_id'),
+  deviceName: text('device_name').notNull().default('Square Terminal'),
+  status: text('status').notNull().default('unpaired'),
+  pairedAt: timestamp('paired_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
@@ -175,12 +215,41 @@ export const storeHours = pgTable('store_hours', {
   isOpen: boolean('is_open').default(true).notNull(),
 })
 
+/** Barber-facing profile (specialty, ratings) — keyed by staff user id */
+export const barberProfiles = pgTable('barber_profiles', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  specialty: text('specialty'),
+  bio: text('bio'),
+  instagramHandle: text('instagram_handle'),
+  averageRating: numeric('average_rating', { precision: 3, scale: 2 }).default('5.00').notNull(),
+  reviewCount: integer('review_count').default(0).notNull(),
+  avatarUrl: text('avatar_url'),
+})
+
+/** Single-day blocks on the schedule (lunch, break, etc.) */
+export const blockedTimes = pgTable('blocked_times', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  barberId: uuid('barber_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  date: date('date', { mode: 'string' }).notNull(),
+  startTime: time('start_time').notNull(),
+  endTime: time('end_time').notNull(),
+  reason: text('reason').default('Block'),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Barber = typeof barbers.$inferSelect
 export type NewBarber = typeof barbers.$inferInsert
 export type Availability = typeof availability.$inferSelect
 export type NewAvailability = typeof availability.$inferInsert
+export type BarberDayMode = typeof barberDayModes.$inferSelect
+export type NewBarberDayMode = typeof barberDayModes.$inferInsert
 export type BarberTimeOff = typeof barberTimeOff.$inferSelect
 export type NewBarberTimeOff = typeof barberTimeOff.$inferInsert
 export type Service = typeof services.$inferSelect
@@ -192,3 +261,9 @@ export type NewPosTransaction = typeof posTransactions.$inferInsert
 export type TimeOffRequest = typeof timeOffRequests.$inferSelect
 export type NewTimeOffRequest = typeof timeOffRequests.$inferInsert
 export type StoreHourRow = typeof storeHours.$inferSelect
+export type BarberProfile = typeof barberProfiles.$inferSelect
+export type NewBarberProfile = typeof barberProfiles.$inferInsert
+export type BlockedTime = typeof blockedTimes.$inferSelect
+export type NewBlockedTime = typeof blockedTimes.$inferInsert
+export type SquareDevice = typeof squareDevices.$inferSelect
+export type NewSquareDevice = typeof squareDevices.$inferInsert

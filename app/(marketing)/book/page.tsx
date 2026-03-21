@@ -38,10 +38,10 @@ export default async function BookPage({
   }
   return (
     <div className="min-h-screen bg-[var(--background)] py-8 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-2xl mx-auto w-full">
+      <div className="max-w-5xl mx-auto w-full">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center sm:text-left">Book your cut</h1>
-        <p className="text-headz-gray mb-6 sm:mb-8 text-center sm:text-left">
-          Pick a service, your barber, and a time. We&apos;ll hold your slot.
+        <p className="text-headz-gray mb-6 sm:mb-8 text-center sm:text-left max-w-2xl">
+          Choose a service, barber, and time — like a calendar booking. We&apos;ll hold your slot.
         </p>
         {backendUnavailable && (
           <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">

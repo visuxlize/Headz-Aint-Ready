@@ -2,47 +2,69 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { db } from '@/lib/db'
 import { barbersForMarketingCondition } from '@/lib/barbers/public-queries'
-import { barbers, services, users, type Barber } from '@/lib/db/schema'
+import {
+  getPublishedFallbackPrices,
+  getPublishedFallbackTeam,
+  type MarketingBarberCard,
+  type MarketingPriceRow,
+} from '@/lib/marketing/home-fallbacks'
+import { barbers, services, users } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { SITE } from '@/lib/site-config'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
+/**
+ * Public marketing homepage — do not remove these sections (hero, Dream Team video, team grid,
+ * services, price list, contact) when refactoring dashboard or APIs. DB failures fall back to
+ * published content in `lib/marketing/home-fallbacks.ts`.
+ */
 export default async function HomePage() {
-  let barbersList: Barber[] = []
-  let priceRows: {
-    id: string
-    name: string
-    description: string | null
-    price: string
-    priceDisplayOverride: string | null
-    durationMinutes: number
-  }[] = []
-  try {
-    const [bRows, pRows] = await Promise.all([
-      db
-        .select({ barber: barbers })
-        .from(barbers)
-        .leftJoin(users, eq(barbers.userId, users.id))
-        .where(barbersForMarketingCondition)
-        .orderBy(asc(barbers.sortOrder))
-        .then((rows) => rows.map((r) => r.barber)),
-      db
-        .select({
-          id: services.id,
-          name: services.name,
-          description: services.description,
-          price: services.price,
-          priceDisplayOverride: services.priceDisplayOverride,
-          durationMinutes: services.durationMinutes,
-        })
-        .from(services)
-        .where(eq(services.isActive, true))
-        .orderBy(asc(services.displayOrder)),
-    ])
-    barbersList = bRows
-    priceRows = pRows
-  } catch (err) {
-    console.error('HomePage: could not load barbers/services', err)
+  let barbersList: MarketingBarberCard[] = []
+  let priceRows: MarketingPriceRow[] = []
+
+  const barbersQuery = db
+    .select({ barber: barbers })
+    .from(barbers)
+    .leftJoin(users, eq(barbers.userId, users.id))
+    .where(barbersForMarketingCondition)
+    .orderBy(asc(barbers.sortOrder))
+    .then((rows) => rows.map((r) => r.barber))
+
+  const pricesQuery = db
+    .select({
+      id: services.id,
+      name: services.name,
+      description: services.description,
+      price: services.price,
+      priceDisplayOverride: services.priceDisplayOverride,
+      durationMinutes: services.durationMinutes,
+    })
+    .from(services)
+    .where(eq(services.isActive, true))
+    .orderBy(asc(services.displayOrder))
+
+  const [barbersSettled, pricesSettled] = await Promise.allSettled([barbersQuery, pricesQuery])
+
+  if (barbersSettled.status === 'fulfilled' && barbersSettled.value.length > 0) {
+    barbersList = barbersSettled.value.map((b) => ({
+      id: b.id,
+      name: b.name,
+      avatarUrl: b.avatarUrl,
+    }))
+  } else {
+    if (barbersSettled.status === 'rejected') {
+      console.error('HomePage: barbers query failed', barbersSettled.reason)
+    }
+    barbersList = getPublishedFallbackTeam()
+  }
+
+  if (pricesSettled.status === 'fulfilled' && pricesSettled.value.length > 0) {
+    priceRows = pricesSettled.value
+  } else {
+    if (pricesSettled.status === 'rejected') {
+      console.error('HomePage: services query failed', pricesSettled.reason)
+    }
+    priceRows = getPublishedFallbackPrices()
   }
 
   return (
@@ -156,78 +178,90 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Team – Dream Team from headzaintready.com */}
+      {/* Team — same grid as Feb 2026 marketing (avatars + names); roster from admin / DB */}
       <section id="team" className="py-20 px-4 sm:px-6 max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-4">The Dream Team</h2>
         <p className="text-headz-gray text-center max-w-xl mx-auto mb-12">
           Headz Ain&apos;t Ready Master Barbers. Pick your favorite when you book.
         </p>
-        <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8">
-          {barbersList.length > 0 ? (
-            barbersList.map((barber) => (
-              <div key={barber.id} className="text-center">
-                <div className="aspect-square rounded-full overflow-hidden mx-auto mb-4 max-w-[200px] bg-headz-black/10">
-                  {barber.avatarUrl ? (
-                    <Image
-                      src={barber.avatarUrl}
-                      alt={barber.name}
-                      width={200}
-                      height={200}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-headz-black/20" />
-                  )}
-                </div>
-                <h3 className="font-semibold">{barber.name}</h3>
-                <p className="text-headz-gray text-sm">Master Barber</p>
+        <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-10">
+          {barbersList.map((barber) => (
+            <div
+              key={barber.id}
+              className="w-40 shrink-0 text-center sm:w-44 md:w-48"
+            >
+              <div className="aspect-square rounded-full overflow-hidden mx-auto mb-4 max-w-[200px] bg-headz-black/10">
+                {barber.avatarUrl ? (
+                  <Image
+                    src={barber.avatarUrl}
+                    alt={barber.name}
+                    width={200}
+                    height={200}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-headz-cream border-2 border-headz-red/15 flex items-center justify-center">
+                    <span className="text-headz-red font-semibold text-3xl sm:text-4xl tracking-tight">
+                      {barber.name
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((w) => w[0])
+                        .join('')
+                        .toUpperCase() || '?'}
+                    </span>
+                  </div>
+                )}
               </div>
-            ))
-          ) : (
-            <p className="col-span-full text-center text-headz-gray text-sm">
-              Meet the team when you book — our barbers are ready for you.
-            </p>
-          )}
+              <h3 className="font-semibold">{barber.name}</h3>
+              <p className="text-headz-gray text-sm">Master Barber</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Price list — matches in-shop flyer: title, description under service, price in red */}
+      {/* Price list — Feb 2026 layout (Service | Time | Price); rows from admin / services table */}
       <section id="prices" className="py-20 bg-white border-t border-black/10 px-4 sm:px-6">
         <div className="max-w-2xl mx-auto">
-          <h2 className="font-serif text-3xl sm:text-4xl text-headz-black text-left mb-2 tracking-tight">
-            Headz Ain&apos;t Ready Pricelist
-          </h2>
-          <p className="text-headz-gray text-sm mb-10">
-            Clear pricing — same list you&apos;ll see in the chair. Edited from admin when rates change.
-          </p>
+          <h2 className="text-3xl font-bold text-center mb-10">Price list</h2>
           <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
-            {priceRows.length > 0 ? (
-              priceRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="flex gap-4 justify-between items-start px-5 sm:px-6 py-4 border-b border-black/5 last:border-b-0"
-                >
-                  <div className="min-w-0 pr-2">
-                    <p className="text-headz-black font-semibold leading-snug">{row.name}</p>
-                    {row.description?.trim() ? (
-                      <p className="text-headz-black/80 text-sm mt-1 leading-snug">{row.description}</p>
-                    ) : null}
+            <div className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-3 bg-headz-black/5 border-b border-black/10 text-xs font-semibold uppercase tracking-wider text-headz-gray">
+              <div>Service</div>
+              <div className="text-right">Time</div>
+              <div className="text-right">Price</div>
+            </div>
+            {priceRows.map((row) => (
+              <div
+                key={row.id}
+                className="grid grid-cols-1 sm:grid-cols-[1fr_5rem_5.5rem] gap-x-4 gap-y-1 px-5 py-4 border-b border-black/5 last:border-b-0 items-start sm:items-center"
+              >
+                <div className="min-w-0">
+                  <span className="text-headz-black font-medium block">{row.name}</span>
+                  {row.description?.trim() ? (
+                    <span className="text-headz-gray text-sm block mt-0.5 leading-snug">{row.description}</span>
+                  ) : null}
+                  <div className="sm:hidden flex justify-between gap-3 mt-2 text-sm">
+                    <span className="text-headz-gray">{row.durationMinutes} min</span>
+                    <span className="text-headz-red font-semibold tabular-nums shrink-0">
+                      {formatServicePriceDisplay(row)}
+                    </span>
                   </div>
-                  <p className="text-headz-red font-semibold tabular-nums shrink-0 text-right pt-0.5">
-                    {formatServicePriceDisplay(row)}
-                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="px-5 py-8 text-center text-headz-gray text-sm">
-                Pricing is loading — call the shop or book online for current rates.
+                <span className="hidden sm:inline text-headz-gray text-sm text-right tabular-nums">
+                  {row.durationMinutes} min
+                </span>
+                <span className="hidden sm:inline text-headz-red font-semibold tabular-nums text-right">
+                  {formatServicePriceDisplay(row)}
+                </span>
               </div>
-            )}
+            ))}
           </div>
           <div className="mt-6 text-center text-sm text-headz-gray space-y-1">
             <p>{SITE.hoursShort}</p>
             <p>
-              <a href={`tel:${SITE.phoneTel}`} className="text-headz-red hover:underline">{SITE.phone}</a>
+              <a href={`tel:${SITE.phoneTel}`} className="text-headz-red hover:underline">
+                {SITE.phone}
+              </a>
             </p>
           </div>
         </div>

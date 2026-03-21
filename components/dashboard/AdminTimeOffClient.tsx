@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
+import toast from 'react-hot-toast'
 
 type RequestRow = {
   id: string

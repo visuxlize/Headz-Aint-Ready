@@ -95,6 +95,13 @@ export default async function AvailabilityPage() {
         <p className="text-headz-gray text-sm mt-1">
           Recurring weekly hours and time off. Booking only shows slots when the barber is available within store hours.
         </p>
+        <p className="mt-3 rounded-xl border border-headz-red/20 bg-headz-red/5 px-4 py-3 text-sm text-headz-black">
+          <span className="font-semibold">New:</span> use{' '}
+          <a href="/dashboard/schedule" className="font-medium text-headz-red underline underline-offset-2">
+            Schedule → Working hours
+          </a>{' '}
+          for the full weekly editor (N/A, Open, custom shifts, copy to days).
+        </p>
       </div>
       <AvailabilityEditor barberData={barberData} dayNames={DAY_NAMES} dayShort={DAY_SHORT} />
     </div>

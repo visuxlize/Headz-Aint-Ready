@@ -22,15 +22,7 @@ export const SITE = {
   },
 } as const
 
-/** Legacy static list — the home page price table reads active rows from `services` in the database. */
-export const PRICE_LIST = [
-  { name: 'Kids Haircut', price: '$30.00', duration: '30 min' },
-  { name: 'Shape Up', price: '$20.00', duration: '30 min' },
-  { name: 'Shape Up & Beard', price: '$30.00', duration: '30 min' },
-  { name: 'Senior Citizens', price: '$30.00', duration: '30 min' },
-  { name: 'Haircut Adult', price: '$40.00', duration: '30 min' },
-  { name: 'Haircut & Beard', price: '$50.00', duration: '30 min' },
-  { name: 'Haircut / Beard / Hot Towel', price: '$55.00', duration: '30 min' },
-  { name: 'Enhancement beard color black/brown', price: 'Price varies', duration: '30 min' },
-  { name: 'Braids', price: '$50.00', duration: '30 min' },
-] as const
+/**
+ * Home /book pricing comes from the `services` table (Dashboard → Services & pricing).
+ * Default rows match Feb 2026 marketing: `lib/services/default-headz-services.json` — run `npm run restore:services` to sync DB.
+ */

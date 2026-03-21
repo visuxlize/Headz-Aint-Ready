@@ -23,42 +23,32 @@ async function uniqueBarberSlug(base: string): Promise<string> {
   }
 }
 
-/** GET — all barber profiles (Dream Team + invited), with or without linked staff login */
+/** GET — full roster: every `barbers` row (linked staff + roster-only placeholders). */
 export async function GET() {
   const auth = await requireAdminApi()
   if ('error' in auth) return auth.error
 
   const rows = await db
     .select({
-      barberProfileId: barbers.id,
-      userId: barbers.userId,
-      barberName: barbers.name,
-      barberEmail: barbers.email,
-      avatarUrl: barbers.avatarUrl,
-      barberActive: barbers.isActive,
-      barberCreatedAt: barbers.createdAt,
-      userEmail: users.email,
-      userFullName: users.fullName,
-      userIsActive: users.isActive,
-      userCreatedAt: users.createdAt,
+      barber: barbers,
+      user: users,
     })
     .from(barbers)
     .leftJoin(users, eq(barbers.userId, users.id))
     .orderBy(asc(barbers.sortOrder), asc(barbers.name))
 
-  const data = rows.map((r) => {
-    const linked = r.userId != null
+  const data = rows.map(({ barber: b, user: u }) => {
+    const linked = u != null
     return {
-      barberProfileId: r.barberProfileId,
-      userId: r.userId,
-      linked,
-      displayName: r.barberName,
-      email: r.userEmail ?? r.barberEmail,
-      avatarUrl: r.avatarUrl,
-      isActive: linked ? (r.userIsActive ?? false) : r.barberActive,
-      createdAt: (linked ? r.userCreatedAt : r.barberCreatedAt)?.toISOString?.() ?? String(linked ? r.userCreatedAt : r.barberCreatedAt),
-      /** Use for PATCH /api/admin/barbers/:id when linked */
-      staffUserId: r.userId,
+      kind: linked ? ('linked' as const) : ('placeholder' as const),
+      userId: u?.id ?? null,
+      barberProfileId: b.id,
+      displayName: b.name,
+      email: linked ? u.email : (b.email ?? ''),
+      avatarUrl: b.avatarUrl,
+      isActive: linked ? u.isActive : b.isActive,
+      createdAt: linked ? u.createdAt : b.createdAt,
+      slug: b.slug,
     }
   })
 
@@ -86,6 +76,17 @@ export async function POST(request: Request) {
   const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.email, emailLower)).limit(1)
   if (dup) {
     return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 409 })
+  }
+  const [dupBarberEmail] = await db
+    .select({ id: barbers.id })
+    .from(barbers)
+    .where(eq(barbers.email, emailLower))
+    .limit(1)
+  if (dupBarberEmail) {
+    return NextResponse.json(
+      { error: 'This email is already on the barber roster. Use “Add to roster” to link, or remove the roster entry first.' },
+      { status: 409 }
+    )
   }
 
   const admin = createServiceRoleClient()

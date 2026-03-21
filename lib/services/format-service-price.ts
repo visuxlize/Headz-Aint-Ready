@@ -10,7 +10,7 @@ export function formatServicePriceDisplay(service: {
   return `$${n.toFixed(2)}`
 }
 
-/** Base amount for fees, POS totals, Stripe (uses numeric column). */
+/** Base amount for fees and POS totals (uses numeric column). */
 export function servicePriceNumeric(service: { price: string | number }): number {
   const n = Number.parseFloat(String(service.price))
   return Number.isFinite(n) ? n : 0

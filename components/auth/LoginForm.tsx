@@ -8,18 +8,35 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
+    const msg = searchParams.get('message')
+    if (msg === 'confirm_email') {
+      setInfo('Check your email to confirm your account, then sign in.')
+    }
     const err = searchParams.get('error')
     if (err === 'unauthorized') {
-      setError('You don’t have access to the staff site. Contact your manager to be added.')
+      setError(
+        'Not on the staff allow list. Your email must be in the staff_allowlist table. Dev fix: Supabase → SQL → run scripts/ensure-staff-allowlist.sql, or npm run seed:dev-users.'
+      )
+    }
+    if (err === 'unavailable') {
+      setError(
+        "We couldn't reach the shop servers to finish sign-in. Use Try again on the next screen, or wait a moment and open the staff area again."
+      )
     }
     if (err === 'inactive') {
       setError('This account has been deactivated. Contact your manager.')
+    }
+    if (err === 'no_profile') {
+      setError(
+        'No staff profile is linked to this login. Ask an admin to add your email to the barber roster (or send you an invite), then try again.'
+      )
     }
   }, [searchParams])
 
@@ -50,6 +67,11 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {info && (
+        <div className="p-3 bg-emerald-500/15 border border-emerald-400/40 rounded-lg text-emerald-100 text-sm text-center">
+          {info}
+        </div>
+      )}
       {error && (
         <div className="p-3 bg-headz-red/20 border border-headz-red/50 rounded-lg text-white text-sm text-center">
           {error}
