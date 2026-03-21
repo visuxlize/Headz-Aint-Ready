@@ -23,36 +23,44 @@ async function uniqueBarberSlug(base: string): Promise<string> {
   }
 }
 
-/** GET — all users with role barber */
+/** GET — all barber profiles (Dream Team + invited), with or without linked staff login */
 export async function GET() {
   const auth = await requireAdminApi()
   if ('error' in auth) return auth.error
 
   const rows = await db
     .select({
-      id: users.id,
       barberProfileId: barbers.id,
-      email: users.email,
-      fullName: users.fullName,
-      isActive: users.isActive,
-      createdAt: users.createdAt,
+      userId: barbers.userId,
       barberName: barbers.name,
+      barberEmail: barbers.email,
       avatarUrl: barbers.avatarUrl,
+      barberActive: barbers.isActive,
+      barberCreatedAt: barbers.createdAt,
+      userEmail: users.email,
+      userFullName: users.fullName,
+      userIsActive: users.isActive,
+      userCreatedAt: users.createdAt,
     })
-    .from(users)
-    .leftJoin(barbers, eq(barbers.userId, users.id))
-    .where(eq(users.role, 'barber'))
-    .orderBy(asc(users.createdAt))
+    .from(barbers)
+    .leftJoin(users, eq(barbers.userId, users.id))
+    .orderBy(asc(barbers.sortOrder), asc(barbers.name))
 
-  const data = rows.map((r) => ({
-    id: r.id,
-    barberProfileId: r.barberProfileId,
-    email: r.email,
-    displayName: r.barberName ?? r.fullName ?? r.email,
-    avatarUrl: r.avatarUrl,
-    isActive: r.isActive,
-    createdAt: r.createdAt,
-  }))
+  const data = rows.map((r) => {
+    const linked = r.userId != null
+    return {
+      barberProfileId: r.barberProfileId,
+      userId: r.userId,
+      linked,
+      displayName: r.barberName,
+      email: r.userEmail ?? r.barberEmail,
+      avatarUrl: r.avatarUrl,
+      isActive: linked ? (r.userIsActive ?? false) : r.barberActive,
+      createdAt: (linked ? r.userCreatedAt : r.barberCreatedAt)?.toISOString?.() ?? String(linked ? r.userCreatedAt : r.barberCreatedAt),
+      /** Use for PATCH /api/admin/barbers/:id when linked */
+      staffUserId: r.userId,
+    }
+  })
 
   return NextResponse.json({ data })
 }
