@@ -121,10 +121,10 @@ After the first deploy, do these so booking and staff login work in production.
 
 ### 2. Database connection string (DATABASE_URL)
 
-- Use Supabase **Session** (connection pooler) if possible, not **Direct**.
-- In Supabase: **Project → Settings → Database → Connection string** → choose **URI** and **Session mode** (port **5432**). Copy that URI and set it as `DATABASE_URL` in Netlify.
-- **ENOTFOUND on pooler host?** Use **`aws-0-[region]`** (hyphen after aws: **aws-0** not **aws0**). Fix `DATABASE_URL` in Netlify and redeploy.
-- If you only have Direct and see connection errors (e.g. timeouts or ENETUNREACH) on Netlify, the app will still load but the book page will show “Booking is temporarily unavailable” until the DB is reachable.
+- Prefer the **Transaction** pooler (**port 6543**, host often `db.<project>.supabase.co`) or Supabase’s **Session** pooler — **not** a mis-copied host. Copy the full URI from **Project → Settings → Database → Connection string** (include password; URL-encode special characters if needed).
+- Set **`DATABASE_URL` in Netlify** to the **same** value as local `.env.local` if you want production to hit the same DB. After any change: **Deploys → Trigger deploy**.
+- **“Can’t reach the shop right now”** after sign-in usually means the deploy **does not** have `DATABASE_URL` or the DB is unreachable. Add/fix `DATABASE_URL`, redeploy, then open **`/api/health`** — you want `hasDatabaseUrl: true` and `dbOk: true`.
+- **ENOTFOUND** on the host? Double-check the hostname from Supabase (e.g. `aws-0-us-west-2.pooler...` vs typo **aws0**).
 
 ### 3. Supabase auth redirect for your Netlify URL
 

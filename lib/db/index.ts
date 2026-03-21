@@ -88,12 +88,26 @@ function getDb(): ReturnType<typeof drizzle> {
   }
 
   if (!globalForDb.__headzPostgres) {
-    globalForDb.__headzPostgres = postgres(process.env.DATABASE_URL, {
+    const url = process.env.DATABASE_URL
+    const supabaseHost =
+      url &&
+      (() => {
+        try {
+          const u = new URL(url.replace(/^postgresql:/i, 'http:').replace(/^postgres:/i, 'http:'))
+          return u.hostname.includes('supabase.co') || u.hostname.includes('pooler.supabase.com')
+        } catch {
+          return false
+        }
+      })()
+
+    globalForDb.__headzPostgres = postgres(url, {
       // Required for Supabase Transaction pooler (PgBouncer).
       prepare: false,
       max: 1,
-      connect_timeout: 10,
+      connect_timeout: 15,
       idle_timeout: 20,
+      // Netlify/serverless → Supabase often needs explicit TLS when not in the URI.
+      ...(supabaseHost ? { ssl: 'require' as const } : {}),
     })
     globalForDb.__headzDrizzle = drizzle(globalForDb.__headzPostgres, { schema })
   }

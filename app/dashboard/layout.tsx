@@ -70,8 +70,10 @@ export default async function DashboardRootLayout({
   } catch (e) {
     const cause = e instanceof Error ? e.cause : undefined
     console.error('Dashboard allowlist check failed:', e, cause != null ? { cause } : '')
+    const msg = e instanceof Error ? e.message : String(e)
+    const reason = msg.includes('DATABASE_URL environment variable is not set') ? 'config' : 'db'
     // Keep Supabase session — transient DB issues were signing users out and looking like "login failed".
-    redirect('/auth/service-unavailable')
+    redirect(`/auth/service-unavailable?reason=${reason}`)
   }
 
   return <>{children}</>
