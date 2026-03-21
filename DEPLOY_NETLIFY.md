@@ -78,9 +78,11 @@ Your app needs these so it can talk to Supabase and the database.
 - In Netlify: **Team settings → Integrations → GitHub** and ensure the repo (or org) is allowed.
 
 **“Build failed”**  
-- Open the failed deploy in Netlify and read the **Build log**.  
-- Common: missing env vars—confirm all three variables are set and names have no typos or extra spaces.  
-- If you see “Cannot find module 'autoprefixer'”, the repo’s `netlify.toml` sets `NPM_FLAGS = "--include=dev"` so devDependencies install; redeploy after pushing that.
+- Open the failed deploy in Netlify and read the **Build log** (scroll up for the first `Error:` / `Failed to compile` line).  
+- **Publish directory:** In **Site settings → Build & deploy → Build settings**, clear **Publish directory** if it is set to `.next`. The Next.js plugin must control output; a wrong publish dir causes cryptic failures.  
+- Common: missing env vars—confirm required variables are set and names have no typos or extra spaces.  
+- If you see “Cannot find module 'autoprefixer'”, the repo’s `netlify.toml` sets `NPM_FLAGS = "--include=dev"` so devDependencies install; redeploy after pushing that.  
+- Repo now includes **`eslint.config.mjs`** so `next build` never stops on an interactive ESLint setup prompt in CI.
 
 **“Site loads but login/booking doesn’t work”**  
 - Confirm all three env vars in **Site settings → Environment variables**.  

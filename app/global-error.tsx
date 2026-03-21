@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 export default function GlobalError({
   error,
   reset,
@@ -54,7 +56,7 @@ export default function GlobalError({
             >
               Try again
             </button>
-            <a
+            <Link
               href="/"
               style={{
                 padding: '0.625rem 1.25rem',
@@ -67,7 +69,7 @@ export default function GlobalError({
               }}
             >
               Back to home
-            </a>
+            </Link>
           </div>
           {process.env.NODE_ENV === 'development' && error?.message && (
             <pre

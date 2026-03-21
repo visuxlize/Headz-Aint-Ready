@@ -20,7 +20,7 @@ export async function buildScheduleDaysForStaffUser(staffUserId: string) {
   const keyIds = [keys.userId, keys.barberProfileId].filter(Boolean) as string[]
 
   let avRows: Availability[] = []
-  let storeHours = await getAllStoreWindows()
+  const storeHours = await getAllStoreWindows()
   try {
     if (keyIds.length > 0) {
       avRows = await db.select().from(availability).where(inArray(availability.barberId, keyIds))
