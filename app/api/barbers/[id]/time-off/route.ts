@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
-import { barberTimeOff } from '@/lib/db/schema'
+import { barberTimeOff, barbers } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { z } from 'zod'
+import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 
 const bodySchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -18,11 +19,21 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
 
-    const { id: barberId } = await params
+    const { id: barberProfileId } = await params
+    const [profile] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
+    if (!profile) {
+      return NextResponse.json({ error: 'Barber not found' }, { status: 404 })
+    }
+    if (!profile.userId) {
+      return NextResponse.json({ error: 'Barber is not linked to a staff account.' }, { status: 400 })
+    }
+    const scoped = requireBarberUserId(auth, profile.userId)
+    if (scoped) return scoped
+
+    const barberId = barberProfileId
     const body = await request.json()
     const parsed = bodySchema.safeParse(body)
     if (!parsed.success) {
@@ -50,11 +61,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
 
-    const { id: barberId } = await params
+    const { id: barberProfileId } = await params
+    const [profile] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
+    if (!profile?.userId) {
+      return NextResponse.json({ error: 'Barber not found' }, { status: 404 })
+    }
+    const scoped = requireBarberUserId(auth, profile.userId)
+    if (scoped) return scoped
+
+    const barberId = barberProfileId
     const { searchParams } = new URL(request.url)
     const timeOffId = searchParams.get('id')
     if (!timeOffId) {

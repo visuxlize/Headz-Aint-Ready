@@ -72,7 +72,7 @@ export async function PATCH(
       timeSlot,
       updatedAt: new Date(),
     })
-    .where(eq(appointments.id, id))
+    .where(and(eq(appointments.id, id), eq(appointments.barberId, auth.user.id)))
     .returning()
 
   return NextResponse.json({ data: updated })

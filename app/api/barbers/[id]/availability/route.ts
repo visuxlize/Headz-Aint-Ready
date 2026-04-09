@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { availability, barbers } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { minutesToPgTime } from '@/lib/appointments/time'
+import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 
 const bodySchema = z.object({
   dayOfWeek: z.number().min(0).max(6),
@@ -18,11 +19,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
 
     const { id: barberProfileId } = await params
     const body = await request.json()
@@ -42,6 +40,9 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    const scoped = requireBarberUserId(auth, barberRow.userId)
+    if (scoped) return scoped
 
     const [row] = await db
       .insert(availability)
@@ -66,11 +67,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
 
     const { id: barberProfileId } = await params
     const { searchParams } = new URL(request.url)
@@ -83,6 +81,9 @@ export async function DELETE(
     if (!barberRow?.userId) {
       return NextResponse.json({ error: 'Barber has no linked staff user.' }, { status: 400 })
     }
+
+    const scoped = requireBarberUserId(auth, barberRow.userId)
+    if (scoped) return scoped
 
     await db
       .delete(availability)

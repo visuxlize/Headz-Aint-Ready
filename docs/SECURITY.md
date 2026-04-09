@@ -23,6 +23,7 @@ This document complements code-level controls. **Supabase Auth** hashes password
 ## Application
 
 - **IDOR**: API routes must scope by `auth.uid()` / role (`requireStaffApi`, `requireBarberApi`, `requireAdminApi`) before reads/writes. Prefer `WHERE resource_id = $id AND owner_id = auth.uid()` in updates.
+- **`requireBarberUserId`**: `lib/staff/barber-scope.ts` — non-admins may only pass their own staff `users.id` as POS/Squire `barberId`. Admin/dashboard calendar routes intentionally use `requireAdminApi` or scoped queries.
 - **Rate limits**: In-memory limits in `lib/security/rate-limit.ts` apply to selected routes; for multi-instance production use **Redis** (e.g. Upstash) or an edge firewall (Cloudflare, Vercel WAF).
 - **Logging**: `lib/security/security-log.ts` emits structured `console.warn` lines — ship to your log aggregator and alert on `event: "idor_blocked"` / `"rate_limit"`.
 

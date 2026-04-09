@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { appointments, barbers, posTransactions } from '@/lib/db/schema'
 import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 import { sendPosReceiptEmail } from '@/lib/receipts/send-pos-receipt'
 import { getTodayStoreDate } from '@/lib/pos/store-date'
 import { and, eq } from 'drizzle-orm'
@@ -43,6 +44,9 @@ export async function POST(request: Request) {
   }
 
   const d = parsed.data
+  const scoped = requireBarberUserId(auth, d.barberId)
+  if (scoped) return scoped
+
   const tipStr = d.tip.toFixed(2)
   const subStr = d.subtotal.toFixed(2)
   const totalStr = d.total.toFixed(2)
@@ -83,6 +87,9 @@ export async function POST(request: Request) {
       if (row.appointmentDate !== today) {
         return NextResponse.json({ error: 'Appointment is not for today' }, { status: 400 })
       }
+      if (row.barberId !== d.barberId) {
+        return NextResponse.json({ error: 'Barber does not match appointment' }, { status: 400 })
+      }
 
       await db
         .update(appointments)
@@ -96,7 +103,13 @@ export async function POST(request: Request) {
           stripeChargeId: d.stripeChargeId ?? null,
           updatedAt: new Date(),
         })
-        .where(and(eq(appointments.id, d.appointmentId), eq(appointments.status, 'pending')))
+        .where(
+          and(
+            eq(appointments.id, d.appointmentId),
+            eq(appointments.status, 'pending'),
+            eq(appointments.barberId, d.barberId)
+          )
+        )
 
       return NextResponse.json({ ok: true, mode: 'appointment' })
     }

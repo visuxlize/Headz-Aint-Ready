@@ -12,6 +12,25 @@ export async function GET() {
 
   const today = getTodayStoreDate()
 
+  const barberWhere =
+    auth.dbUser.role === 'admin'
+      ? and(eq(users.role, 'barber'), eq(users.isActive, true), eq(barbers.isActive, true))
+      : and(
+          eq(users.role, 'barber'),
+          eq(users.isActive, true),
+          eq(barbers.isActive, true),
+          eq(users.id, auth.user.id)
+        )
+
+  const apptWhere =
+    auth.dbUser.role === 'admin'
+      ? and(eq(appointments.appointmentDate, today), eq(appointments.status, 'pending'))
+      : and(
+          eq(appointments.appointmentDate, today),
+          eq(appointments.status, 'pending'),
+          eq(appointments.barberId, auth.user.id)
+        )
+
   const [serviceRows, barberRows, apptRows] = await Promise.all([
     db.select().from(services).where(eq(services.isActive, true)).orderBy(asc(services.displayOrder)),
     db
@@ -24,7 +43,7 @@ export async function GET() {
       })
       .from(users)
       .innerJoin(barbers, eq(barbers.userId, users.id))
-      .where(and(eq(users.role, 'barber'), eq(users.isActive, true), eq(barbers.isActive, true)))
+      .where(barberWhere)
       .orderBy(asc(barbers.sortOrder)),
     db
       .select({
@@ -38,7 +57,7 @@ export async function GET() {
       .innerJoin(services, eq(appointments.serviceId, services.id))
       .innerJoin(users, eq(appointments.barberId, users.id))
       .leftJoin(barbers, eq(barbers.userId, users.id))
-      .where(and(eq(appointments.appointmentDate, today), eq(appointments.status, 'pending')))
+      .where(apptWhere)
       .orderBy(asc(appointments.timeSlot)),
   ])
 

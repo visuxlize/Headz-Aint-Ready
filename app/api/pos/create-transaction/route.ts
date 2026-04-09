@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { appointments, posTransactions } from '@/lib/db/schema'
 import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 import { getTodayStoreDate } from '@/lib/pos/store-date'
 
 const itemSchema = z.object({
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
   }
 
   const d = parsed.data
+  const scoped = requireBarberUserId(auth, d.barberId)
+  if (scoped) return scoped
+
   const today = getTodayStoreDate()
   const subStr = d.subtotal.toFixed(2)
   const tipStr = d.tipAmount.toFixed(2)

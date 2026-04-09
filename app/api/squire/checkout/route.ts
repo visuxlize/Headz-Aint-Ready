@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { posTransactions } from '@/lib/db/schema'
 import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 import { squireFetch } from '@/lib/squire/client'
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
   const { barberId, serviceId, appointmentId, amount, transactionId } = parsed.data
   const locationId = process.env.SQUIRE_LOCATION_ID?.trim()
 
+  const scoped = requireBarberUserId(auth, barberId)
+  if (scoped) return scoped
+
   if (transactionId) {
     const [txn] = await db.select().from(posTransactions).where(eq(posTransactions.id, transactionId)).limit(1)
     if (!txn) {
@@ -45,6 +49,9 @@ export async function POST(request: Request) {
     }
     if (txn.paymentStatus !== 'pending') {
       return NextResponse.json({ error: 'Transaction is not pending' }, { status: 400 })
+    }
+    if (txn.barberId !== barberId) {
+      return NextResponse.json({ error: 'Transaction does not match barber' }, { status: 400 })
     }
   }
 

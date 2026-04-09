@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { appointments, posTransactions } from '@/lib/db/schema'
 import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
   if (!txn) {
     return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
   }
+  const scoped = requireBarberUserId(auth, txn.barberId)
+  if (scoped) return scoped
   if (txn.paymentStatus !== 'pending') {
     return NextResponse.json({ error: 'Transaction is not pending' }, { status: 400 })
   }

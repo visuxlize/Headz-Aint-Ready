@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
+import { eq } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { posTransactions } from '@/lib/db/schema'
 import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { requireBarberUserId } from '@/lib/staff/barber-scope'
 import { squireFetch } from '@/lib/squire/client'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +16,18 @@ export async function POST(_request: Request, context: { params: Promise<{ check
   const { checkoutId } = await context.params
   if (!checkoutId) {
     return NextResponse.json({ error: 'Missing checkout id' }, { status: 400 })
+  }
+
+  const [scopeTxn] = await db
+    .select()
+    .from(posTransactions)
+    .where(eq(posTransactions.squareTerminalCheckoutId, checkoutId))
+    .limit(1)
+  if (scopeTxn) {
+    const forbidden = requireBarberUserId(auth, scopeTxn.barberId)
+    if (forbidden) return forbidden
+  } else if (auth.dbUser.role !== 'admin') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
   try {
