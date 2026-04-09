@@ -170,8 +170,8 @@ export default async function HomePage() {
                 Been Serving Thousands Of Clients In New York &amp; The Entire Tri-State Area. We&apos;re proud of
                 the craft and we let the cuts speak for themselves.
               </p>
-              <div className="mx-auto flex max-w-xl flex-col gap-4 sm:max-w-none sm:flex-row sm:justify-center sm:gap-5">
-                <div className="flex flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px]">
+              <div className="mx-auto flex max-w-xl flex-row flex-wrap justify-center gap-4 sm:max-w-2xl sm:gap-5 lg:max-w-md lg:flex-col lg:flex-nowrap lg:justify-start">
+                <div className="flex min-w-[min(100%,280px)] flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px] lg:max-w-none">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-headz-red text-white shadow-md shadow-headz-red/20">
                     <RedCheckIcon className="h-4 w-4" />
                   </span>
@@ -180,7 +180,7 @@ export default async function HomePage() {
                     <p className="mt-1 text-sm leading-snug text-headz-gray">Monday – Sun: 9am – 8pm</p>
                   </div>
                 </div>
-                <div className="flex flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px]">
+                <div className="flex min-w-[min(100%,280px)] flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px] lg:max-w-none">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-headz-red text-white shadow-md shadow-headz-red/20">
                     <RedCheckIcon className="h-4 w-4" />
                   </span>
@@ -325,7 +325,7 @@ export default async function HomePage() {
 
       {/* Price list + gallery */}
       <section id="prices" className="py-20 bg-white border-t border-black/10 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:items-center">
           <div className="min-w-0">
             <h2 className="font-headz-display mb-10 text-3xl text-headz-black">Price list</h2>
             <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
