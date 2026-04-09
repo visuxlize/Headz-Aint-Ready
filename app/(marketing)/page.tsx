@@ -161,7 +161,7 @@ export default async function HomePage() {
           aria-hidden
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white/90 to-transparent" aria-hidden />
-        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-16 lg:grid-cols-2">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-stretch gap-16 lg:grid-cols-2">
           <FadeInOnScroll>
             <div className="mx-auto w-full max-w-md text-left lg:mx-0">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">
@@ -214,11 +214,14 @@ export default async function HomePage() {
             </div>
           </FadeInOnScroll>
 
-          <div className="lg:pt-1">
+          <div className="flex min-h-0 min-w-0 flex-col lg:justify-between">
             <FadeInOnScroll delayMs={80}>
-              <h3 className="font-headz-display text-3xl text-headz-black sm:text-4xl">
-                Why Jackson Heights trusts the chair
-              </h3>
+              <div>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">In their words</p>
+                <h3 className="font-headz-display text-4xl leading-[1.12] text-headz-black sm:text-5xl">
+                  Why Jackson Heights trusts the chair
+                </h3>
+              </div>
             </FadeInOnScroll>
             <MarketingReviewsCarousel reviews={REVIEWS} />
           </div>
@@ -320,9 +323,10 @@ export default async function HomePage() {
 
       {/* Price list + gallery */}
       <section id="prices" className="border-t border-black/10 bg-white py-20 px-4 sm:px-6">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-14">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-x-12 lg:gap-y-10 lg:items-start">
           <div className="min-w-0 w-full text-left">
-            <h2 className="font-headz-display mb-2 text-3xl text-headz-black">Price list</h2>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">Rates &amp; timing</p>
+            <h2 className="font-headz-display mb-3 text-3xl leading-tight text-headz-black sm:text-4xl">Price list</h2>
             <p className="mb-10 max-w-xl text-sm leading-relaxed text-headz-black/70">
               Straight from the chair — every service gets a line, a little context, and the time we lock in for you.
             </p>
@@ -347,10 +351,10 @@ export default async function HomePage() {
               <p>{SITE.hoursShort}</p>
             </div>
           </div>
-          <div className="min-w-0 w-full text-left lg:pt-1">
-            <h2 className="font-headz-display text-2xl text-headz-black">The Work</h2>
-            <p className="mt-2 text-headz-red uppercase tracking-widest text-xs font-semibold">Fresh out the chair</p>
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-headz-gray">
+          <div className="flex min-w-0 w-full flex-col text-left">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">Fresh out the chair</p>
+            <h2 className="font-headz-display mb-3 text-3xl leading-tight text-headz-black sm:text-4xl">The Work</h2>
+            <p className="mb-10 max-w-xl text-sm leading-relaxed text-headz-black/70">
               Stills from our{' '}
               <a
                 href={INSTAGRAM_PROFILE_URL}
@@ -362,21 +366,21 @@ export default async function HomePage() {
               </a>
               . Tap a photo to open the original post — follow for lineups, reels, and shop drops.
             </p>
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
               {instagramGalleryPhotos.map((item, index) => (
                 <a
                   key={`${item.postUrl}-${index}`}
                   href={item.postUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative aspect-square overflow-hidden rounded-lg bg-neutral-200 shadow-md ring-1 ring-black/5 transition duration-300 hover:scale-[1.02] hover:ring-headz-red/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                  className="group relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-neutral-200 shadow-md ring-1 ring-black/[0.06] transition duration-300 hover:ring-headz-red/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
                 >
                   <Image
                     src={item.src}
                     alt={item.alt}
                     fill
-                    className="object-cover object-center"
-                    sizes="(max-width: 1024px) 50vw, 400px"
+                    className="object-cover object-center transition duration-500 group-hover:scale-[1.03]"
+                    sizes="(max-width: 1024px) 46vw, min(400px, 28vw)"
                     unoptimized
                   />
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-white opacity-0 transition group-hover:opacity-100">
