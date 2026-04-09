@@ -12,6 +12,8 @@ import { barbers, services, users } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { SITE } from '@/lib/site-config'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
+import { GOOGLE_READ_REVIEWS_URL, GOOGLE_WRITE_REVIEW_URL } from '@/lib/marketing/google-reviews'
+import { formatServiceDurationLabel, marketingServiceDescription } from '@/lib/marketing/price-list-ui'
 import { INSTAGRAM_PROFILE_URL, instagramGalleryPhotos } from '@/lib/marketing/instagram-gallery'
 import { MarketingHero } from '@/components/marketing/MarketingHero'
 import { FadeInOnScroll, FadeInOnScrollLi } from '@/components/marketing/FadeInOnScroll'
@@ -190,6 +192,24 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
+              <div className="mx-auto mt-8 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center lg:mx-0 lg:max-w-md lg:flex-col lg:justify-start">
+                <a
+                  href={GOOGLE_WRITE_REVIEW_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[3rem] flex-1 items-center justify-center rounded-lg bg-headz-red px-6 py-3 text-center text-sm font-semibold uppercase tracking-widest text-white shadow-md shadow-headz-red/25 transition hover:bg-[var(--headz-red-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                >
+                  Write a review
+                </a>
+                <a
+                  href={GOOGLE_READ_REVIEWS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[3rem] flex-1 items-center justify-center rounded-lg border-2 border-headz-red bg-white/90 px-6 py-3 text-center text-sm font-semibold uppercase tracking-widest text-headz-red transition hover:bg-headz-red/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                >
+                  Read reviews
+                </a>
+              </div>
             </div>
           </FadeInOnScroll>
 
@@ -324,49 +344,35 @@ export default async function HomePage() {
       </section>
 
       {/* Price list + gallery */}
-      <section id="prices" className="py-20 bg-white border-t border-black/10 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:items-center">
-          <div className="min-w-0">
-            <h2 className="font-headz-display mb-10 text-3xl text-headz-black">Price list</h2>
-            <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
-              <div className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-3 bg-headz-black/5 border-b border-black/10 text-xs font-semibold uppercase tracking-wider text-headz-gray">
-                <div>Service</div>
-                <div className="text-right">Time</div>
-                <div className="text-right">Price</div>
-              </div>
+      <section id="prices" className="border-t border-black/10 bg-white py-20 px-4 sm:px-6">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-14">
+          <div className="min-w-0 w-full text-left">
+            <h2 className="font-headz-display mb-2 text-3xl text-headz-black">Price list</h2>
+            <p className="mb-10 max-w-xl text-sm leading-relaxed text-headz-black/70">
+              Straight from the chair — every service gets a line, a little context, and the time we lock in for you.
+            </p>
+            <div className="w-full max-w-none divide-y divide-black/10 border-t border-black/10">
               {priceRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="grid grid-cols-1 sm:grid-cols-[1fr_5rem_5.5rem] gap-x-4 gap-y-1 px-5 py-4 border-b border-black/5 last:border-b-0 items-start sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <span className="text-headz-black font-medium block">{row.name}</span>
-                    {row.description?.trim() ? (
-                      <p className="mt-2 border-l-2 border-headz-red/50 pl-3 text-sm leading-relaxed text-headz-black/75">
-                        {row.description}
-                      </p>
-                    ) : null}
-                    <div className="sm:hidden flex justify-between gap-3 mt-2 text-sm">
-                      <span className="text-headz-gray">{row.durationMinutes} min</span>
-                      <span className="text-headz-red font-semibold tabular-nums shrink-0">
-                        {formatServicePriceDisplay(row)}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="hidden sm:inline text-headz-gray text-sm text-right tabular-nums">
-                    {row.durationMinutes} min
-                  </span>
-                  <span className="hidden sm:inline text-headz-red font-semibold tabular-nums text-right">
-                    {formatServicePriceDisplay(row)}
-                  </span>
-                </div>
+                <article key={row.id} className="py-7 first:pt-0 last:pb-0">
+                  <h3 className="text-lg font-semibold tracking-tight text-headz-black">{row.name}</h3>
+                  <p className="mt-2 max-w-xl text-[15px] italic leading-relaxed text-headz-black/65">
+                    {marketingServiceDescription(row)}
+                  </p>
+                  <p className="mt-3 text-[15px] font-normal tabular-nums text-headz-black">
+                    {formatServicePriceDisplay(row)}{' '}
+                    <span className="mx-1.5 inline text-headz-black/35" aria-hidden>
+                      ·
+                    </span>{' '}
+                    {formatServiceDurationLabel(row.durationMinutes)}
+                  </p>
+                </article>
               ))}
             </div>
-            <div className="mt-6 text-sm text-headz-gray">
+            <div className="mt-8 border-t border-black/10 pt-6 text-sm text-headz-gray">
               <p>{SITE.hoursShort}</p>
             </div>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 w-full text-left lg:pt-1">
             <h2 className="font-headz-display text-2xl text-headz-black">The Work</h2>
             <p className="mt-2 text-headz-red uppercase tracking-widest text-xs font-semibold">Fresh out the chair</p>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-headz-gray">

@@ -59,15 +59,6 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
   /** Remount hero copy when the motion phase starts so CSS delays aren’t spent while the block is hidden. */
   const [contentMountKey, setContentMountKey] = useState(0)
 
-  const prevVideoEpochRef = useRef(videoEpoch)
-  useEffect(() => {
-    if (prefersReducedMotion) return
-    if (prevVideoEpochRef.current === videoEpoch) return
-    prevVideoEpochRef.current = videoEpoch
-    setBgMediaReady(false)
-    setHeroTimeline('waitingMedia')
-  }, [videoEpoch, prefersReducedMotion])
-
   const prevVideoFailedRef = useRef(videoFailed)
   useEffect(() => {
     if (prefersReducedMotion) return
@@ -137,6 +128,16 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
       obs?.disconnect()
     }
   }, [prefersReducedMotion])
+
+  /** After `key={videoEpoch}` remount, browsers may not re-fire loadeddata; sync if frames already decodable. */
+  useLayoutEffect(() => {
+    if (prefersReducedMotion || videoFailed) return
+    const v = videoRef.current
+    if (!v) return
+    if (v.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setBgMediaReady(true)
+    }
+  }, [videoEpoch, prefersReducedMotion, videoFailed])
 
   useEffect(() => {
     if (prefersReducedMotion || videoFailed) return
