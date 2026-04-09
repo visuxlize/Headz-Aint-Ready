@@ -345,7 +345,7 @@ export default async function HomePage() {
 
       {/* Price list + gallery */}
       <section id="prices" className="border-t border-black/10 bg-white py-20 px-4 sm:px-6">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 lg:grid-cols-2 lg:gap-x-12 lg:gap-y-10 lg:items-start">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.28fr)] lg:gap-x-10 lg:gap-y-10 lg:items-start xl:gap-x-12">
           <div className="min-w-0 w-full text-left">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">Rates &amp; timing</p>
             <h2 className="font-headz-display mb-3 text-3xl leading-tight text-headz-black sm:text-4xl">Price list</h2>
@@ -395,14 +395,14 @@ export default async function HomePage() {
                   href={item.postUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-neutral-200 shadow-md ring-1 ring-black/[0.06] transition duration-300 hover:ring-headz-red/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                  className="group relative h-[clamp(20rem,40vw,28rem)] w-full overflow-hidden rounded-xl bg-neutral-200 shadow-md ring-1 ring-black/[0.06] transition duration-300 hover:ring-headz-red/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
                 >
                   <Image
                     src={item.src}
                     alt={item.alt}
                     fill
                     className="object-cover object-center transition duration-500 group-hover:scale-[1.03]"
-                    sizes="(max-width: 1024px) 46vw, min(400px, 28vw)"
+                    sizes="(max-width: 1024px) 47vw, (max-width: 1280px) 34vw, 380px"
                     unoptimized
                   />
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-white opacity-0 transition group-hover:opacity-100">
