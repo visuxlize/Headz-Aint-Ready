@@ -66,7 +66,7 @@ export function Header() {
   const textClass = isDark
     ? 'text-white hover:text-white'
     : 'text-headz-black hover:text-headz-black'
-  const linkClass = `text-sm font-medium transition-colors duration-200 ${textClass}`
+  const linkClass = `text-sm font-headz-display tracking-wide transition-colors duration-200 ${textClass}`
 
   return (
     <header className={`sticky top-0 z-50 ${headerBg} transition-[background-color,border-color] duration-200`}>
@@ -88,7 +88,7 @@ export function Header() {
           ))}
           <Link
             href="/book"
-            className="bg-headz-red hover:bg-headz-redDark text-white px-4 py-2 rounded font-medium text-sm transition"
+            className="bg-headz-red hover:bg-headz-redDark font-headz-display text-sm tracking-wide text-white px-4 py-2 rounded transition"
           >
             Book Now
           </Link>
@@ -96,7 +96,7 @@ export function Header() {
         <div className="md:hidden flex items-center gap-4">
           <Link
             href="/book"
-            className="bg-headz-red text-white px-3 py-1.5 rounded text-sm font-medium"
+            className="bg-headz-red font-headz-display text-sm tracking-wide text-white px-3 py-1.5 rounded"
           >
             Book
           </Link>

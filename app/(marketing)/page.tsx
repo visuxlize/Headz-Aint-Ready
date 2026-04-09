@@ -12,6 +12,48 @@ import { barbers, services, users } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { SITE } from '@/lib/site-config'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
+import { INSTAGRAM_PROFILE_URL, instagramGalleryPhotos } from '@/lib/marketing/instagram-gallery'
+import { MarketingHero } from '@/components/marketing/MarketingHero'
+import { FadeInOnScroll, FadeInOnScrollLi } from '@/components/marketing/FadeInOnScroll'
+
+export const dynamic = 'force-dynamic'
+
+const REVIEWS = [
+  {
+    name: 'Carlos M.',
+    role: 'Regular · Jackson Heights',
+    text: "Been coming here since I was a kid. Real Queens institution. The barbers know their craft — fades are always clean and tight. Wouldn't go anywhere else.",
+  },
+  {
+    name: 'David R.',
+    role: 'Walk-in turned regular',
+    text: 'Best shop in Jackson Heights, hands down. Walk in, get treated right, walk out looking fresh. Staff is professional and the vibe is always good.',
+  },
+  {
+    name: 'Mike T.',
+    role: 'Local · 5+ years',
+    text: 'These guys have been cutting hair in this neighborhood for decades and it shows. Consistent, sharp, and always on point. Highly recommend.',
+  },
+  {
+    name: 'Anthony L.',
+    role: 'Parent · first cut',
+    text: 'Brought my son here for his first cut. The barber was patient and did an amazing job. This is the kind of place you keep coming back to.',
+  },
+] as const
+
+function RedCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M13.5 4.5L6 12 2.5 8.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 /**
  * Public marketing homepage — do not remove these sections (hero, Dream Team video, team grid,
@@ -69,44 +111,10 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      {/* Hero – urban night / subway vibe with dark overlay */}
-      <section data-header-dark className="relative bg-headz-black text-white min-h-[85vh] flex flex-col justify-center overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1648571113744-928bcc1eaa90?q=80&w=1336&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')",
-          }}
-        />
-        {/* Dark overlay so white text and red CTA stand out (like reference) */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/65 to-black/80" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 text-center">
-          <p className="text-headz-red tracking-[0.3em] text-sm uppercase mb-4">Queens, NYC</p>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4">
-            Headz Ain&apos;t Ready
-          </h1>
-          <p className="text-xl text-white/90 max-w-xl mx-auto mb-8">
-            Legendary cuts in Jackson Heights. Book your slot, skip the wait.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/book"
-              className="inline-flex items-center justify-center bg-headz-red hover:bg-headz-redDark text-white font-semibold px-8 py-4 rounded transition shadow-lg"
-            >
-              Book Now
-            </Link>
-            <a
-              href={`tel:${SITE.phoneTel}`}
-              className="inline-flex items-center justify-center border border-white/40 hover:border-white text-white font-medium px-8 py-4 rounded transition"
-            >
-              {SITE.phone}
-            </a>
-          </div>
-        </div>
-      </section>
+      <MarketingHero playfairClassName="font-headz-display" />
 
-      {/* Dream Team – YouTube Short with dark cityscape (style from reference) */}
+      {/* Dream Team – YouTube Short with dark cityscape */}
       <section data-header-dark className="relative py-20 px-4 sm:px-6 overflow-hidden">
-        {/* Dark monochromatic cityscape background */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-50"
           style={{
@@ -120,7 +128,7 @@ export default async function HomePage() {
             A compilation of the
           </h2>
           <div className="w-16 h-px bg-white/50 mx-auto my-3" aria-hidden />
-          <h3 className="text-white font-serif text-3xl sm:text-4xl md:text-5xl tracking-wide italic">
+          <h3 className="font-headz-display text-3xl text-white sm:text-4xl md:text-5xl tracking-wide">
             Dream Team
           </h3>
           <div className="mt-10 flex justify-center">
@@ -139,57 +147,152 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Services */}
-      <section id="services" className="py-20 px-4 sm:px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-4">Services</h2>
-        <p className="text-headz-gray text-center max-w-xl mx-auto mb-12">
-          From kids to seniors, we&apos;ve got you. Choose your service and book with your preferred barber.
-        </p>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            { title: 'Kids', desc: 'Precise, gentle cuts that keep kids and parents happy.', href: '/book?category=kids' },
-            { title: 'Adults', desc: 'Master barbers. Fresh cuts and styles, every time.', href: '/book?category=adults' },
-            { title: 'Seniors', desc: 'Considerate service so everyone leaves looking sharp.', href: '/book?category=seniors' },
-          ].map(({ title, desc, href }) => (
-            <div key={title} className="bg-white border border-black/10 rounded-xl p-6 shadow-sm hover:shadow-md transition">
-              <h3 className="text-xl font-semibold mb-2">{title}</h3>
-              <p className="text-headz-gray mb-6">{desc}</p>
-              <Link href={href} className="inline-flex items-center text-headz-red font-medium hover:underline">
-                Book appointment →
+      {/* History + reviews — light section with subtle brand-red wash (no inset “dark widget”) */}
+      <section className="relative overflow-hidden bg-[#fafaf8] px-4 py-20 sm:px-6">
+        <div
+          className="pointer-events-none absolute -right-[min(18rem,25vw)] -top-32 h-[min(28rem,55vw)] w-[min(28rem,55vw)] rounded-full bg-[radial-gradient(circle_at_center,rgba(196,30,58,0.12),transparent_68%)]"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -left-[min(10rem,18vw)] bottom-0 h-[min(22rem,50vw)] w-[min(22rem,50vw)] rounded-full bg-[radial-gradient(circle_at_center,rgba(196,30,58,0.08),transparent_70%)]"
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white/90 to-transparent" aria-hidden />
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-16 lg:grid-cols-2">
+          <FadeInOnScroll>
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">
+                OVER 25 YEARS IN...
+              </p>
+              <h2 className="font-headz-display mb-5 text-5xl text-headz-black sm:text-6xl">The Industry</h2>
+              <p className="mx-auto mb-10 max-w-xl text-base leading-relaxed text-headz-black/85">
+                Headz Ain&apos;t Ready Was Established In 1995 In Jackson Heights, Queens. Since Then We Have
+                Been Serving Thousands Of Clients In New York &amp; The Entire Tri-State Area. We&apos;re proud of
+                the craft and we let the cuts speak for themselves.
+              </p>
+              <div className="mx-auto flex max-w-xl flex-col gap-4 sm:max-w-none sm:flex-row sm:justify-center sm:gap-5">
+                <div className="flex flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px]">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-headz-red text-white shadow-md shadow-headz-red/20">
+                    <RedCheckIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="font-semibold text-headz-black">Open 7 Days</p>
+                    <p className="mt-1 text-sm leading-snug text-headz-gray">Monday – Sun: 9am – 8pm</p>
+                  </div>
+                </div>
+                <div className="flex flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px]">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-headz-red text-white shadow-md shadow-headz-red/20">
+                    <RedCheckIcon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="font-semibold text-headz-black">Master Barbers</p>
+                    <p className="mt-1 text-sm leading-snug text-headz-gray">&amp; State of the art chairs</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </FadeInOnScroll>
+
+          <div className="lg:pt-1">
+            <FadeInOnScroll delayMs={80}>
+              <h3 className="font-headz-display text-3xl text-headz-black sm:text-4xl">
+                Why Jackson Heights trusts the chair
+              </h3>
+            </FadeInOnScroll>
+            <ul className="mt-9 grid list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {REVIEWS.map((r, index) => (
+                <FadeInOnScrollLi key={r.name} delayMs={120 + index * 90} className="list-none">
+                  <div className="flex h-full flex-col rounded-xl border border-black/[0.08] bg-white/75 p-5 shadow-[0_10px_36px_-22px_rgba(196,30,58,0.35)] ring-1 ring-headz-red/[0.06] backdrop-blur-[2px]">
+                    <p className="text-[15px] leading-none tracking-tight text-amber-500" aria-label="5 out of 5 stars">
+                      ★★★★★
+                    </p>
+                    <p className="mt-3 flex-1 text-[15px] leading-relaxed text-headz-black/88">{r.text}</p>
+                    <div className="mt-5 flex items-center gap-3 border-t border-black/[0.06] pt-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-headz-red/20 to-headz-red/5 text-xs font-bold text-headz-red ring-2 ring-headz-red/15">
+                        {r.name
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w) => w[0])
+                          .join('')
+                          .toUpperCase()}
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="truncate font-semibold text-headz-black">{r.name}</p>
+                        <p className="truncate text-sm text-headz-gray">{r.role}</p>
+                      </div>
+                    </div>
+                  </div>
+                </FadeInOnScrollLi>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Services — single focused band + one primary CTA */}
+      <section
+        id="services"
+        className="scroll-mt-6 border-t border-black/[0.06] bg-gradient-to-b from-white via-[#fafaf8] to-white py-20 px-4 sm:px-6"
+      >
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_24px_70px_-40px_rgba(196,30,58,0.28)] ring-1 ring-headz-red/10">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] lg:items-stretch">
+            <div className="relative p-8 sm:p-10 lg:p-12">
+              <div
+                className="pointer-events-none absolute -right-16 top-1/2 hidden h-48 w-48 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(196,30,58,0.12),transparent_65%)] lg:block"
+                aria-hidden
+              />
+              <p className="relative text-xs font-semibold uppercase tracking-[0.22em] text-headz-red">The chair is open</p>
+              <h2 className="font-headz-display relative mt-3 text-4xl text-headz-black sm:text-5xl">
+                Every age. Every texture.
+              </h2>
+              <p className="relative mt-4 max-w-xl text-base leading-relaxed text-headz-black/80">
+                Kids, adults, seniors — same shop standard. Book your service and barber in one flow, or walk in when
+                the door&apos;s spinning.
+              </p>
+              <ul className="relative mt-10 space-y-6 border-l-2 border-headz-red/45 pl-5">
+                {[
+                  { k: 'Kids', line: 'Patient hands, clean lines, confidence on the walk to school.' },
+                  { k: 'Adults', line: 'Fades, tapers, beards — Queens-level consistency every visit.' },
+                  { k: 'Seniors', line: 'Respectful pace, sharp finish, the dignity a long-time regular deserves.' },
+                ].map(({ k, line }) => (
+                  <li key={k} className="text-left">
+                    <span className="font-semibold text-headz-black">{k}</span>
+                    <span className="mt-1 block text-sm leading-snug text-headz-gray">{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex flex-col justify-center gap-4 border-t border-black/10 bg-gradient-to-br from-headz-red/[0.07] via-white to-white p-8 sm:p-10 lg:w-[280px] lg:border-l lg:border-t-0 xl:w-[300px]">
+              <p className="text-center text-sm font-medium text-headz-black/90 lg:text-left">
+                Ready when you are — pick your cut on the next screen.
+              </p>
+              <Link
+                href="/book"
+                className="inline-flex min-h-[3.25rem] items-center justify-center bg-headz-red px-8 py-3.5 text-center text-sm font-semibold uppercase tracking-widest text-white shadow-lg transition hover:bg-[var(--headz-red-dark)] hover:shadow-headz-red/25"
+              >
+                Book your cut
+              </Link>
+              <Link
+                href="#prices"
+                className="text-center text-sm font-medium text-headz-red underline-offset-4 hover:underline lg:text-left"
+              >
+                Browse full price list
               </Link>
             </div>
-          ))}
+          </div>
         </div>
       </section>
 
-      {/* Why book */}
-      <section data-header-dark className="py-20 bg-headz-black text-white px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Skip the wait</h2>
-          <p className="text-white/80 max-w-2xl mx-auto mb-10">
-            We get busy. Book ahead so your time is reserved and you walk in knowing exactly when you&apos;re up.
-          </p>
-          <Link
-            href="/book"
-            className="inline-flex items-center justify-center bg-headz-red hover:bg-headz-redDark font-semibold px-8 py-4 rounded transition"
-          >
-            Book your cut
-          </Link>
-        </div>
-      </section>
-
-      {/* Team — same grid as Feb 2026 marketing (avatars + names); roster from admin / DB */}
+      {/* Team */}
       <section id="team" className="py-20 px-4 sm:px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-4">The Dream Team</h2>
+        <h2 className="font-headz-display text-center text-3xl mb-4">The Dream Team</h2>
         <p className="text-headz-gray text-center max-w-xl mx-auto mb-12">
           Headz Ain&apos;t Ready Master Barbers. Pick your favorite when you book.
         </p>
         <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-10">
           {barbersList.map((barber) => (
-            <div
-              key={barber.id}
-              className="w-40 shrink-0 text-center sm:w-44 md:w-48"
-            >
+            <div key={barber.id} className="w-40 shrink-0 text-center sm:w-44 md:w-48">
               <div className="aspect-square rounded-full overflow-hidden mx-auto mb-4 max-w-[200px] bg-headz-black/10">
                 {barber.avatarUrl ? (
                   <Image
@@ -220,56 +323,94 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Price list — Feb 2026 layout (Service | Time | Price); rows from admin / services table */}
+      {/* Price list + gallery */}
       <section id="prices" className="py-20 bg-white border-t border-black/10 px-4 sm:px-6">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-10">Price list</h2>
-          <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
-            <div className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-3 bg-headz-black/5 border-b border-black/10 text-xs font-semibold uppercase tracking-wider text-headz-gray">
-              <div>Service</div>
-              <div className="text-right">Time</div>
-              <div className="text-right">Price</div>
-            </div>
-            {priceRows.map((row) => (
-              <div
-                key={row.id}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_5rem_5.5rem] gap-x-4 gap-y-1 px-5 py-4 border-b border-black/5 last:border-b-0 items-start sm:items-center"
-              >
-                <div className="min-w-0">
-                  <span className="text-headz-black font-medium block">{row.name}</span>
-                  {row.description?.trim() ? (
-                    <span className="text-headz-gray text-sm block mt-0.5 leading-snug">{row.description}</span>
-                  ) : null}
-                  <div className="sm:hidden flex justify-between gap-3 mt-2 text-sm">
-                    <span className="text-headz-gray">{row.durationMinutes} min</span>
-                    <span className="text-headz-red font-semibold tabular-nums shrink-0">
-                      {formatServicePriceDisplay(row)}
-                    </span>
-                  </div>
-                </div>
-                <span className="hidden sm:inline text-headz-gray text-sm text-right tabular-nums">
-                  {row.durationMinutes} min
-                </span>
-                <span className="hidden sm:inline text-headz-red font-semibold tabular-nums text-right">
-                  {formatServicePriceDisplay(row)}
-                </span>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+          <div className="min-w-0">
+            <h2 className="font-headz-display mb-10 text-3xl text-headz-black">Price list</h2>
+            <div className="rounded-xl border border-black/10 overflow-hidden shadow-sm bg-white">
+              <div className="grid grid-cols-[1fr_5rem_5.5rem] gap-4 px-5 py-3 bg-headz-black/5 border-b border-black/10 text-xs font-semibold uppercase tracking-wider text-headz-gray">
+                <div>Service</div>
+                <div className="text-right">Time</div>
+                <div className="text-right">Price</div>
               </div>
-            ))}
+              {priceRows.map((row) => (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-1 sm:grid-cols-[1fr_5rem_5.5rem] gap-x-4 gap-y-1 px-5 py-4 border-b border-black/5 last:border-b-0 items-start sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <span className="text-headz-black font-medium block">{row.name}</span>
+                    {row.description?.trim() ? (
+                      <p className="mt-2 border-l-2 border-headz-red/50 pl-3 text-sm leading-relaxed text-headz-black/75">
+                        {row.description}
+                      </p>
+                    ) : null}
+                    <div className="sm:hidden flex justify-between gap-3 mt-2 text-sm">
+                      <span className="text-headz-gray">{row.durationMinutes} min</span>
+                      <span className="text-headz-red font-semibold tabular-nums shrink-0">
+                        {formatServicePriceDisplay(row)}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="hidden sm:inline text-headz-gray text-sm text-right tabular-nums">
+                    {row.durationMinutes} min
+                  </span>
+                  <span className="hidden sm:inline text-headz-red font-semibold tabular-nums text-right">
+                    {formatServicePriceDisplay(row)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 text-sm text-headz-gray">
+              <p>{SITE.hoursShort}</p>
+            </div>
           </div>
-          <div className="mt-6 text-center text-sm text-headz-gray space-y-1">
-            <p>{SITE.hoursShort}</p>
-            <p>
-              <a href={`tel:${SITE.phoneTel}`} className="text-headz-red hover:underline">
-                {SITE.phone}
+          <div className="min-w-0">
+            <h2 className="font-headz-display text-2xl text-headz-black">The Work</h2>
+            <p className="mt-2 text-headz-red uppercase tracking-widest text-xs font-semibold">Fresh out the chair</p>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-headz-gray">
+              Stills from our{' '}
+              <a
+                href={INSTAGRAM_PROFILE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-headz-red underline-offset-2 hover:underline"
+              >
+                Instagram @headzaintready.nyc
               </a>
+              . Tap a photo to open the original post — follow for lineups, reels, and shop drops.
             </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              {instagramGalleryPhotos.map((item, index) => (
+                <a
+                  key={`${item.postUrl}-${index}`}
+                  href={item.postUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative aspect-square overflow-hidden rounded-lg bg-neutral-200 shadow-md ring-1 ring-black/5 transition duration-300 hover:scale-[1.02] hover:ring-headz-red/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                >
+                  <Image
+                    src={item.src}
+                    alt={item.alt}
+                    fill
+                    className="object-cover object-center"
+                    sizes="(max-width: 1024px) 50vw, 400px"
+                    unoptimized
+                  />
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-white opacity-0 transition group-hover:opacity-100">
+                    Open in Instagram
+                  </span>
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* Contact */}
       <section id="contact" className="py-20 px-4 sm:px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-4">Contact</h2>
+        <h2 className="font-headz-display text-center text-3xl mb-4">Contact</h2>
         <div className="flex flex-col sm:flex-row justify-center gap-8 text-center">
           <a href={`tel:${SITE.phoneTel}`} className="text-headz-red font-medium hover:underline">
             {SITE.phone}

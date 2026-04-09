@@ -101,7 +101,7 @@ export default function PaymentsPage() {
       return
     }
     const cents = Math.round(amt * 100)
-    const res = await fetch('/api/square/refund', {
+    const res = await fetch('/api/squire/refund', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },

@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { services } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
+import { revalidateMarketingAndBooking } from '@/lib/marketing/revalidate-public-pages'
 import { z } from 'zod'
 import { slugifyName } from '@/lib/utils/slug'
 
@@ -74,5 +75,6 @@ export async function POST(request: Request) {
     })
     .returning()
 
+  revalidateMarketingAndBooking()
   return NextResponse.json({ data: row }, { status: 201 })
 }

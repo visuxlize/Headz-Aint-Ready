@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { services } from '@/lib/db/schema'
 import { eq, inArray } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
+import { revalidateMarketingAndBooking } from '@/lib/marketing/revalidate-public-pages'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -43,5 +44,6 @@ export async function POST(request: Request) {
   const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]))
   list.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0))
 
+  revalidateMarketingAndBooking()
   return NextResponse.json({ data: list })
 }

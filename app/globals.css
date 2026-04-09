@@ -36,6 +36,12 @@
 }
 
 @layer utilities {
+  /** Marketing: Playfair italic 700 — section titles & nav (body copy stays sans in `body`) */
+  .font-headz-display {
+    font-family: var(--font-headz-display), ui-serif, Georgia, 'Times New Roman', serif;
+    font-weight: 700;
+    font-style: italic;
+  }
   .text-balance {
     text-wrap: balance;
   }
@@ -53,4 +59,113 @@
   100% {
     background-position: -200% 0;
   }
+}
+
+/* Marketing hero — background clip fades in first (then text; delays set in TS) */
+@keyframes marketing-hero-bg-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.marketing-hero-bg-reveal {
+  opacity: 0;
+  animation: marketing-hero-bg-reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: opacity;
+}
+
+/* Marketing hero — one-at-a-time line entrance (delay = prior lines × duration in TS) */
+@keyframes marketing-hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(1.125rem) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.marketing-hero-enter {
+  opacity: 0;
+  animation: marketing-hero-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* Scissors: pop in, then two snip motions (keep keyframe transforms compatible with enter end state) */
+@keyframes marketing-hero-scissors-snip {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  35% {
+    transform: translateY(0) scale(1.07) rotate(-22deg);
+  }
+  65% {
+    transform: translateY(0) scale(0.96) rotate(18deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.marketing-hero-scissors {
+  opacity: 0;
+  display: inline-block;
+  transform-origin: 55% 70%;
+  animation:
+    marketing-hero-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) var(--hero-scissors-enter-delay, 0ms) forwards,
+    marketing-hero-scissors-snip 0.44s cubic-bezier(0.45, 0, 0.55, 1) var(--hero-scissors-snip-delay, 520ms) 2;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-hero-bg-reveal {
+    animation: none;
+    opacity: 1;
+    will-change: auto;
+  }
+  .marketing-hero-enter,
+  .marketing-hero-scissors {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+}
+
+/* Marketing hero — slow background pan + train-window light streaks */
+@keyframes trainPass {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Wider canvas + steady pan reads more like a train/car passing than a slow fade */
+.train-hero-bg {
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  background-position: 0% 50%;
+  animation: trainPass 22s linear infinite alternate;
+}
+
+@keyframes lightStreak {
+  from {
+    transform: translateX(-10px);
+  }
+  to {
+    transform: translateX(100vw);
+  }
+}
+
+.light-streak-animate {
+  animation-name: lightStreak;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
 }

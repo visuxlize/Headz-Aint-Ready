@@ -264,23 +264,34 @@ export function BookingFlow({
           <div className="rounded-xl bg-white border border-black/10 p-6 text-center md:text-left">
             <h3 className="font-semibold mb-2">Choose a service</h3>
             <p className="text-headz-gray text-sm mb-4">Pick one, then choose your barber and time.</p>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {(filteredServices.length ? filteredServices : services).map((s) => (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => { setService(s); setStep('barber') }}
-                  className="w-full flex justify-between items-start p-3 rounded-lg border border-black/10 hover:border-headz-red hover:bg-headz-red/5 transition text-left gap-3"
+                  className="group w-full rounded-xl border border-black/10 bg-white text-left shadow-sm transition hover:border-headz-red hover:shadow-[0_12px_40px_-24px_rgba(220,38,38,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
                 >
-                  <span className="text-left min-w-0">
-                    <span className="font-medium block">{s.name}</span>
-                    {s.description?.trim() ? (
-                      <span className="text-headz-gray text-xs font-normal block mt-0.5">{s.description}</span>
-                    ) : null}
-                  </span>
-                  <span className="text-headz-gray text-sm shrink-0 text-right">
-                    {formatServicePriceDisplay(s)} · {s.durationMinutes} min
-                  </span>
+                  <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-5 sm:p-5">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-base font-semibold text-headz-black group-hover:text-headz-black">{s.name}</span>
+                      {s.description?.trim() ? (
+                        <p className="mt-2 border-l-2 border-headz-red/55 bg-headz-red/[0.03] py-2 pl-3 pr-2 text-sm leading-relaxed text-headz-black/80">
+                          {s.description}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-headz-gray">Tap to select — your barber&apos;s up next.</p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-black/[0.06] pt-3 sm:w-44 sm:flex-col sm:items-end sm:justify-center sm:border-t-0 sm:border-l sm:border-black/[0.06] sm:pl-5 sm:pt-0">
+                      <span className="text-lg font-bold tabular-nums text-headz-red sm:text-right">
+                        {formatServicePriceDisplay(s)}
+                      </span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-headz-gray">
+                        {s.durationMinutes} min
+                      </span>
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>

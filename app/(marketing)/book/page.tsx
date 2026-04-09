@@ -5,6 +5,8 @@ import { asc, eq } from 'drizzle-orm'
 import { BookingFlow } from '@/components/booking/BookingFlow'
 import type { Barber, Service } from '@/lib/db/schema'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Book | Headz Ain\'t Ready',
   description: 'Book your haircut at Headz Ain\'t Ready, Jackson Heights.',
@@ -39,7 +41,7 @@ export default async function BookPage({
   return (
     <div className="min-h-screen bg-[var(--background)] py-8 sm:py-12 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto w-full">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center sm:text-left">Book your cut</h1>
+        <h1 className="font-headz-display mb-2 text-center text-2xl sm:text-left sm:text-3xl">Book your cut</h1>
         <p className="text-headz-gray mb-6 sm:mb-8 text-center sm:text-left max-w-2xl">
           Choose a service, barber, and time — like a calendar booking. We&apos;ll hold your slot.
         </p>

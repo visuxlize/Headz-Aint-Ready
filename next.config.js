@@ -15,6 +15,9 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.supabase.co' },
       { protocol: 'https', hostname: 'headzaintready.com' },
       { protocol: 'https', hostname: 'seller-brand-assets-f.squarecdn.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: '**.cdninstagram.com' },
+      { protocol: 'https', hostname: '**.tenor.com' },
     ],
   },
 }

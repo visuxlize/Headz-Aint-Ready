@@ -73,6 +73,8 @@ export async function GET() {
   })
 
   return NextResponse.json({
+    viewerId: auth.user.id,
+    viewerRole: auth.dbUser.role,
     today,
     services: serviceRows.map((s) => ({
       id: s.id,

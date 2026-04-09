@@ -43,13 +43,6 @@ type RecentTxn = {
   time: string
 }
 
-type SquareDeviceRow = {
-  id: string
-  deviceId: string | null
-  deviceName: string
-  status: string
-}
-
 type PosLine = { serviceId: string; name: string; price: string }
 
 const TIP_PRESETS = [15, 20, 25]
@@ -148,10 +141,8 @@ function ChargeModal({
   customerName,
   appointmentId,
   flatItems,
-  pairedDevices,
-  selectedDeviceId,
-  onSelectDevice,
-  settingsPath,
+  squireConnected,
+  squireHelpPath,
   onClose,
   onDone,
   onNewSale,
@@ -164,10 +155,8 @@ function ChargeModal({
   customerName: string
   appointmentId?: string
   flatItems: PosLine[]
-  pairedDevices: SquareDeviceRow[]
-  selectedDeviceId: string
-  onSelectDevice: (squareDeviceId: string) => void
-  settingsPath: string
+  squireConnected: boolean
+  squireHelpPath: string
   onClose: () => void
   onDone: () => void
   onNewSale: () => void
@@ -215,9 +204,13 @@ function ChargeModal({
       const r = await fetch(`/api/pos/transaction/${txnId}`, { credentials: 'include' })
       const j = await r.json().catch(() => ({}))
       const t = j.transaction as
-        | { squarePaymentId?: string | null; cardBrand?: string | null; cardLastFour?: string | null }
+        | {
+            squarePaymentId?: string | null
+            cardBrand?: string | null
+            cardLastFour?: string | null
+          }
         | undefined
-      if (t?.squarePaymentId) {
+      if (t?.squarePaymentId && !String(t.squarePaymentId).startsWith('cash-')) {
         setDoneMeta({
           paymentMethod: 'card',
           cardBrand: t.cardBrand,
@@ -235,20 +228,20 @@ function ChargeModal({
 
     const tick = async () => {
       try {
-        const r = await fetch(`/api/square/terminal-checkout/${encodeURIComponent(checkoutId)}`, {
+        const r = await fetch(`/api/squire/checkout/${encodeURIComponent(checkoutId)}`, {
           credentials: 'include',
         })
         const j = await r.json().catch(() => ({}))
         if (!r.ok) return
-        const st = j.status as string
-        if (st === 'COMPLETED') {
+        const st = String(j.status ?? '').toUpperCase()
+        if (st === 'COMPLETED' || st === 'COMPLETE' || st === 'PAID') {
           stopPoll()
           toast.success('Payment complete')
           setStep('done')
           const tid = txnIdRef.current
           if (tid) await pollTxnForCard(tid)
           else setDoneMeta({ paymentMethod: 'card' })
-        } else if (st === 'CANCELED') {
+        } else if (st === 'CANCELED' || st === 'CANCELLED') {
           stopPoll()
           setStep('select')
           setCheckoutId(null)
@@ -272,7 +265,6 @@ function ChargeModal({
   }, [step, checkoutId, pollTxnForCard, stopPoll])
 
   const runCard = async () => {
-    if (!selectedDeviceId) return
     setTerminalError(null)
     const createRes = await fetch('/api/pos/create-transaction', {
       method: 'POST',
@@ -296,16 +288,16 @@ function ChargeModal({
     txnIdRef.current = transactionId
     setActiveTxnId(transactionId)
 
-    const tcRes = await fetch('/api/square/terminal-checkout', {
+    const tcRes = await fetch('/api/squire/checkout', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        deviceId: selectedDeviceId,
-        amountCents: Math.round(total * 100),
+        barberId,
+        serviceId: flatItems[0]?.serviceId,
+        appointmentId,
+        amount: total,
         transactionId,
-        note,
-        tipEnabled: false,
       }),
     })
     const tcJson = await tcRes.json().catch(() => ({}))
@@ -319,7 +311,7 @@ function ChargeModal({
     if (!checkoutId) return
     stopPoll()
     try {
-      await fetch(`/api/square/terminal-checkout/${encodeURIComponent(checkoutId)}/cancel`, {
+      await fetch(`/api/squire/checkout/${encodeURIComponent(checkoutId)}/cancel`, {
         method: 'POST',
         credentials: 'include',
       })
@@ -354,7 +346,7 @@ function ChargeModal({
 
     const transactionId = createJson.id as string
 
-    const cashRes = await fetch('/api/square/record-cash', {
+    const cashRes = await fetch('/api/squire/record-cash', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -401,8 +393,6 @@ function ChargeModal({
     if (res.ok) toast.success('Receipt sent')
     else toast.error('Could not send receipt')
   }
-
-  const selectedDev = pairedDevices.find((d) => d.deviceId === selectedDeviceId)
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85 backdrop-blur-sm">
@@ -460,57 +450,50 @@ function ChargeModal({
 
               {method === 'card' && (
                 <div>
-                  {pairedDevices.length === 0 || !selectedDeviceId ? (
+                  {!squireConnected ? (
                     <div className="rounded-xl border border-amber-900/50 bg-amber-950/30 p-5 text-sm text-amber-100">
-                      <p className="mb-3">No Square Terminal paired.</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          window.location.href = settingsPath
-                        }}
-                        className={`rounded-lg bg-headz-red px-4 py-2 text-xs font-bold uppercase text-white ${dmMono.className}`}
-                      >
-                        Go to Settings
-                      </button>
+                      <p className="mb-3">Squire POS is not configured. Add SQUIRE_API_KEY to your environment, then redeploy.</p>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={() => window.open('https://app.getsquire.com', '_blank', 'noopener,noreferrer')}
+                          className={`rounded-lg bg-headz-red px-4 py-2 text-xs font-bold uppercase text-white ${dmMono.className}`}
+                        >
+                          Open Squire
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.location.href = squireHelpPath
+                          }}
+                          className={`rounded-lg border border-amber-800/60 px-4 py-2 text-xs font-bold uppercase text-amber-100 ${dmMono.className}`}
+                        >
+                          Devices / setup
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <>
                       <div className="mb-4 rounded-xl border border-neutral-800 bg-[#1a1a1a] p-5">
                         <div className="mb-2 flex items-center gap-2">
                           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                          <span className={`text-sm text-white ${dmMono.className}`}>{selectedDev?.deviceName ?? 'Terminal'}</span>
+                          <span className={`text-sm text-white ${dmMono.className}`}>Squire Terminal</span>
                           <span className={`ml-auto text-[10px] font-bold uppercase text-emerald-400 ${dmMono.className}`}>
                             Ready
                           </span>
                         </div>
                         <p className={`text-sm text-neutral-500 ${dmSans.className}`}>
-                          Charge {fmt(total)} on the Square Terminal (tip included).
+                          Charge {fmt(total)} through Squire (tip included). Customer pays on your terminal.
                         </p>
                       </div>
-                      {pairedDevices.length > 1 && (
-                        <div className="mb-4">
-                          <div className={`mb-1 text-[10px] uppercase text-neutral-500 ${dmMono.className}`}>Device</div>
-                          <select
-                            value={selectedDeviceId}
-                            onChange={(e) => onSelectDevice(e.target.value)}
-                            className="w-full rounded-lg border border-neutral-700 bg-[#1e1e1e] px-3 py-2 text-sm text-white"
-                          >
-                            {pairedDevices.map((d) =>
-                              d.deviceId ? (
-                                <option key={d.id} value={d.deviceId}>
-                                  {d.deviceName}
-                                </option>
-                              ) : null
-                            )}
-                          </select>
-                        </div>
-                      )}
                       <button
                         type="button"
-                        onClick={() => void runCard().catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'))}
+                        onClick={() =>
+                          void runCard().catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'))
+                        }
                         className={`w-full rounded-[10px] bg-headz-red py-4 text-[15px] font-bold uppercase tracking-wide text-white ${dmMono.className}`}
                       >
-                        Charge {fmt(total)} via Terminal
+                        Charge {fmt(total)} via Squire
                       </button>
                     </>
                   )}
@@ -686,7 +669,9 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
   const router = useRouter()
   const pathname = usePathname()
   const dashboardHome = pathname?.includes('/dashboard/barber') ? '/dashboard/barber' : '/dashboard'
-  const settingsPath = pathname?.includes('/dashboard/barber') ? '/dashboard' : '/dashboard/settings/devices'
+  const squireHelpPath = pathname?.includes('/dashboard/barber')
+    ? '/dashboard/settings/devices'
+    : '/dashboard/settings/devices'
 
   const goDashboard = () => {
     if (onBack) onBack()
@@ -710,8 +695,7 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
   const [selectedCategory, setSelectedCategory] = useState<(typeof CATEGORY_FILTERS)[number]>('all')
   const [showCharge, setShowCharge] = useState(false)
   const [recent, setRecent] = useState<RecentTxn[]>([])
-  const [pairedDevices, setPairedDevices] = useState<SquareDeviceRow[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState('')
+  const [squireConnected, setSquireConnected] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -739,24 +723,18 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
 
   useEffect(() => {
     let cancelled = false
-    async function loadDevices() {
+    async function loadSquire() {
       try {
-        const r = await fetch('/api/square/devices', { credentials: 'include' })
+        const r = await fetch('/api/squire/status', { credentials: 'include' })
         const j = await r.json().catch(() => ({}))
         if (!r.ok || cancelled) return
-        const list = (j.devices ?? []) as SquareDeviceRow[]
-        const paired = list.filter((d) => d.status === 'paired' && d.deviceId)
-        setPairedDevices(paired)
-        setSelectedDeviceId((prev) => {
-          if (prev && paired.some((p) => p.deviceId === prev)) return prev
-          return paired[0]?.deviceId ?? ''
-        })
+        setSquireConnected(Boolean(j.connected))
       } catch {
         /* ignore */
       }
     }
-    void loadDevices()
-    const id = setInterval(() => void loadDevices(), 45000)
+    void loadSquire()
+    const id = setInterval(() => void loadSquire(), 45000)
     return () => {
       cancelled = true
       clearInterval(id)
@@ -868,7 +846,6 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
   }
 
   const noBarbers = services.length > 0 && barbers.length === 0
-  const hasTerminal = pairedDevices.length > 0 && !!selectedDeviceId
 
   return (
     <div
@@ -894,17 +871,17 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
             </button>
             <button
               type="button"
-              onClick={() => router.push(settingsPath)}
+              onClick={() => router.push(squireHelpPath)}
               className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${
-                hasTerminal
+                squireConnected
                   ? 'border-emerald-800 bg-emerald-950/40 text-emerald-400'
                   : 'border-amber-800 bg-amber-950/40 text-amber-200'
               } ${dmMono.className}`}
             >
-              <span className={hasTerminal ? 'text-emerald-400' : 'text-amber-400'}>
-                {hasTerminal ? '●' : '⚠'}
+              <span className={squireConnected ? 'text-emerald-400' : 'text-amber-400'}>
+                {squireConnected ? '●' : '⚠'}
               </span>
-              {hasTerminal ? 'Terminal ready' : 'No terminal'}
+              {squireConnected ? 'Squire ready' : 'Configure Squire'}
             </button>
           </div>
         </div>
@@ -1252,10 +1229,8 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
           customerName={customerName}
           appointmentId={selectedAppt?.id}
           flatItems={flatItems}
-          pairedDevices={pairedDevices}
-          selectedDeviceId={selectedDeviceId}
-          onSelectDevice={setSelectedDeviceId}
-          settingsPath={settingsPath}
+          squireConnected={squireConnected}
+          squireHelpPath={squireHelpPath}
           onClose={() => setShowCharge(false)}
           onDone={() => void finishSaleSuccess()}
           onNewSale={() => clearCart()}

@@ -5,6 +5,7 @@
  * Live DB data always wins when available.
  */
 import defaultServices from '@/lib/services/default-headz-services.json'
+import type { DefaultServiceSeed } from '@/lib/services/default-price-list'
 
 /** Minimal barber shape for the marketing team grid (matches what the homepage renders). */
 export type MarketingBarberCard = {
@@ -70,12 +71,13 @@ export function getPublishedFallbackTeam(): MarketingBarberCard[] {
 }
 
 export function getPublishedFallbackPrices(): MarketingPriceRow[] {
-  return (defaultServices as Array<Record<string, unknown>>).map((row, i) => ({
-    id: `fallback-svc-${String(row.slug ?? i)}`,
-    name: String(row.name ?? ''),
-    description: row.description != null ? String(row.description) : null,
-    price: String(row.price ?? '0'),
-    priceDisplayOverride: row.priceDisplayOverride != null ? String(row.priceDisplayOverride) : null,
-    durationMinutes: Number(row.durationMinutes ?? 30),
+  const sorted = [...(defaultServices as DefaultServiceSeed[])].sort((a, b) => a.displayOrder - b.displayOrder)
+  return sorted.map((row) => ({
+    id: `fallback-svc-${row.slug}`,
+    name: row.name,
+    description: row.description,
+    price: row.price,
+    priceDisplayOverride: row.priceDisplayOverride,
+    durationMinutes: row.durationMinutes,
   }))
 }

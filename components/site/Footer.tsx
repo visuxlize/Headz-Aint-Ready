@@ -20,7 +20,7 @@ export function Footer() {
             <p className="text-white/70 text-sm mt-2">{SITE.tagline}</p>
           </div>
           <div>
-            <p className="font-medium text-sm mb-2">Visit</p>
+            <p className="font-headz-display text-sm mb-2 tracking-wide">Visit</p>
             <a
               href={SITE.addressUrl}
               target="_blank"
@@ -32,7 +32,7 @@ export function Footer() {
             <p className="text-white/70 text-sm mt-1">{SITE.hours}</p>
           </div>
           <div>
-            <p className="font-medium text-sm mb-2">Contact</p>
+            <p className="font-headz-display text-sm mb-2 tracking-wide">Contact</p>
             <a href={`tel:${SITE.phoneTel}`} className="text-white/80 hover:text-white text-sm block">
               {SITE.phone}
             </a>

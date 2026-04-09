@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { appointments, services } from '@/lib/db/schema'
 import { count, eq } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
+import { revalidateMarketingAndBooking } from '@/lib/marketing/revalidate-public-pages'
 import { z } from 'zod'
 
 const patchSchema = z.object({
@@ -68,6 +69,7 @@ export async function PATCH(
     .where(eq(services.id, id))
     .returning()
 
+  revalidateMarketingAndBooking()
   return NextResponse.json({ data: updated })
 }
 
@@ -106,5 +108,6 @@ export async function DELETE(
   }
 
   await db.delete(services).where(eq(services.id, id))
+  revalidateMarketingAndBooking()
   return NextResponse.json({ ok: true })
 }
