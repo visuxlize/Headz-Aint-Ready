@@ -16,8 +16,7 @@ import { GOOGLE_READ_REVIEWS_URL, GOOGLE_WRITE_REVIEW_URL } from '@/lib/marketin
 import { formatServiceDurationLabel, marketingServiceDescription } from '@/lib/marketing/price-list-ui'
 import { INSTAGRAM_PROFILE_URL, instagramGalleryPhotos } from '@/lib/marketing/instagram-gallery'
 import { MarketingHero } from '@/components/marketing/MarketingHero'
-import { FadeInOnScroll } from '@/components/marketing/FadeInOnScroll'
-import { MarketingReviewsCarousel } from '@/components/marketing/MarketingReviewsCarousel'
+import { FadeInOnScroll, FadeInOnScrollLi } from '@/components/marketing/FadeInOnScroll'
 
 export const dynamic = 'force-dynamic'
 
@@ -161,7 +160,7 @@ export default async function HomePage() {
           aria-hidden
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white/90 to-transparent" aria-hidden />
-        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-stretch gap-16 lg:grid-cols-2">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-16 lg:grid-cols-2">
           <FadeInOnScroll>
             <div className="mx-auto w-full max-w-md text-left lg:mx-0">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">
@@ -214,16 +213,39 @@ export default async function HomePage() {
             </div>
           </FadeInOnScroll>
 
-          <div className="flex min-h-0 min-w-0 flex-col lg:justify-between">
+          <div className="lg:pt-1">
             <FadeInOnScroll delayMs={80}>
-              <div>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">In their words</p>
-                <h3 className="font-headz-display text-4xl leading-[1.12] text-headz-black sm:text-5xl">
-                  Why Jackson Heights trusts the chair
-                </h3>
-              </div>
+              <h3 className="font-headz-display text-3xl text-headz-black sm:text-4xl">
+                Why Jackson Heights trusts the chair
+              </h3>
             </FadeInOnScroll>
-            <MarketingReviewsCarousel reviews={REVIEWS} />
+            <ul className="mt-9 grid list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {REVIEWS.map((r, index) => (
+                <FadeInOnScrollLi key={r.name} delayMs={120 + index * 90} className="list-none">
+                  <div className="flex h-full flex-col rounded-xl border border-black/[0.08] bg-white/75 p-5 shadow-[0_10px_36px_-22px_rgba(196,30,58,0.35)] ring-1 ring-headz-red/[0.06] backdrop-blur-[2px]">
+                    <p className="text-[15px] leading-none tracking-tight text-amber-500" aria-label="5 out of 5 stars">
+                      ★★★★★
+                    </p>
+                    <p className="mt-3 flex-1 text-[15px] leading-relaxed text-headz-black/88">{r.text}</p>
+                    <div className="mt-5 flex items-center gap-3 border-t border-black/[0.06] pt-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-headz-red/20 to-headz-red/5 text-xs font-bold text-headz-red ring-2 ring-headz-red/15">
+                        {r.name
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w) => w[0])
+                          .join('')
+                          .toUpperCase()}
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className="truncate font-semibold text-headz-black">{r.name}</p>
+                        <p className="truncate text-sm text-headz-gray">{r.role}</p>
+                      </div>
+                    </div>
+                  </div>
+                </FadeInOnScrollLi>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
