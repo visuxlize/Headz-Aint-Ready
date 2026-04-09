@@ -388,7 +388,7 @@ export default async function HomePage() {
               </a>
               . Tap a photo to open the original post — follow for lineups, reels, and shop drops.
             </p>
-            <div className="grid w-full grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid w-full grid-cols-1 gap-4">
               {instagramGalleryPhotos.map((item, index) => (
                 <a
                   key={`${item.postUrl}-${index}`}
@@ -402,7 +402,7 @@ export default async function HomePage() {
                     alt={item.alt}
                     fill
                     className="object-cover object-center transition duration-500 group-hover:scale-[1.03]"
-                    sizes="(max-width: 1024px) 47vw, (max-width: 1280px) 34vw, 380px"
+                    sizes="(max-width: 1024px) min(100vw, 42rem), (max-width: 1536px) 58vw, 720px"
                     unoptimized
                   />
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-white opacity-0 transition group-hover:opacity-100">
