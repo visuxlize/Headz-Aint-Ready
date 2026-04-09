@@ -5,6 +5,16 @@ import { appointments, barbers, users } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { isoToNyDateAndTime } from '@/lib/appointments/time'
+import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import {
+  API_BURST_LIMIT,
+  API_BURST_WINDOW_MS,
+  BOOKING_POST_LIMIT,
+  BOOKING_POST_WINDOW_MS,
+  clientKeyFromRequest,
+  rateLimitResponse,
+} from '@/lib/security/rate-limit'
+import { logSecurityEvent } from '@/lib/security/security-log'
 
 const createSchema = z.object({
   barberId: z.string().uuid(),
@@ -20,30 +30,35 @@ const createSchema = z.object({
   paymentMethod: z.enum(['cash', 'card']),
 })
 
-/** GET /api/appointments?date=YYYY-MM-DD – list appointments for the day (staff only) */
+/** GET /api/appointments?date=YYYY-MM-DD – list appointments for the day (staff only, scoped by barber) */
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
+
+    const limited = rateLimitResponse(
+      `appt-get:${clientKeyFromRequest(request, auth.user.id)}`,
+      API_BURST_LIMIT,
+      API_BURST_WINDOW_MS
+    )
+    if (limited) {
+      logSecurityEvent('rate_limit', { route: 'GET /api/appointments', userId: auth.user.id })
+      return limited
     }
+
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json({ error: 'Invalid or missing date' }, { status: 400 })
     }
-    const list = await db
-      .select()
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.appointmentDate, date),
-          eq(appointments.status, 'pending')
-        )
-      )
+
+    const base = and(eq(appointments.appointmentDate, date), eq(appointments.status, 'pending'))
+    const scoped =
+      auth.dbUser.role === 'admin'
+        ? base
+        : and(base, eq(appointments.barberId, auth.user.id))
+
+    const list = await db.select().from(appointments).where(scoped)
     return NextResponse.json({ data: list })
   } catch (e) {
     console.error('GET /api/appointments', e)
@@ -54,6 +69,20 @@ export async function GET(request: Request) {
 /** POST /api/appointments – create a new appointment (public booking or staff walk-in) */
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient()
+    const {
+      data: { user: bookingUser },
+    } = await supabase.auth.getUser()
+    const limited = rateLimitResponse(
+      `book:${clientKeyFromRequest(request, bookingUser?.id ?? null)}`,
+      BOOKING_POST_LIMIT,
+      BOOKING_POST_WINDOW_MS
+    )
+    if (limited) {
+      logSecurityEvent('rate_limit', { route: 'POST /api/appointments' })
+      return limited
+    }
+
     const body = await request.json()
     const parsed = createSchema.safeParse({
       ...body,

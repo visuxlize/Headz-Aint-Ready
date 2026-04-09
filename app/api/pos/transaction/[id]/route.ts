@@ -19,5 +19,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  if (auth.dbUser.role !== 'admin' && row.barberId !== auth.user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   return NextResponse.json({ transaction: row })
 }

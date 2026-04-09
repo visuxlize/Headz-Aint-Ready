@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { appointments, barbers, services } from '@/lib/db/schema'
 import { and, eq, inArray } from 'drizzle-orm'
 import { appointmentEndUtc, appointmentStartUtc } from '@/lib/appointments/time'
+import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { logSecurityEvent } from '@/lib/security/security-log'
 
 function formatICSDate(d: Date) {
   return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
@@ -18,13 +19,9 @@ function escapeICS(s: string) {
  */
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
+
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
     const barberProfileId = searchParams.get('barberId')
@@ -32,14 +29,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid or missing date' }, { status: 400 })
     }
 
-    let barberUserId: string | undefined
-    if (barberProfileId) {
-      const [b] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
-      barberUserId = b?.userId ?? undefined
-    }
-
     const conditions = [eq(appointments.appointmentDate, date), eq(appointments.status, 'pending')]
-    if (barberUserId) conditions.push(eq(appointments.barberId, barberUserId))
+
+    if (auth.dbUser.role === 'admin') {
+      if (barberProfileId) {
+        const [b] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
+        if (b?.userId) conditions.push(eq(appointments.barberId, b.userId))
+      }
+    } else {
+      conditions.push(eq(appointments.barberId, auth.user.id))
+      if (barberProfileId) {
+        const [b] = await db.select().from(barbers).where(eq(barbers.id, barberProfileId)).limit(1)
+        if (!b?.userId || b.userId !== auth.user.id) {
+          logSecurityEvent('idor_blocked', { route: 'GET /api/appointments/calendar', userId: auth.user.id })
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+    }
 
     const list = await db
       .select({

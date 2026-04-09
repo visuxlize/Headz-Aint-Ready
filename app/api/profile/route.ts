@@ -19,7 +19,11 @@ import { z } from 'zod'
 // Input validation schema
 const updateProfileSchema = z.object({
   fullName: z.string().min(1).max(100).optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: z
+    .string()
+    .max(2048)
+    .optional()
+    .refine((s) => !s || /^https:\/\//i.test(s), 'Avatar URL must be https'),
 })
 
 // GET /api/profile - Get current user's profile
@@ -78,7 +82,11 @@ export async function PUT(request: Request) {
 
     // 2. Parse and validate input
     const body = await request.json()
-    const validatedData = updateProfileSchema.parse(body)
+    const parsed = updateProfileSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+    }
+    const validatedData = parsed.data
 
     // 3. Update profile in database
     const [updatedProfile] = await db
@@ -101,14 +109,6 @@ export async function PUT(request: Request) {
     return NextResponse.json({ data: updatedProfile })
 
   } catch (error) {
-    // 5. Handle errors
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
-    }
-
     console.error('PUT /api/profile error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

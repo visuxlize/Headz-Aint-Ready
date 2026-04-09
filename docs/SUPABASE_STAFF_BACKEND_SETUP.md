@@ -190,7 +190,7 @@ Staff use **Supabase Auth**; there is no separate “staff” table. Anyone with
 - **Create a staff user:** Supabase → **Authentication** → **Users** → **Add user** (email + password), or use the app’s signup page at `/auth/signup`.
 - **Login:** `/auth/login` → then redirect to `/dashboard`.
 
-No RLS is required for the app’s current pattern: the Next.js server uses `createClient()` (with cookies) and `DATABASE_URL` (server-side). All staff routes and APIs check `supabase.auth.getUser()` and only then run DB queries with the server-side Postgres client.
+Server routes use `DATABASE_URL` with the **postgres** database role (Drizzle), which **bypasses RLS**, so the app keeps working as before. You should still **enable RLS on public tables** so Supabase Advisor stays green and any `anon` / `authenticated` access via PostgREST is constrained. After `scripts/migrate-roles.sql`, run **`scripts/supabase-rls-advisor-fix.sql`** in the SQL Editor. Staff routes continue to check `supabase.auth.getUser()` before mutating data.
 
 ---
 

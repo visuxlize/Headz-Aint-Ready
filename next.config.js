@@ -1,7 +1,32 @@
 /** @type {import('next').NextConfig} */
 // Use module.exports (CommonJS) so no "type": "module" needed
+const securityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=()',
+  },
+]
+
+function buildResponseHeaders() {
+  /** HSTS only on real HTTPS origins (not localhost). */
+  const h =
+    process.env.VERCEL_ENV === 'production'
+      ? [
+          ...securityHeaders,
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+        ]
+      : securityHeaders
+  return h
+}
+
 const nextConfig = {
   outputFileTracingRoot: process.cwd(),
+  async headers() {
+    return [{ source: '/:path*', headers: buildResponseHeaders() }]
+  },
   // Netlify CI can differ from local ESLint; warnings should not block deploys.
   eslint: {
     ignoreDuringBuilds: true,

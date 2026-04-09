@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { appointments, services } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { computeNoShowFeeFromServicePrice } from '@/lib/appointments/no-show-fee'
 import { z } from 'zod'
 import { isoToNyDateAndTime } from '@/lib/appointments/time'
+import { requireStaffApi } from '@/lib/staff/require-staff-api'
+import { logSecurityEvent } from '@/lib/security/security-log'
 
 const updateSchema = z.object({
   startAt: z.string().optional(),
@@ -27,13 +28,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = await requireStaffApi()
+    if ('error' in auth) return auth.error
+
     const { id } = await params
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (!id || !uuidRegex.test(id)) {
@@ -65,17 +62,33 @@ export async function PATCH(
       setPayload.timeSlot = timeSlot
     }
 
+    const [existing] = await db.select().from(appointments).where(eq(appointments.id, id)).limit(1)
+    if (!existing) {
+      return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
+    }
+
+    if (auth.dbUser.role !== 'admin' && existing.barberId !== auth.user.id) {
+      logSecurityEvent('idor_blocked', {
+        route: 'PATCH /api/appointments/[id]',
+        userId: auth.user.id,
+        resource: id,
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     if (data.status === 'no_show') {
-      const [existing] = await db.select().from(appointments).where(eq(appointments.id, id)).limit(1)
-      if (existing) {
-        const [svc] = await db.select().from(services).where(eq(services.id, existing.serviceId)).limit(1)
-        if (svc) {
-          setPayload.noShowFee = computeNoShowFeeFromServicePrice(svc.price)
-        }
+      const [svc] = await db.select().from(services).where(eq(services.id, existing.serviceId)).limit(1)
+      if (svc) {
+        setPayload.noShowFee = computeNoShowFeeFromServicePrice(svc.price)
       }
     }
 
-    const [updated] = await db.update(appointments).set(setPayload).where(eq(appointments.id, id)).returning()
+    const whereClause =
+      auth.dbUser.role === 'admin'
+        ? eq(appointments.id, id)
+        : and(eq(appointments.id, id), eq(appointments.barberId, auth.user.id))
+
+    const [updated] = await db.update(appointments).set(setPayload).where(whereClause).returning()
 
     if (!updated) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
