@@ -169,3 +169,23 @@
   animation-iteration-count: infinite;
   will-change: transform;
 }
+
+/* Marketing — review carousel slide change */
+@keyframes marketing-review-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.marketing-review-fade {
+  animation: marketing-review-fade 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-review-fade {
+    animation: none;
+  }
+}

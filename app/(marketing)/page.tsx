@@ -16,7 +16,8 @@ import { GOOGLE_READ_REVIEWS_URL, GOOGLE_WRITE_REVIEW_URL } from '@/lib/marketin
 import { formatServiceDurationLabel, marketingServiceDescription } from '@/lib/marketing/price-list-ui'
 import { INSTAGRAM_PROFILE_URL, instagramGalleryPhotos } from '@/lib/marketing/instagram-gallery'
 import { MarketingHero } from '@/components/marketing/MarketingHero'
-import { FadeInOnScroll, FadeInOnScrollLi } from '@/components/marketing/FadeInOnScroll'
+import { FadeInOnScroll } from '@/components/marketing/FadeInOnScroll'
+import { MarketingReviewsCarousel } from '@/components/marketing/MarketingReviewsCarousel'
 
 export const dynamic = 'force-dynamic'
 
@@ -219,33 +220,7 @@ export default async function HomePage() {
                 Why Jackson Heights trusts the chair
               </h3>
             </FadeInOnScroll>
-            <ul className="mt-9 grid list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              {REVIEWS.map((r, index) => (
-                <FadeInOnScrollLi key={r.name} delayMs={120 + index * 90} className="list-none">
-                  <div className="flex h-full flex-col rounded-xl border border-black/[0.08] bg-white/75 p-5 shadow-[0_10px_36px_-22px_rgba(196,30,58,0.35)] ring-1 ring-headz-red/[0.06] backdrop-blur-[2px]">
-                    <p className="text-[15px] leading-none tracking-tight text-amber-500" aria-label="5 out of 5 stars">
-                      ★★★★★
-                    </p>
-                    <p className="mt-3 flex-1 text-[15px] leading-relaxed text-headz-black/88">{r.text}</p>
-                    <div className="mt-5 flex items-center gap-3 border-t border-black/[0.06] pt-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-headz-red/20 to-headz-red/5 text-xs font-bold text-headz-red ring-2 ring-headz-red/15">
-                        {r.name
-                          .split(/\s+/)
-                          .filter(Boolean)
-                          .slice(0, 2)
-                          .map((w) => w[0])
-                          .join('')
-                          .toUpperCase()}
-                      </div>
-                      <div className="min-w-0 text-left">
-                        <p className="truncate font-semibold text-headz-black">{r.name}</p>
-                        <p className="truncate text-sm text-headz-gray">{r.role}</p>
-                      </div>
-                    </div>
-                  </div>
-                </FadeInOnScrollLi>
-              ))}
-            </ul>
+            <MarketingReviewsCarousel reviews={REVIEWS} />
           </div>
         </div>
       </section>
@@ -358,12 +333,12 @@ export default async function HomePage() {
                   <p className="mt-2 max-w-xl text-[15px] italic leading-relaxed text-headz-black/65">
                     {marketingServiceDescription(row)}
                   </p>
-                  <p className="mt-3 text-[15px] font-normal tabular-nums text-headz-black">
-                    {formatServicePriceDisplay(row)}{' '}
+                  <p className="mt-3 text-[15px] tabular-nums text-headz-black/85">
+                    <span className="font-bold text-headz-black">{formatServicePriceDisplay(row)}</span>
                     <span className="mx-1.5 inline text-headz-black/35" aria-hidden>
                       ·
                     </span>{' '}
-                    {formatServiceDurationLabel(row.durationMinutes)}
+                    <span className="font-normal">{formatServiceDurationLabel(row.durationMinutes)}</span>
                   </p>
                 </article>
               ))}
