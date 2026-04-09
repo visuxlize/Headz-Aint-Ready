@@ -162,18 +162,18 @@ export default async function HomePage() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white/90 to-transparent" aria-hidden />
         <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-16 lg:grid-cols-2">
           <FadeInOnScroll>
-            <div className="mx-auto max-w-2xl text-center">
+            <div className="mx-auto w-full max-w-md text-left lg:mx-0">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">
                 OVER 25 YEARS IN...
               </p>
               <h2 className="font-headz-display mb-5 text-5xl text-headz-black sm:text-6xl">The Industry</h2>
-              <p className="mx-auto mb-10 max-w-xl text-base leading-relaxed text-headz-black/85">
+              <p className="mb-10 text-base leading-relaxed text-headz-black/85">
                 Headz Ain&apos;t Ready Was Established In 1995 In Jackson Heights, Queens. Since Then We Have
                 Been Serving Thousands Of Clients In New York &amp; The Entire Tri-State Area. We&apos;re proud of
                 the craft and we let the cuts speak for themselves.
               </p>
-              <div className="mx-auto flex max-w-xl flex-row flex-wrap justify-center gap-4 sm:max-w-2xl sm:gap-5 lg:max-w-md lg:flex-col lg:flex-nowrap lg:justify-start">
-                <div className="flex min-w-[min(100%,280px)] flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px] lg:max-w-none">
+              <div className="flex w-full flex-col gap-4">
+                <div className="flex w-full min-w-0 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-headz-red text-white shadow-md shadow-headz-red/20">
                     <RedCheckIcon className="h-4 w-4" />
                   </span>
@@ -182,7 +182,7 @@ export default async function HomePage() {
                     <p className="mt-1 text-sm leading-snug text-headz-gray">Monday – Sun: 9am – 8pm</p>
                   </div>
                 </div>
-                <div className="flex min-w-[min(100%,280px)] flex-1 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 text-left shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm sm:min-w-0 sm:max-w-[280px] lg:max-w-none">
+                <div className="flex w-full min-w-0 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-headz-red text-white shadow-md shadow-headz-red/20">
                     <RedCheckIcon className="h-4 w-4" />
                   </span>
@@ -192,12 +192,12 @@ export default async function HomePage() {
                   </div>
                 </div>
               </div>
-              <div className="mx-auto mt-8 flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:justify-center lg:mx-0 lg:max-w-md lg:flex-col lg:justify-start">
+              <div className="mt-10 w-full space-y-3 border-t border-black/[0.06] pt-10">
                 <a
                   href={GOOGLE_WRITE_REVIEW_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-[3rem] flex-1 items-center justify-center rounded-lg bg-headz-red px-6 py-3 text-center text-sm font-semibold uppercase tracking-widest text-white shadow-md shadow-headz-red/25 transition hover:bg-[var(--headz-red-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                  className="flex w-full items-center justify-center rounded-xl bg-headz-red px-5 py-3.5 text-center text-[13px] font-semibold uppercase tracking-[0.2em] text-white shadow-[0_6px_20px_-6px_rgba(196,30,58,0.55)] transition hover:brightness-[0.92] active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
                 >
                   Write a review
                 </a>
@@ -205,7 +205,7 @@ export default async function HomePage() {
                   href={GOOGLE_READ_REVIEWS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-[3rem] flex-1 items-center justify-center rounded-lg border-2 border-headz-red bg-white/90 px-6 py-3 text-center text-sm font-semibold uppercase tracking-widest text-headz-red transition hover:bg-headz-red/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                  className="flex w-full items-center justify-center rounded-xl border border-headz-red/90 bg-white px-5 py-3.5 text-center text-[13px] font-semibold uppercase tracking-[0.2em] text-headz-red shadow-sm shadow-black/[0.04] transition hover:bg-headz-red/[0.04] active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
                 >
                   Read reviews
                 </a>
