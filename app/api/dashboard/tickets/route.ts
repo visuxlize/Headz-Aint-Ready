@@ -99,41 +99,64 @@ const postSchema = z.object({
   serviceLabel: z.string().optional(),
 })
 
+/** Older DBs may not have migrated `source` yet — detect and query without it. */
+function isMissingPosSourceColumnError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return /source.*does not exist|column.*source/i.test(msg)
+}
+
+const ticketSelectBase = {
+  id: posTransactions.id,
+  customerName: posTransactions.customerName,
+  barberId: posTransactions.barberId,
+  barberName: sql<string>`coalesce(${users.fullName}, 'Staff')`,
+  items: posTransactions.items,
+  total: posTransactions.total,
+  tipAmount: posTransactions.tipAmount,
+  paymentMethod: posTransactions.paymentMethod,
+  createdAt: posTransactions.createdAt,
+} as const
+
+async function fetchTodayTicketRows(): Promise<TicketRow[]> {
+  const dayStart = startOfNyDayUtc()
+  const now = new Date()
+  const where = and(
+    gte(posTransactions.createdAt, dayStart),
+    lte(posTransactions.createdAt, now),
+    ne(posTransactions.paymentStatus, 'voided'),
+    eq(posTransactions.paymentStatus, 'paid')
+  )
+
+  try {
+    const raw = await db
+      .select({
+        ...ticketSelectBase,
+        source: posTransactions.source,
+      })
+      .from(posTransactions)
+      .innerJoin(users, eq(posTransactions.barberId, users.id))
+      .where(where)
+      .orderBy(desc(posTransactions.createdAt))
+    return raw as TicketRow[]
+  } catch (e) {
+    if (!isMissingPosSourceColumnError(e)) throw e
+    const raw = await db
+      .select({ ...ticketSelectBase })
+      .from(posTransactions)
+      .innerJoin(users, eq(posTransactions.barberId, users.id))
+      .where(where)
+      .orderBy(desc(posTransactions.createdAt))
+    return (raw as Omit<TicketRow, 'source'>[]).map((r) => ({ ...r, source: 'manual' }))
+  }
+}
+
 /** GET — today's POS tickets (NY day, paid/non-voided). POST — manual ticket. */
 export async function GET() {
   const auth = await requireAdminApi()
   if ('error' in auth) return auth.error
 
-  const dayStart = startOfNyDayUtc()
-  const now = new Date()
-
   try {
-    const raw = await db
-      .select({
-        id: posTransactions.id,
-        customerName: posTransactions.customerName,
-        barberId: posTransactions.barberId,
-        barberName: sql<string>`coalesce(${users.fullName}, 'Staff')`,
-        items: posTransactions.items,
-        total: posTransactions.total,
-        tipAmount: posTransactions.tipAmount,
-        paymentMethod: posTransactions.paymentMethod,
-        createdAt: posTransactions.createdAt,
-        source: posTransactions.source,
-      })
-      .from(posTransactions)
-      .innerJoin(users, eq(posTransactions.barberId, users.id))
-      .where(
-        and(
-          gte(posTransactions.createdAt, dayStart),
-          lte(posTransactions.createdAt, now),
-          ne(posTransactions.paymentStatus, 'voided'),
-          eq(posTransactions.paymentStatus, 'paid')
-        )
-      )
-      .orderBy(desc(posTransactions.createdAt))
-
-    const rows = raw as TicketRow[]
+    const rows = await fetchTodayTicketRows()
     const totals = computeTotals(rows)
     const tickets = rows.map(toTicketPayload)
 
@@ -168,23 +191,30 @@ export async function POST(request: Request) {
     ? [{ name: serviceLabel.trim(), price: amount.toFixed(2) }]
     : null
 
+  const baseInsert = {
+    customerName,
+    barberId,
+    appointmentId: null,
+    serviceId: null,
+    items,
+    subtotal: amount.toFixed(2),
+    tipAmount: tip.toFixed(2),
+    total: total.toFixed(2),
+    paymentMethod,
+    paymentStatus: 'paid' as const,
+  }
+
   try {
-    const [inserted] = await db
-      .insert(posTransactions)
-      .values({
-        customerName,
-        barberId,
-        appointmentId: null,
-        serviceId: null,
-        items,
-        subtotal: amount.toFixed(2),
-        tipAmount: tip.toFixed(2),
-        total: total.toFixed(2),
-        paymentMethod,
-        paymentStatus: 'paid',
-        source: 'manual',
-      })
-      .returning()
+    let inserted: typeof posTransactions.$inferSelect | undefined
+    try {
+      ;[inserted] = await db
+        .insert(posTransactions)
+        .values({ ...baseInsert, source: 'manual' })
+        .returning()
+    } catch (e) {
+      if (!isMissingPosSourceColumnError(e)) throw e
+      ;[inserted] = await db.insert(posTransactions).values(baseInsert).returning()
+    }
 
     if (!inserted) {
       return NextResponse.json({ error: 'Insert failed' }, { status: 500 })
@@ -192,6 +222,7 @@ export async function POST(request: Request) {
 
     const [u] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, barberId)).limit(1)
     const barberName = u?.fullName ?? 'Staff'
+    const rowSource = (inserted as { source?: string }).source ?? 'manual'
 
     const ticketRow: TicketRow = {
       id: inserted.id,
@@ -203,37 +234,11 @@ export async function POST(request: Request) {
       tipAmount: String(inserted.tipAmount),
       paymentMethod: inserted.paymentMethod,
       createdAt: inserted.createdAt,
-      source: inserted.source,
+      source: rowSource,
     }
 
-    const dayStart = startOfNyDayUtc()
-    const now = new Date()
-    const todayRows = await db
-      .select({
-        id: posTransactions.id,
-        customerName: posTransactions.customerName,
-        barberId: posTransactions.barberId,
-        barberName: sql<string>`coalesce(${users.fullName}, 'Staff')`,
-        items: posTransactions.items,
-        total: posTransactions.total,
-        tipAmount: posTransactions.tipAmount,
-        paymentMethod: posTransactions.paymentMethod,
-        createdAt: posTransactions.createdAt,
-        source: posTransactions.source,
-      })
-      .from(posTransactions)
-      .innerJoin(users, eq(posTransactions.barberId, users.id))
-      .where(
-        and(
-          gte(posTransactions.createdAt, dayStart),
-          lte(posTransactions.createdAt, now),
-          ne(posTransactions.paymentStatus, 'voided'),
-          eq(posTransactions.paymentStatus, 'paid')
-        )
-      )
-      .orderBy(desc(posTransactions.createdAt))
-
-    const totals = computeTotals(todayRows as TicketRow[])
+    const todayRows = await fetchTodayTicketRows()
+    const totals = computeTotals(todayRows)
 
     return NextResponse.json({
       ticket: toTicketPayload(ticketRow),

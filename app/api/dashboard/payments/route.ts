@@ -8,16 +8,14 @@ export const dynamic = 'force-dynamic'
 
 function friendlyPaymentsError(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e)
+  console.error('[payments API]', raw)
   if (/relation ["']?pos_transactions["']? does not exist/i.test(raw)) {
-    return 'Database is missing the payments table. In Supabase → SQL Editor, run scripts/ensure-pos-payments-schema.sql, then refresh.'
+    return 'Payment history is temporarily unavailable. Try again later or ask your shop admin for help.'
   }
   if (/relation ["']?square_devices["']? does not exist/i.test(raw)) {
-    return 'Database is missing optional device tables. Run scripts/ensure-pos-payments-schema.sql in Supabase.'
+    return 'Payment history is temporarily unavailable. Try again later or ask your shop admin for help.'
   }
-  if (/Failed query:/i.test(raw)) {
-    return 'Could not load payments from the database. If this persists, run scripts/ensure-pos-payments-schema.sql in Supabase (or check DATABASE_URL).'
-  }
-  return raw
+  return 'Could not load payment history. Please refresh the page or try again in a moment.'
 }
 
 async function sumPaidSince(method: 'card' | 'cash', since: Date) {

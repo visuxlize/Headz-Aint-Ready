@@ -46,44 +46,74 @@ type ReportsTodayApi = {
   combinedRevenue: number
 }
 
+const EMPTY_TICKETS: TicketsApi = {
+  tickets: [],
+  totals: { cash: 0, card: 0, count: 0, byBarber: [] },
+}
+
+const EMPTY_REPORTS: ReportsTodayApi = { combinedRevenue: 0 }
+
 export function AdminOverviewTab() {
   const [overview, setOverview] = useState<OverviewApi | null>(null)
-  const [ticketsData, setTicketsData] = useState<TicketsApi | null>(null)
-  const [reportsToday, setReportsToday] = useState<ReportsTodayApi | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+  const [ticketsData, setTicketsData] = useState<TicketsApi>(EMPTY_TICKETS)
+  const [reportsToday, setReportsToday] = useState<ReportsTodayApi>(EMPTY_REPORTS)
+  const [fatalError, setFatalError] = useState(false)
+  const [partialLoad, setPartialLoad] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    setErr(null)
+    setFatalError(false)
+    setPartialLoad(false)
     const todayNy = format(toZonedTime(new Date(), NY_TZ), 'yyyy-MM-dd')
-    void Promise.all([
+
+    void Promise.allSettled([
       fetch('/api/dashboard/overview', { credentials: 'include' }).then(async (r) => {
-        const j = await r.json()
-        if (!r.ok) throw new Error(j.error || 'Overview failed')
+        const j: unknown = await r.json()
+        if (!r.ok) throw new Error(typeof j === 'object' && j && 'error' in j ? String((j as { error: string }).error) : 'Overview failed')
         return j as OverviewApi
       }),
       fetch('/api/dashboard/tickets', { credentials: 'include' }).then(async (r) => {
-        const j = await r.json()
-        if (!r.ok) throw new Error(j.error || 'Tickets failed')
+        const j: unknown = await r.json()
+        if (!r.ok) throw new Error(typeof j === 'object' && j && 'error' in j ? String((j as { error: string }).error) : 'Tickets failed')
         return j as TicketsApi
       }),
       fetch(
         `/api/dashboard/reports?start=${encodeURIComponent(todayNy)}&end=${encodeURIComponent(todayNy)}`,
         { credentials: 'include' }
       ).then(async (r) => {
-        const j = await r.json()
-        if (!r.ok) throw new Error(j.error || 'Reports failed')
+        const j: unknown = await r.json()
+        if (!r.ok) throw new Error(typeof j === 'object' && j && 'error' in j ? String((j as { error: string }).error) : 'Reports failed')
         return j as ReportsTodayApi
       }),
-    ])
-      .then(([o, t, rep]) => {
-        setOverview(o)
-        setTicketsData(t)
-        setReportsToday(rep)
-      })
-      .catch((e) => setErr(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
+    ]).then((results) => {
+      const [o, t, r] = results
+
+      if (o.status === 'fulfilled') {
+        setOverview(o.value)
+        setFatalError(false)
+      } else {
+        setOverview(null)
+        setFatalError(true)
+      }
+
+      if (t.status === 'fulfilled') {
+        setTicketsData(t.value)
+      } else {
+        setTicketsData(EMPTY_TICKETS)
+      }
+
+      if (r.status === 'fulfilled') {
+        setReportsToday(r.value)
+      } else {
+        setReportsToday(EMPTY_REPORTS)
+      }
+
+      const ticketsOk = t.status === 'fulfilled'
+      const reportsOk = r.status === 'fulfilled'
+      setPartialLoad(o.status === 'fulfilled' && (!ticketsOk || !reportsOk))
+    })
+    .finally(() => setLoading(false))
   }, [])
 
   const cash = useAnimatedCounter(ticketsData?.totals.cash ?? 0, 600)
@@ -99,18 +129,26 @@ export function AdminOverviewTab() {
 
   const byBarber = [...(ticketsData?.totals.byBarber ?? [])].sort((a, b) => b.total - a.total)
 
-  if (err) {
+  if (fatalError && !loading) {
     return (
-      <div className="rounded-full border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
-        {err}{' '}
-        <button type="button" className="ml-2 font-semibold underline" onClick={() => window.location.reload()}>
-          Retry
+      <div className="mx-auto max-w-md rounded-2xl border border-black/[0.08] bg-white px-6 py-8 text-center shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">Headz</p>
+        <h2 className="mt-2 text-xl font-bold text-headz-black">Couldn&apos;t load the dashboard</h2>
+        <p className="mt-2 text-sm leading-relaxed text-headz-gray">
+          Something interrupted the connection. Wait a moment, then try again.
+        </p>
+        <button
+          type="button"
+          className="mt-6 w-full rounded-xl bg-headz-red py-3 text-sm font-bold uppercase tracking-widest text-white shadow-md shadow-headz-red/20 transition hover:bg-headz-redDark"
+          onClick={() => window.location.reload()}
+        >
+          Try again
         </button>
       </div>
     )
   }
 
-  if (loading || !overview || !ticketsData || !reportsToday) {
+  if (loading || !overview) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -126,6 +164,21 @@ export function AdminOverviewTab() {
 
   return (
     <div className="space-y-8 text-headz-black">
+      {partialLoad && (
+        <div
+          className="flex flex-col gap-2 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <span>Some live numbers didn&apos;t load. You can still use the rest of the dashboard.</span>
+          <button
+            type="button"
+            className="shrink-0 font-semibold text-headz-red underline decoration-headz-red/40 underline-offset-2 hover:text-headz-redDark"
+            onClick={() => window.location.reload()}
+          >
+            Refresh
+          </button>
+        </div>
+      )}
       {/* Hero */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div

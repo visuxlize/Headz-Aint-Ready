@@ -22,7 +22,7 @@ export function LoginForm() {
     const err = searchParams.get('error')
     if (err === 'unauthorized') {
       setError(
-        'Not on the staff allow list. Your email must be in the staff_allowlist table. Dev fix: Supabase → SQL → run scripts/ensure-staff-allowlist.sql, or npm run seed:dev-users.'
+        "This email isn’t on the staff access list yet. Ask your manager or shop admin to add you, then try signing in again."
       )
     }
     if (err === 'unavailable') {
