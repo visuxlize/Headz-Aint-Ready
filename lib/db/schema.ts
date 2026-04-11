@@ -25,9 +25,13 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: text('email').notNull().unique(),
   fullName: text('full_name'),
+  /** E.164 or loose digits/spaces — staff contact, not customer PII policy */
+  phone: text('phone'),
   avatarUrl: text('avatar_url'),
   isActive: boolean('is_active').default(true).notNull(),
   role: text('role').notNull().default('barber'),
+  /** After admin temporary password reset — user must set a new password before using the dashboard. */
+  mustChangePassword: boolean('must_change_password').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
@@ -49,6 +53,7 @@ export const barbers = pgTable('barbers', {
   slug: text('slug').notNull().unique(),
   avatarUrl: text('avatar_url'),
   email: text('email'),
+  phone: text('phone'),
   bio: text('bio'),
   sortOrder: integer('sort_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),

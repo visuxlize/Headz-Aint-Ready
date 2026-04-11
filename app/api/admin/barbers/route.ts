@@ -45,6 +45,7 @@ export async function GET() {
       barberProfileId: b.id,
       displayName: b.name,
       email: linked ? u.email : (b.email ?? ''),
+      phone: linked ? u.phone : (b.phone ?? ''),
       avatarUrl: b.avatarUrl,
       isActive: linked ? u.isActive : b.isActive,
       createdAt: linked ? u.createdAt : b.createdAt,

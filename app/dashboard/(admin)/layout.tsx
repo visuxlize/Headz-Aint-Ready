@@ -19,6 +19,9 @@ export default async function AdminDashboardLayout({
 
   const [dbUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1)
   if (!dbUser) redirect('/auth/login')
+  if (dbUser.mustChangePassword) {
+    redirect('/dashboard/force-password-change')
+  }
   if (dbUser.role === 'barber') {
     redirect('/dashboard/barber')
   }

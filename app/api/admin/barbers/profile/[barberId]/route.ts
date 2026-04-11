@@ -5,9 +5,14 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 import { z } from 'zod'
 
-const patchSchema = z.object({
-  isActive: z.boolean(),
-})
+const patchSchema = z
+  .object({
+    isActive: z.boolean().optional(),
+    name: z.string().min(1).max(200).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().max(40).optional().nullable(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: 'At least one field required' })
 
 /** PATCH roster-only barber row (no linked auth user yet). */
 export async function PATCH(
@@ -44,13 +49,42 @@ export async function PATCH(
   }
 
   const now = new Date()
-  await db.update(barbers).set({ isActive: parsed.data.isActive, updatedAt: now }).where(eq(barbers.id, barberId))
+  const patch = parsed.data
+  const oldEmail = row.email?.trim().toLowerCase()
 
-  const em = row.email?.trim().toLowerCase()
-  if (em) {
-    if (parsed.data.isActive) {
+  if (patch.email !== undefined) {
+    const next = patch.email.trim().toLowerCase()
+    const [dup] = await db
+      .select({ id: barbers.id })
+      .from(barbers)
+      .where(eq(barbers.email, next))
+      .limit(1)
+    if (dup && dup.id !== barberId) {
+      return NextResponse.json({ error: 'That email is already on the roster.' }, { status: 409 })
+    }
+  }
+
+  await db
+    .update(barbers)
+    .set({
+      ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
+      ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+      ...(patch.email !== undefined ? { email: patch.email.trim().toLowerCase() } : {}),
+      ...(patch.phone !== undefined ? { phone: patch.phone?.trim() || null } : {}),
+      updatedAt: now,
+    })
+    .where(eq(barbers.id, barberId))
+
+  const [fresh] = await db.select().from(barbers).where(eq(barbers.id, barberId)).limit(1)
+  const em = fresh?.email?.trim().toLowerCase()
+
+  if (patch.isActive !== undefined || patch.email !== undefined) {
+    if (patch.email !== undefined && oldEmail && em && oldEmail !== em) {
+      await db.delete(staffAllowlist).where(eq(staffAllowlist.email, oldEmail))
+    }
+    if (fresh?.isActive && em) {
       await db.insert(staffAllowlist).values({ email: em }).onConflictDoNothing()
-    } else {
+    } else if (em) {
       await db.delete(staffAllowlist).where(eq(staffAllowlist.email, em))
     }
   }

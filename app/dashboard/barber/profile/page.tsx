@@ -30,7 +30,12 @@ export default async function BarberProfilePage() {
         <h1 className="text-2xl font-bold text-headz-black">Profile</h1>
         <p className="text-headz-gray text-sm mt-1">{profile.name}</p>
       </div>
-      <BarberProfileClient initialName={profile.name} initialAvatarUrl={profile.avatarUrl} />
+      <BarberProfileClient
+        initialName={profile.name}
+        initialAvatarUrl={profile.avatarUrl}
+        initialEmail={dbUser.email}
+        initialPhone={dbUser.phone ?? ''}
+      />
     </div>
   )
 }

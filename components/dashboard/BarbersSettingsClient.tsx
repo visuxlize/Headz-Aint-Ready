@@ -10,6 +10,7 @@ type BarberRow = {
   barberProfileId: string
   displayName: string
   email: string
+  phone?: string | null
   avatarUrl?: string | null
   isActive: boolean
   createdAt: string
@@ -255,9 +256,12 @@ export function BarbersSettingsClient() {
         <div>
           <h1 className="text-2xl font-bold text-headz-black">Barber management</h1>
           <p className="text-sm text-headz-gray mt-1 max-w-xl">
-            Roster shows everyone on the floor (photos + names). Add staff to the list before they sign up — when they
-            create an account with the same email, their login links automatically. Or send a full invite email with
-            password setup.
+            Roster shows everyone on the floor (photos + names). To edit login emails, phones, names, or reset a
+            barber&apos;s password, use{' '}
+            <a href="/dashboard/settings/staff" className="font-medium text-headz-red hover:underline">
+              Staff accounts
+            </a>
+            . Add roster rows before signup, or send an email invite so they can set a password.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -376,6 +380,9 @@ export function BarbersSettingsClient() {
                   <p className="text-sm text-headz-gray break-words" title={b.email || undefined}>
                     {b.email || '—'}
                   </p>
+                  {b.phone ? (
+                    <p className="text-xs text-headz-gray/90 break-words">{b.phone}</p>
+                  ) : null}
                   <p className="text-xs text-headz-gray/90">
                     <span className="text-headz-gray/70">Joined</span>{' '}
                     <span className="whitespace-nowrap">{formatJoin(b.createdAt)}</span>

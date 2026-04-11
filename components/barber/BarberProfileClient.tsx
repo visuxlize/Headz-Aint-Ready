@@ -5,15 +5,26 @@ import { useCallback, useState } from 'react'
 type Props = {
   initialName: string
   initialAvatarUrl: string | null
+  initialEmail: string
+  initialPhone: string
 }
 
-export function BarberProfileClient({ initialName, initialAvatarUrl }: Props) {
+export function BarberProfileClient({ initialName, initialAvatarUrl, initialEmail, initialPhone }: Props) {
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
   const [urlInput, setUrlInput] = useState(initialAvatarUrl ?? '')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const [fullName, setFullName] = useState(initialName)
+  const [email, setEmail] = useState(initialEmail)
+  const [phone, setPhone] = useState(initialPhone)
+  const [accountSaving, setAccountSaving] = useState(false)
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [newPw2, setNewPw2] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
 
   const onFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +52,67 @@ export function BarberProfileClient({ initialName, initialAvatarUrl }: Props) {
     },
     []
   )
+
+  const saveAccount = async () => {
+    const n = fullName.trim()
+    const em = email.trim().toLowerCase()
+    if (!n || !em) {
+      setError('Name and email are required')
+      return
+    }
+    setAccountSaving(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/barber/account', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: n,
+          email: em,
+          phone: phone.trim() || null,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not save')
+      setMessage('Account details saved.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save')
+    } finally {
+      setAccountSaving(false)
+    }
+  }
+
+  const savePassword = async () => {
+    if (newPw.length < 8) {
+      setError('New password must be at least 8 characters.')
+      return
+    }
+    if (newPw !== newPw2) {
+      setError('New passwords do not match.')
+      return
+    }
+    setPwSaving(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Could not update password')
+      setCurrentPw('')
+      setNewPw('')
+      setNewPw2('')
+      setMessage('Password updated.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update password')
+    } finally {
+      setPwSaving(false)
+    }
+  }
 
   const saveUrl = async () => {
     const trimmed = urlInput.trim()
@@ -72,6 +144,99 @@ export function BarberProfileClient({ initialName, initialAvatarUrl }: Props) {
   return (
     <div className="space-y-8">
       <div>
+        <h2 className="text-lg font-semibold text-headz-black">Account</h2>
+        <p className="text-sm text-headz-gray mt-1">
+          Your name, email, and phone as shown to the shop. Email is what you use to sign in.
+        </p>
+        <div className="mt-4 grid gap-4 max-w-lg">
+          <div>
+            <label className="block text-sm font-medium text-headz-black mb-1">Display name</label>
+            <input
+              className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="name"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-headz-black mb-1">Email</label>
+            <input
+              type="email"
+              className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-headz-black mb-1">Phone</label>
+            <input
+              type="tel"
+              className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void saveAccount()}
+            disabled={accountSaving}
+            className="w-fit rounded-lg bg-headz-red text-white px-4 py-2 text-sm font-medium hover:opacity-95 disabled:opacity-50"
+          >
+            {accountSaving ? 'Saving…' : 'Save account'}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold text-headz-black">Change password</h2>
+        <p className="text-sm text-headz-gray mt-1">Enter your current password, then choose a new one.</p>
+        <div className="mt-4 grid gap-4 max-w-lg">
+          <div>
+            <label className="block text-sm font-medium text-headz-black mb-1">Current password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-headz-black mb-1">New password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              minLength={8}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-headz-black mb-1">Confirm new password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+              value={newPw2}
+              onChange={(e) => setNewPw2(e.target.value)}
+              minLength={8}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void savePassword()}
+            disabled={pwSaving}
+            className="w-fit rounded-lg border border-black/15 bg-white px-4 py-2 text-sm font-medium hover:bg-black/[0.03] disabled:opacity-50"
+          >
+            {pwSaving ? 'Updating…' : 'Update password'}
+          </button>
+        </div>
+      </div>
+
+      <div>
         <h2 className="text-lg font-semibold text-headz-black">Profile photo</h2>
         <p className="text-sm text-headz-gray mt-1">
           This photo appears on the website team section and booking flow. Upload a new image or paste a
@@ -87,7 +252,7 @@ export function BarberProfileClient({ initialName, initialAvatarUrl }: Props) {
               <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-headz-gray text-2xl font-medium">
-                {initialName.slice(0, 2)}
+                {fullName.slice(0, 2)}
               </div>
             )}
           </div>
