@@ -6,6 +6,7 @@ import { posTransactions, users } from '@/lib/db/schema'
 import type { PosLineItem } from '@/lib/db/schema'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 import { startOfNyDayUtc } from '@/lib/date/ny-bounds'
+import { isMissingPosSourceColumnError } from '@/lib/db/pos-source-column-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,12 +99,6 @@ const postSchema = z.object({
   tipAmount: z.number().min(0).optional(),
   serviceLabel: z.string().optional(),
 })
-
-/** Older DBs may not have migrated `source` yet — detect and query without it. */
-function isMissingPosSourceColumnError(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e)
-  return /source.*does not exist|column.*source/i.test(msg)
-}
 
 const ticketSelectBase = {
   id: posTransactions.id,

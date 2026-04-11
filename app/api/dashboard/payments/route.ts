@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { isMissingPosSourceColumnError } from '@/lib/db/pos-source-column-error'
 import { posTransactions, users } from '@/lib/db/schema'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 
@@ -47,7 +49,7 @@ export async function GET(request: Request) {
   const q = searchParams.get('q')?.trim()
   const sourceFilter = searchParams.get('source')
 
-  const conditions = []
+  const conditions: SQL[] = []
   if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) {
     conditions.push(gte(posTransactions.createdAt, new Date(`${from}T00:00:00`)))
   }
@@ -63,37 +65,84 @@ export async function GET(request: Request) {
   if (q) {
     conditions.push(ilike(posTransactions.customerName, `%${q}%`))
   }
-  if (sourceFilter === 'manual') {
-    conditions.push(eq(posTransactions.source, 'manual'))
+
+  const wantManualOnly = sourceFilter === 'manual'
+
+  const paymentSelectBase = {
+    id: posTransactions.id,
+    customerName: posTransactions.customerName,
+    barberId: posTransactions.barberId,
+    barberName: sql<string | null>`coalesce(${users.fullName}, 'Staff')`,
+    items: posTransactions.items,
+    subtotal: posTransactions.subtotal,
+    tipAmount: posTransactions.tipAmount,
+    total: posTransactions.total,
+    paymentMethod: posTransactions.paymentMethod,
+    paymentStatus: posTransactions.paymentStatus,
+    squarePaymentId: posTransactions.squarePaymentId,
+    cardBrand: posTransactions.cardBrand,
+    cardLastFour: posTransactions.cardLastFour,
+    refundedAt: posTransactions.refundedAt,
+    createdAt: posTransactions.createdAt,
+  } as const
+
+  const whereWithSourceColumn = () => {
+    const c = [...conditions]
+    if (wantManualOnly) c.push(eq(posTransactions.source, 'manual'))
+    return c.length > 0 ? and(...c) : undefined
   }
 
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+  /** Without `source` column we cannot filter manual rows — return none for that tab. */
+  const whereWithoutSourceColumn = () => {
+    const c = [...conditions]
+    if (wantManualOnly) c.push(sql`false`)
+    if (c.length === 0) return undefined
+    return and(...c)
+  }
+
+  type PaymentsListRow = {
+    id: string
+    customerName: string
+    barberId: string
+    barberName: string | null
+    items: unknown
+    subtotal: string
+    tipAmount: string
+    total: string
+    paymentMethod: string
+    paymentStatus: string
+    squarePaymentId: string | null
+    cardBrand: string | null
+    cardLastFour: string | null
+    refundedAt: Date | null
+    createdAt: Date
+    source: string
+  }
 
   try {
-    const rows = await db
-      .select({
-        id: posTransactions.id,
-        customerName: posTransactions.customerName,
-        barberId: posTransactions.barberId,
-        barberName: sql<string | null>`coalesce(${users.fullName}, 'Staff')`,
-        items: posTransactions.items,
-        subtotal: posTransactions.subtotal,
-        tipAmount: posTransactions.tipAmount,
-        total: posTransactions.total,
-        paymentMethod: posTransactions.paymentMethod,
-        paymentStatus: posTransactions.paymentStatus,
-        squarePaymentId: posTransactions.squarePaymentId,
-        cardBrand: posTransactions.cardBrand,
-        cardLastFour: posTransactions.cardLastFour,
-        refundedAt: posTransactions.refundedAt,
-        createdAt: posTransactions.createdAt,
-        source: posTransactions.source,
-      })
-      .from(posTransactions)
-      .leftJoin(users, eq(posTransactions.barberId, users.id))
-      .where(whereClause)
-      .orderBy(desc(posTransactions.createdAt))
-      .limit(500)
+    let rows: PaymentsListRow[]
+    try {
+      rows = (await db
+        .select({
+          ...paymentSelectBase,
+          source: posTransactions.source,
+        })
+        .from(posTransactions)
+        .leftJoin(users, eq(posTransactions.barberId, users.id))
+        .where(whereWithSourceColumn())
+        .orderBy(desc(posTransactions.createdAt))
+        .limit(500)) as PaymentsListRow[]
+    } catch (e) {
+      if (!isMissingPosSourceColumnError(e)) throw e
+      const raw = await db
+        .select({ ...paymentSelectBase })
+        .from(posTransactions)
+        .leftJoin(users, eq(posTransactions.barberId, users.id))
+        .where(whereWithoutSourceColumn())
+        .orderBy(desc(posTransactions.createdAt))
+        .limit(500)
+      rows = raw.map((r) => ({ ...r, source: 'unknown' })) as PaymentsListRow[]
+    }
 
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
