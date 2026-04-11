@@ -2,6 +2,387 @@
 
 ---
 
+## ACTIVE PROMPT 2: Squire Booking Embed + Full Dashboard Revamp
+
+Paste the entire block below into Cursor's composer as a second pass after Prompt 1.
+
+```
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM, Supabase Auth, deployed on Netlify. Color palette: headz-red (#C41E3A), headz-black (#111), headz-cream (#FDF6EC), headz-gray (#6b7280). All design decisions must match the existing dark/red/white barbershop aesthetic.
+
+Squire is now the SINGLE SOURCE OF TRUTH for:
+  - All customer bookings and appointments
+  - Barber scheduling and availability
+  - Time-off requests
+  - Services and pricing
+  - POS / payments
+  - No-show tracking
+
+The Squire booking URL for this shop is:
+  https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1
+
+The Squire partner/business dashboard is at:
+  https://app.getsquire.com
+
+Keep the local database ONLY for:
+  - User authentication (Supabase)
+  - Barber public profiles (name, avatar, bio shown on the marketing site)
+  - Website-specific settings (display order, published/unpublished for marketing)
+  - Local payment transaction log (mirrored from Squire webhooks for reporting)
+
+Everything else that duplicated Squire functionality must be removed or converted to a Squire embed / deep-link.
+
+---
+
+## TASK 1 — NATIVE SQUIRE BOOKING EMBED (replace BookingFlow)
+
+### 1a. New booking page: app/(marketing)/book/page.tsx
+
+Replace the entire current page with a clean embedded booking experience:
+
+1. Remove the DB queries for barbers and services — Squire owns this data now.
+2. Remove the `<BookingFlow>` component import and usage.
+3. The page becomes a simple server component (no DB calls needed):
+
+```tsx
+export const metadata = {
+  title: "Book | Headz Ain't Ready",
+  description: 'Book your haircut at Headz Ain\'t Ready, Jackson Heights.',
+}
+
+export default function BookPage() {
+  return (
+    <div className="min-h-screen bg-headz-black flex flex-col">
+      {/* Header strip */}
+      <div className="bg-headz-black border-b border-white/10 px-4 py-4 text-center">
+        <p className="text-headz-red text-xs uppercase tracking-[0.25em] font-semibold mb-1">
+          Jackson Heights, Queens
+        </p>
+        <h1 className="font-headz-display text-white text-2xl sm:text-3xl">
+          Book Your Cut
+        </h1>
+        <p className="text-white/50 text-sm mt-1">
+          Powered by Squire — your time is locked in the moment you confirm.
+        </p>
+      </div>
+
+      {/* Squire iframe — full remaining viewport height */}
+      <div className="flex-1 relative" style={{ minHeight: 'calc(100vh - 96px)' }}>
+        <iframe
+          src="https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1"
+          title="Book at Headz Ain't Ready"
+          className="w-full h-full absolute inset-0 border-0"
+          style={{ minHeight: 'calc(100vh - 96px)' }}
+          allow="payment; camera; microphone"
+          loading="eager"
+        />
+      </div>
+    </div>
+  )
+}
+```
+
+4. Add `frame-src https://getsquire.com` to the Content Security Policy in `next.config.js` (find the existing CSP headers config and add it — if no CSP exists, add a permissive one that includes Squire).
+
+5. The marketing page CTA buttons (in app/(marketing)/page.tsx) already link to /book — no change needed there. Just confirm all "Book Appointment", "Book Now", "Book your cut" links point to `/book`.
+
+### 1b. Remove now-redundant booking components and API routes
+
+Read each file first, then DELETE (replace with a redirect or 410 stub) the following files since Squire fully handles this flow:
+- `components/booking/BookingFlow.tsx` — Replace with a simple re-export redirect component: `export { default } from './SquireBookingEmbed'` — then create `components/booking/SquireBookingEmbed.tsx` as a thin wrapper `<iframe src="https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1" ... />` for any place that might still use `<BookingFlow>`.
+- `app/api/appointments/route.ts` — Add a deprecation note comment at top: `// DEPRECATED: Booking is now handled by Squire. This endpoint remains for webhook-mirrored data only.` Do NOT delete — it may still receive Squire webhook mirrors.
+- `app/api/appointments/slots/route.ts` — Return 410 Gone: `return NextResponse.json({ error: 'Slot availability is now managed by Squire.' }, { status: 410 })`
+- `app/api/appointments/calendar/route.ts` — Keep but add deprecation comment.
+
+---
+
+## TASK 2 — ADMIN DASHBOARD FULL REVAMP
+
+The admin dashboard must be completely reorganized around Squire. Here is the new page/nav structure:
+
+### New admin nav items (update DashboardNav.tsx and DashboardShell.tsx):
+
+KEEP (revamped):
+  - /dashboard → "Overview"
+  - /dashboard/payments → "Payments"
+  - /dashboard/reports → "Reports"
+  - /dashboard/settings/staff → "Staff Profiles" (rename from Barbers)
+
+CONVERT TO SQUIRE DEEP-LINKS (update page to show embed + external link):
+  - /dashboard/schedule → "Schedule" (embed Squire calendar)
+
+REMOVE ENTIRELY from nav (delete nav links, pages become redirects to /dashboard):
+  - /dashboard/availability → redirect to /dashboard (Squire owns this)
+  - /dashboard/time-off → redirect to /dashboard (Squire owns this)
+  - /dashboard/no-shows → redirect to /dashboard (Squire owns this)
+  - /dashboard/settings/services → redirect to /dashboard (Squire owns services)
+  - /dashboard/settings/barbers → merged into /dashboard/settings/staff
+  - /dashboard/settings/devices → redirect to /dashboard/settings/squire (rename)
+
+ADD NEW:
+  - /dashboard/settings/squire → "Squire Settings" (already partially done in devices page — revamp it)
+
+### Detailed changes:
+
+#### 2a. app/dashboard/(admin)/page.tsx — Admin Overview (revamp AdminDashboardClient)
+
+Read `components/dashboard/AdminDashboardClient.tsx` first. Revamp the Overview tab to:
+- Remove the calendar/appointment scheduling UI from the overview (Squire owns it).
+- Show a clean command-center layout with 4 stat cards at the top (pull from `/api/dashboard/reports` endpoint — today's revenue, today's appointments, this week's revenue, active barbers).
+- Add a prominent "Open Squire Dashboard" card in the center: dark card with the Squire logo text, description "Manage appointments, availability, and scheduling in Squire", and a red "Open Squire →" button linking to `https://app.getsquire.com` (target _blank).
+- Add a "Quick Actions" section with 4 buttons: "View Schedule in Squire" (→ https://app.getsquire.com/schedule), "Manage Staff in Squire" (→ https://app.getsquire.com/team), "View Payments" (→ /dashboard/payments), "Staff Profiles" (→ /dashboard/settings/staff).
+- Keep the existing appointment list / calendar tab ONLY if it reads from local webhook-mirrored data. If it's calling the Squire API or local slot logic, replace with a message: "Appointments are managed in Squire. Click 'Open Squire Dashboard' to view the live calendar."
+- Style: headz-black cards with white text and headz-red accents. Consistent with existing admin dashboard card style.
+
+#### 2b. app/dashboard/(admin)/schedule/page.tsx — Schedule (embed Squire)
+
+Read `components/dashboard/SchedulePageClient.tsx` first. Replace the page with:
+- A full-height Squire schedule embed page.
+- Top bar: title "Schedule", description "Live view from Squire — manage directly in the Squire app for changes."
+- "Open in Squire" button → https://app.getsquire.com/schedule (target _blank), headz-red button.
+- Iframe embed: `<iframe src="https://app.getsquire.com/schedule" className="w-full rounded-xl border border-black/10" style={{ height: 'calc(100vh - 160px)' }} />`
+- Note: if Squire does not allow embedding their dashboard (X-Frame-Options), fall back gracefully: show a large card with the Squire logo, description, and a full-width "Open Squire Schedule →" button. Detect this with an `onError` handler on the iframe.
+- The `SchedulePageClient` component and calendar grid components (`CalendarGrid.tsx`, `ScheduleBarberStrip.tsx`, etc.) can be LEFT IN PLACE — do not delete, just stop importing them from this page. They may be used elsewhere.
+
+#### 2c. app/dashboard/(admin)/availability/page.tsx — Convert to redirect
+
+Replace entire page content with:
+```tsx
+import { redirect } from 'next/navigation'
+export default function AvailabilityPage() {
+  redirect('/dashboard/settings/squire')
+}
+```
+
+#### 2d. app/dashboard/(admin)/time-off/page.tsx — Convert to redirect
+
+Same pattern: redirect to '/dashboard/settings/squire'
+
+#### 2e. app/dashboard/(admin)/no-shows/page.tsx — Convert to redirect
+
+Same pattern: redirect to '/dashboard/settings/squire'
+
+#### 2f. app/dashboard/(admin)/settings/services/page.tsx — Convert to Squire link page
+
+Replace with a clean "Services managed in Squire" page (do NOT redirect — give the user info):
+- Title: "Services & Pricing"
+- Message: "Services and pricing are managed directly in Squire. Changes made in Squire automatically appear in the booking flow."
+- Card with: "Edit Services in Squire" button → https://app.getsquire.com/services (red button, target _blank)
+- Secondary info: "The public price list on the website homepage pulls from the local services table. To update the website price list, sync it after making changes in Squire." (future TODO)
+
+#### 2g. app/dashboard/(admin)/settings/barbers/page.tsx — Merge into staff profiles
+
+Replace with a redirect to `/dashboard/settings/staff`:
+```tsx
+import { redirect } from 'next/navigation'
+export default function BarbersSettingsPage() { redirect('/dashboard/settings/staff') }
+```
+
+#### 2h. app/dashboard/settings/devices/page.tsx → Rename concept to Squire Settings
+
+Read the existing file (already partially updated to Squire). Revamp to be a full "Squire Integration Settings" page:
+- Remove the redirect link to `/dashboard/pos` (which no longer exists as a useful page).
+- Add an "Integration Health" section with three status rows:
+  1. API Key: green ✓ if SQUIRE_API_KEY env var present, red ✗ if not (detected via /api/squire/status)
+  2. Webhook: shows the webhook URL to configure in Squire: `https://[your-domain]/api/squire/webhook`
+  3. Location ID: green ✓ if SQUIRE_LOCATION_ID set, yellow ⚠ if not
+- Keep the existing configuration steps list.
+- Keep the "Open Squire app" button.
+
+#### 2i. app/dashboard/(admin)/reports/page.tsx — Update data source label
+
+Read the existing reports page. It currently says "same totals as your Square dashboard." Update:
+- Change all "Square" references to "Squire" in the UI text.
+- The data source comment: update to say "Sourced from local transaction log (mirrored from Squire webhooks)".
+- No logic changes needed — just text/label updates.
+
+#### 2j. app/dashboard/payments/page.tsx — Update Square references
+
+Read the existing payments page. Update:
+- Remove the "same totals as your Square dashboard" subtitle → change to "Payments processed through Squire POS"
+- Change the Square external link on transactions: currently links to `https://squareup.com/dashboard/sales/transactions/${t.squarePaymentId}` — update to link to `https://app.getsquire.com/payments` instead (since we don't have Squire-specific payment deep links yet, just link to the Squire payments overview).
+- Remove the "Square" label from the external link icon and replace with "Squire".
+- The refund button still calls `/api/squire/refund` which is correct — no change needed there.
+
+#### 2k. DashboardNav.tsx — Rebuild nav items
+
+Read `components/dashboard/DashboardNav.tsx`. Update the admin navigation to exactly:
+
+```
+Overview        → /dashboard
+Schedule        → /dashboard/schedule
+Payments        → /dashboard/payments
+Reports         → /dashboard/reports
+Staff Profiles  → /dashboard/settings/staff
+Squire Settings → /dashboard/settings/squire
+```
+
+Remove from admin nav:
+- Availability
+- Time off
+- No-shows
+- Services & pricing (now a Squire redirect page, not worth nav space)
+- Barbers (merged into Staff Profiles)
+- Devices (renamed to Squire Settings)
+
+#### 2l. Create app/dashboard/settings/squire/page.tsx
+
+New dedicated Squire settings page that replaces /dashboard/settings/devices as the canonical Squire config hub. Copy and enhance the existing devices page content, adding the Integration Health section from 2h. Update the redirect in devices/page.tsx to point to this new page.
+
+---
+
+## TASK 3 — BARBER DASHBOARD FULL REVAMP
+
+### New barber nav items (update BarberDashboardShell.tsx):
+
+KEEP (revamped):
+  - /dashboard/barber → "My Day" (renamed from generic schedule)
+  - /dashboard/barber/profile → "My Profile"
+
+CONVERT TO SQUIRE:
+  - /dashboard/barber/pos → "Checkout" (Squire POS)
+
+REMOVE ENTIRELY (redirect to Squire or /dashboard/barber):
+  - /dashboard/barber/availability → redirect to Squire
+  - /dashboard/barber/time-off → redirect to Squire
+
+### Detailed changes:
+
+#### 3a. app/dashboard/barber/page.tsx — "My Day" revamp
+
+Read `components/barber/BarberDashboardClient.tsx` first. Revamp:
+- Keep the barber's name/avatar header (this comes from local DB which is correct).
+- Top section: "Today's Schedule" — either show local webhook-mirrored appointments for this barber, or show a clean "Your live schedule is in Squire" card with an "Open My Schedule →" button to `https://app.getsquire.com` (target _blank).
+- Remove any slot-booking or new-appointment creation UI from the barber view — barbers do not create appointments, customers do via Squire.
+- Add a "Quick Actions" row:
+  - "Open Squire" button (red, → https://app.getsquire.com)
+  - "Charge Customer" button (dark, → /dashboard/barber/pos)
+  - "My Profile" button (outline, → /dashboard/barber/profile)
+- Style: keep existing dark card style (bg-headz-black or bg-white cards depending on section).
+
+#### 3b. app/dashboard/barber/availability/page.tsx — Convert to Squire redirect page
+
+Replace with an informational page (not just a redirect — explain why):
+- Title: "Availability"
+- Message: "Your working hours and availability are managed in Squire. Changes take effect immediately in the booking flow."
+- "Edit My Availability in Squire" button → https://app.getsquire.com/availability (red, target _blank)
+- "Back to Dashboard" link → /dashboard/barber
+
+#### 3c. app/dashboard/barber/time-off/page.tsx — Convert to Squire redirect page
+
+Same pattern as availability:
+- Title: "Time Off"
+- Message: "Time off requests are submitted and approved in Squire."
+- "Request Time Off in Squire" button → https://app.getsquire.com/time-off (red, target _blank)
+- "Back to Dashboard" link → /dashboard/barber
+
+#### 3d. app/dashboard/barber/pos/page.tsx — Squire POS page
+
+Read the existing file first. Replace the current redirect with a functional Squire POS page:
+
+```tsx
+'use client'
+// Full Squire POS checkout page for barbers
+```
+
+The page should:
+- Show a dark full-screen layout (bg-headz-black).
+- Top bar with: back arrow to /dashboard/barber, title "Checkout", SquirePOSStatus badge (import from components/pos/SquirePOSStatus.tsx).
+- Primary action: a large "Open Squire POS Terminal" button → https://app.getsquire.com/pos (red, full-width on mobile, opens in new tab).
+- Secondary section "Or charge from this device":
+  - "Charge Card" button that POSTs to /api/squire/checkout — show a loading state while waiting for response.
+  - "Record Cash Payment" button that POSTs to /api/squire/record-cash.
+  - Checkout status display (uses useEffect polling /api/squire/checkout/:id every 3 seconds).
+- Import SquirePOSStatus from @/components/pos/SquirePOSStatus.
+
+#### 3e. BarberDashboardShell.tsx — Rebuild nav
+
+Read `components/barber/BarberDashboardShell.tsx`. Update barber nav to exactly:
+```
+My Day       → /dashboard/barber
+Checkout     → /dashboard/barber/pos
+My Profile   → /dashboard/barber/profile
+```
+
+Remove from barber nav:
+- Availability (now a Squire info page, not nav-worthy)
+- Time off (now a Squire info page, not nav-worthy)
+
+---
+
+## TASK 4 — SQUIRE WEBHOOK DATA MIRROR
+
+For the Reports and Payments pages to show real data from Squire, we need to mirror Squire webhook events into the local DB.
+
+### 4a. app/api/squire/webhook/route.ts
+
+Read the existing file. Enhance it:
+1. Validate `x-squire-signature` HMAC-SHA256 header against `process.env.SQUIRE_WEBHOOK_SECRET` (raw body, not parsed JSON).
+2. Parse the event. Handle these event types:
+   - `appointment.completed` or `payment.completed`: Insert/upsert a row into the local `transactions` table (or whatever the payments table is called in the schema — read `lib/db/schema.ts` to find the correct table name). Map fields: barberId, customerId/customerName, amount, paymentMethod (card/cash), squirePaymentId, status=paid, createdAt.
+   - `appointment.no_show`: Log to console for now (no-show tracking is in Squire).
+   - `appointment.cancelled`: Log to console.
+3. Return 200 for all recognized events, 400 for missing/invalid signature.
+
+### 4b. Read lib/db/schema.ts
+
+Read the schema to find the transactions/payments table name and column names. Use the correct table in the webhook handler above. Do not create a new table — use the existing one.
+
+---
+
+## TASK 5 — CLEANUP & CONSISTENCY
+
+### 5a. Remove dead imports
+
+After all the above changes, scan these files for now-unused imports and remove them:
+- app/dashboard/(admin)/layout.tsx
+- app/dashboard/barber/layout.tsx
+- components/dashboard/DashboardShell.tsx
+- components/dashboard/DashboardNav.tsx
+- components/barber/BarberDashboardShell.tsx
+
+### 5b. Update all "Square" text references in the UI
+
+Search the entire codebase for the strings "Square", "squareup.com", "square" (case-insensitive) in `.tsx` and `.ts` files (excluding node_modules). For each occurrence in UI-visible text (labels, descriptions, button text, error messages), update to "Squire" or "Squire POS". Do NOT change:
+- Variable names like `squarePaymentId` in the DB schema (that's a column name, changing it requires a migration)
+- Import paths
+- The existing `squarePaymentId` field — just don't display "Square" in the UI label for it
+
+### 5c. Environment variable documentation
+
+Read `.env.local.example` if it exists, or find the .env.example file. Add/ensure these variables are documented:
+```
+# Squire Integration
+SQUIRE_API_KEY=           # From Squire Partner Portal
+SQUIRE_WEBHOOK_SECRET=    # Set in Squire webhook settings
+SQUIRE_LOCATION_ID=       # Your shop's Squire location ID
+
+# These Square vars can be removed after verifying Squire works:
+# SQUARE_ACCESS_TOKEN=
+# SQUARE_WEBHOOK_SIGNATURE_KEY=
+# SQUARE_LOCATION_ID=
+# SQUARE_TERMINAL_DEVICE_ID=
+```
+
+### 5d. Final type check
+
+Run `npx tsc --noEmit` and fix any type errors introduced by the above changes.
+
+---
+
+## GENERAL RULES
+
+- Next.js 14 App Router. Server components by default; use 'use client' only when needed.
+- Tailwind only — no new UI libraries.
+- Always use next/image for images, never <img>.
+- Full TypeScript throughout. No `any` unless unavoidable.
+- Do NOT delete any DB schema, migrations, or Drizzle config.
+- Do NOT remove Supabase auth — it still gates all dashboard routes.
+- When replacing a page with a Squire link page, always include: a back link, a clear explanation of why the feature moved to Squire, and the external link button in headz-red.
+- After all tasks: run `npx tsc --noEmit` to confirm zero type errors.
+```
+
+---
+
 ## ACTIVE PROMPT: Website Redesign + Squire Integration
 
 Paste the entire block below into Cursor's composer to implement all 5 planned changes.
