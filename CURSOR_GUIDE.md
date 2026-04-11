@@ -2,6 +2,541 @@
 
 ---
 
+## ACTIVE PROMPT 3: Native Squire Booking Flow (3-Layer System)
+
+Paste the entire block below into Cursor's composer.
+
+```
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM, Supabase Auth, deployed on Netlify. Color palette: headz-red (#C41E3A), headz-black (#111), headz-cream (#FDF6EC), headz-gray (#6b7280).
+
+The Squire booking page at https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1 blocks iframe embedding. Squire has a separate widget subdomain at widget.getsquire.com/v2/ built specifically for third-party embedding. The goal is to keep the entire booking experience on the Headz site with only the final payment step going to Squire.
+
+Implement a 3-layer booking system in priority order:
+  Layer 1 — Try widget.getsquire.com/v2/ iframe (Squire's official embeddable widget endpoint)
+  Layer 2 — Custom native multi-step booking flow (Steps 1–4 fully on-site, fully branded)
+  Layer 3 — At the final confirm step, open Squire in a centered popup window (window.open — NOT a redirect, NOT an iframe, so no embedding restrictions apply)
+
+Known shop constants (do not re-fetch, hardcode in lib/squire-config.ts):
+  shopSlug   = "headz-aint-ready-jackson-heights-1"
+  shopId     = "39b8356f-26e3-4c5d-972b-b33883bbb96f"
+  bookingUrl = "https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1"
+  widgetUrls = [
+    "https://widget.getsquire.com/v2/headz-aint-ready-jackson-heights-1",
+    "https://widget.getsquire.com/v2/?shop=headz-aint-ready-jackson-heights-1",
+    "https://widget.getsquire.com/v2/?shopId=39b8356f-26e3-4c5d-972b-b33883bbb96f",
+    "https://widget.getsquire.com/v2/?slug=headz-aint-ready-jackson-heights-1",
+  ]
+  hours      = Mon–Sat 09:30–19:00, Sun 10:00–18:00 (America/New_York)
+  bookingIntervalMinutes  = 15
+  minAdvanceMinutes       = 30
+  maxAdvanceDays          = 60
+
+Read each existing file before editing it. Do not delete any DB schema, migrations, or Drizzle config. Use TypeScript strict throughout — no `any`. No new npm packages — everything needed (date-fns, date-fns-tz, react-day-picker v9) is already installed. After all tasks run: npx tsc --noEmit and fix all errors.
+
+---
+
+## FILE 1 — lib/squire-config.ts (CREATE)
+
+export const SQUIRE = {
+  shopSlug: 'headz-aint-ready-jackson-heights-1',
+  shopId:   '39b8356f-26e3-4c5d-972b-b33883bbb96f',
+  bookingUrl: 'https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1',
+  widgetUrls: [
+    'https://widget.getsquire.com/v2/headz-aint-ready-jackson-heights-1',
+    'https://widget.getsquire.com/v2/?shop=headz-aint-ready-jackson-heights-1',
+    'https://widget.getsquire.com/v2/?shopId=39b8356f-26e3-4c5d-972b-b33883bbb96f',
+    'https://widget.getsquire.com/v2/?slug=headz-aint-ready-jackson-heights-1',
+  ] as const,
+  hours: {
+    weekday: { open: '09:30', close: '19:00' },
+    sunday:  { open: '10:00', close: '18:00' },
+  },
+  bookingIntervalMinutes: 15,
+  minAdvanceMinutes:      30,
+  maxAdvanceDays:         60,
+  timezone: 'America/New_York',
+} as const
+
+---
+
+## FILE 2 — lib/booking/time-slots.ts (CREATE)
+
+Pure utility, no React. Uses date-fns and date-fns-tz (already installed).
+
+import { addMinutes, format, parse, isAfter, isSameDay } from 'date-fns'
+import { toZonedTime }                                    from 'date-fns-tz'
+import { SQUIRE }                                         from '@/lib/squire-config'
+
+export function generateTimeSlots(date: Date): string[] {
+  const tz       = SQUIRE.timezone
+  const zonedNow = toZonedTime(new Date(), tz)
+  const zonedDay = toZonedTime(date, tz)
+  const dow      = zonedDay.getDay() // 0 = Sunday
+
+  const { open, close } = dow === 0 ? SQUIRE.hours.sunday : SQUIRE.hours.weekday
+
+  // Build open/close as Date objects on the selected day
+  const base      = new Date(zonedDay.getFullYear(), zonedDay.getMonth(), zonedDay.getDate())
+  const openTime  = parse(open,  'HH:mm', base)
+  const closeTime = parse(close, 'HH:mm', base)
+
+  const minBookable = addMinutes(zonedNow, SQUIRE.minAdvanceMinutes)
+
+  const slots: string[] = []
+  let cursor = openTime
+  while (isAfter(closeTime, cursor)) {
+    const isToday    = isSameDay(zonedDay, zonedNow)
+    const tooSoon    = isToday && !isAfter(cursor, minBookable)
+    if (!tooSoon) {
+      slots.push(format(cursor, 'h:mm a'))
+    }
+    cursor = addMinutes(cursor, SQUIRE.bookingIntervalMinutes)
+  }
+  return slots
+}
+
+export function getMinBookableDate(): Date {
+  const now = new Date()
+  return addMinutes(now, SQUIRE.minAdvanceMinutes)
+}
+
+export function getMaxBookableDate(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() + SQUIRE.maxAdvanceDays)
+  return d
+}
+
+---
+
+## FILE 3 — components/booking/SquireWidgetEmbed.tsx (CREATE)
+
+'use client'
+
+Attempts to embed the Squire widget by trying each URL in SQUIRE.widgetUrls in sequence.
+
+import { useEffect, useRef, useState } from 'react'
+import { SQUIRE } from '@/lib/squire-config'
+
+interface SquireWidgetEmbedProps {
+  onFailed: () => void
+}
+
+type Status = 'trying' | 'loaded' | 'failed'
+
+export function SquireWidgetEmbed({ onFailed }: SquireWidgetEmbedProps) {
+  const [urlIndex, setUrlIndex] = useState(0)
+  const [status, setStatus]     = useState<Status>('trying')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const currentUrl = SQUIRE.widgetUrls[urlIndex]
+
+  function tryNext() {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    const next = urlIndex + 1
+    if (next < SQUIRE.widgetUrls.length) {
+      setUrlIndex(next)
+      setStatus('trying')
+    } else {
+      setStatus('failed')
+      onFailed()
+    }
+  }
+
+  function handleLoad(e: React.SyntheticEvent<HTMLIFrameElement>) {
+    // Give the iframe 2 seconds to render real content, then check
+    timerRef.current = setTimeout(() => {
+      try {
+        const doc = (e.target as HTMLIFrameElement).contentDocument
+        const body = doc?.body?.innerText?.trim() ?? ''
+        // Squire's "no JS" fallback text — widget didn't load
+        if (!body || body.includes('You need to enable JavaScript')) {
+          tryNext()
+        } else {
+          setStatus('loaded')
+        }
+      } catch {
+        // Cross-origin access blocked = widget IS rendering (good sign) or hard block
+        // Treat cross-origin error as "probably loaded" — if it's blocked the user will see a blank frame
+        setStatus('loaded')
+      }
+    }, 2000)
+  }
+
+  // Set a 10-second overall timeout per URL attempt
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (status === 'trying') tryNext()
+    }, 10_000)
+    return () => clearTimeout(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlIndex, status])
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  return (
+    <div className="relative w-full" style={{ minHeight: 'calc(100vh - 96px)' }}>
+      {status === 'trying' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-headz-black">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-headz-red" />
+          <p className="text-white/60 text-sm">Loading booking…</p>
+        </div>
+      )}
+
+      {currentUrl && (
+        <iframe
+          key={currentUrl}
+          src={currentUrl}
+          title="Book at Headz Ain't Ready"
+          allow="payment; camera; microphone; clipboard-write"
+          onLoad={handleLoad}
+          onError={tryNext}
+          className="w-full border-0"
+          style={{
+            height: 'calc(100vh - 96px)',
+            minHeight: '620px',
+            opacity: status === 'loaded' ? 1 : 0,
+            transition: 'opacity 0.3s ease',
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+---
+
+## FILE 4 — components/booking/NativeBookingFlow.tsx (CREATE)
+
+'use client'
+
+4-step booking flow that runs 100% on the Headz site. At Step 4 (Confirm) it opens Squire in a centered popup window.
+
+### Types
+
+export interface BookingService {
+  id: string
+  name: string
+  price: number
+  priceDisplayOverride: string | null
+  durationMinutes: number
+}
+
+export interface BookingBarber {
+  id: string
+  name: string
+  avatarUrl: string | null
+}
+
+interface Props {
+  services: BookingService[]
+  barbers:  BookingBarber[]
+}
+
+type Step = 1 | 2 | 3 | 4
+
+interface BookingDraft {
+  step:      Step
+  serviceId: string | null
+  barberId:  string | null   // null means "Any Barber"
+  date:      Date   | null
+  timeSlot:  string | null
+  popupOpened: boolean
+}
+
+### Imports needed
+import { useState, useMemo }    from 'react'
+import { DayPicker }            from 'react-day-picker'
+import { format }               from 'date-fns'
+import { generateTimeSlots, getMinBookableDate, getMaxBookableDate } from '@/lib/booking/time-slots'
+import { SQUIRE }               from '@/lib/squire-config'
+import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
+import Image                    from 'next/image'
+
+Import 'react-day-picker/dist/style.css' at the top of the component file.
+
+### Step Progress Bar
+Render above the form at all times. 4 steps: "Service", "Barber", "Date & Time", "Confirm".
+- Steps connected by a thin line: `<div className="h-px flex-1 bg-black/10" />`
+- Completed step circle: `<div className="h-3 w-3 rounded-full bg-headz-red" />`
+- Active step circle: `<div className="h-3 w-3 rounded-full bg-headz-red ring-4 ring-headz-red/20" />`
+- Future step circle: `<div className="h-3 w-3 rounded-full bg-black/10" />`
+- Step label below circle: text-xs, headz-red for active, headz-black for completed, headz-gray for future
+
+### Step 1 — Choose Service
+Heading: "What can we do for you?"
+Grid: `grid grid-cols-2 sm:grid-cols-3 gap-3`
+
+Each card:
+- Default:  `group cursor-pointer rounded-xl border-2 border-black/10 p-4 transition-all hover:border-headz-red/40 hover:shadow-sm`
+- Selected: `cursor-pointer rounded-xl border-2 border-headz-red bg-headz-red/5 p-4 shadow-sm`
+- Service name: `text-sm font-semibold text-headz-black`
+- Price: use formatServicePriceDisplay(service) → `text-headz-red font-bold text-base`
+- Duration: `{service.durationMinutes} min` → `text-xs text-headz-gray mt-1`
+- On click: set serviceId → immediately advance to step 2
+
+### Step 2 — Choose Your Barber
+Heading: "Who's cutting today?"
+Grid: `grid grid-cols-2 sm:grid-cols-3 gap-3`
+
+First card always = "Any Barber":
+- Icon: a centered ✂ character at text-3xl text-headz-red
+- Name: "Any Barber"
+- Sub: "Next available"
+- barberId = null
+
+Per-barber cards:
+- Avatar: if avatarUrl, use next/image rounded-full w-14 h-14 object-cover mx-auto mb-2
+- No avatarUrl: initials circle — `<div className="h-14 w-14 rounded-full bg-headz-red/10 flex items-center justify-center mx-auto mb-2"><span className="text-headz-red font-bold text-lg">{initials}</span></div>`
+- Initials = first letter of each word in name, max 2 letters, uppercase
+- Name below: text-sm font-semibold text-center
+- Sub: "Master Barber" text-xs text-headz-gray text-center
+- On click: set barberId → advance to step 3
+
+### Step 3 — Pick a Date & Time
+Heading: "When works for you?"
+Layout: `grid grid-cols-1 md:grid-cols-2 gap-8`
+
+Left column — Date Picker:
+Sub-heading: "Choose a date" text-sm font-semibold text-headz-black mb-3
+Render <DayPicker> with:
+  mode="single"
+  selected={draft.date ?? undefined}
+  onSelect={(d) => setDraft(prev => ({ ...prev, date: d ?? null, timeSlot: null }))}
+  disabled={[
+    { before: getMinBookableDate() },
+    { after: getMaxBookableDate() },
+  ]}
+  modifiersClassNames={{ selected: 'rdp-selected-headz' }}
+Add this CSS via a <style> tag in the component (or inline style block):
+  .rdp-selected-headz { background-color: #C41E3A !important; color: white !important; border-radius: 9999px; }
+  .rdp-day:hover:not(.rdp-day_disabled) { background-color: rgba(196, 30, 58, 0.1) !important; border-radius: 9999px; }
+
+Right column — Time Slots:
+Sub-heading: "Choose a time" text-sm font-semibold text-headz-black mb-3
+If no date selected: `<p className="text-headz-gray text-sm">Select a date first</p>`
+If date selected:
+  const slots = useMemo(() => draft.date ? generateTimeSlots(draft.date) : [], [draft.date])
+  If slots.length === 0: `<p className="text-headz-gray text-sm">No available slots for this date. Try another day.</p>`
+  Otherwise: `<div className="grid grid-cols-3 gap-2">` with buttons:
+    Default:  `rounded-lg border border-black/10 px-2 py-2 text-sm text-headz-black hover:border-headz-red/50 hover:bg-headz-red/5 transition`
+    Selected: `rounded-lg border-2 border-headz-red bg-headz-red text-white px-2 py-2 text-sm font-semibold`
+    On click: set timeSlot
+
+Below both columns (full width): show "Next →" button only when BOTH date AND timeSlot are set:
+  `<button onClick={() => setDraft(p => ({...p, step: 4}))} className="mt-6 w-full sm:w-auto bg-headz-black hover:bg-black text-white font-semibold px-8 py-3 rounded-xl transition">Next →</button>`
+
+### Step 4 — Confirm & Book
+Heading: "Your appointment"
+
+Summary card: `rounded-2xl border border-black/10 bg-[#fafaf8] p-6 space-y-4 shadow-sm`
+Inside the card, show 4 rows each with icon + label + value:
+  Row 1: ✂ icon  |  "Service"  |  selectedService.name + " · " + formatServicePriceDisplay(selectedService)
+  Row 2: 👤 icon |  "Barber"   |  selectedBarber?.name ?? "Any Available Barber"
+  Row 3: 📅 icon |  "Date"     |  format(draft.date!, 'EEEE, MMMM d')
+  Row 4: 🕐 icon |  "Time"     |  draft.timeSlot!
+Use emoji or lucide-react icons (already installed). Row label: text-xs uppercase tracking-wider text-headz-gray. Row value: text-headz-black font-semibold.
+
+Below the summary card, if popupOpened is false:
+  Two buttons side by side (stack on mobile):
+  1. "← Edit" ghost button: `border border-black/10 rounded-xl px-6 py-3 text-sm text-headz-black hover:bg-black/5 transition`
+     → onClick: setDraft(p => ({...p, step: 1}))
+  2. "Complete Booking →" primary button: `bg-headz-red hover:bg-headz-redDark text-white font-bold uppercase tracking-widest text-sm px-10 py-4 rounded-xl shadow-lg shadow-headz-red/20 transition w-full sm:w-auto`
+     → onClick: openSquirePopup()
+
+If popupOpened is true, replace the buttons area with:
+  `<div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center space-y-2">`
+    Green ✓ circle icon
+    `<p className="font-semibold text-emerald-800">Booking window opened!</p>`
+    `<p className="text-sm text-emerald-700">Complete your booking in the Squire window. Close it when done.</p>`
+    `<button onClick={openSquirePopup} className="text-xs text-emerald-600 hover:underline mt-1">Didn't open? Click here</button>`
+  `</div>`
+
+### openSquirePopup function
+function openSquirePopup() {
+  const url = SQUIRE.bookingUrl
+  const w = 480, h = 700
+  const left = Math.max(0, (window.screen.width  - w) / 2 + (window.screenX ?? 0))
+  const top  = Math.max(0, (window.screen.height - h) / 2 + (window.screenY ?? 0))
+  const feat = `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
+  const popup = window.open(url, 'squire-booking', feat)
+  if (!popup) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+  setDraft(p => ({ ...p, popupOpened: true }))
+}
+
+### Back button
+On steps 2, 3, 4: render `<button onClick={() => setDraft(p => ({...p, step: (p.step - 1) as Step}))} className="text-sm text-headz-gray hover:text-headz-black transition mb-6 flex items-center gap-1"><span>←</span> Back</button>`
+
+### Full component structure
+return (
+  <div className="p-6 sm:p-8">
+    <StepProgressBar currentStep={draft.step} />
+    {draft.step > 1 && <BackButton />}
+    {draft.step === 1 && <Step1Services />}
+    {draft.step === 2 && <Step2Barbers />}
+    {draft.step === 3 && <Step3DateTime />}
+    {draft.step === 4 && <Step4Confirm />}
+  </div>
+)
+
+---
+
+## FILE 5 — components/booking/BookingPageClient.tsx (CREATE)
+
+'use client'
+
+Top-level orchestrator. Decides which layer to show.
+
+import { useState }              from 'react'
+import { SquireWidgetEmbed }     from './SquireWidgetEmbed'
+import { NativeBookingFlow }     from './NativeBookingFlow'
+import type { BookingService, BookingBarber } from './NativeBookingFlow'
+
+interface Props {
+  services: BookingService[]
+  barbers:  BookingBarber[]
+}
+
+export function BookingPageClient({ services, barbers }: Props) {
+  const [mode, setMode] = useState<'widget' | 'native'>('widget')
+
+  return (
+    <>
+      {mode === 'widget' ? (
+        <SquireWidgetEmbed onFailed={() => setMode('native')} />
+      ) : (
+        <NativeBookingFlow services={services} barbers={barbers} />
+      )}
+
+      {/* Subtle mode toggle at bottom */}
+      <div className="px-6 pb-4 text-center">
+        {mode === 'widget' ? (
+          <button
+            onClick={() => setMode('native')}
+            className="text-xs text-headz-gray/50 hover:text-headz-gray transition underline underline-offset-2"
+          >
+            Having trouble? Switch to simple booking mode
+          </button>
+        ) : (
+          <button
+            onClick={() => setMode('widget')}
+            className="text-xs text-headz-gray/50 hover:text-headz-gray transition underline underline-offset-2"
+          >
+            Switch back to full booking experience
+          </button>
+        )}
+      </div>
+    </>
+  )
+}
+
+---
+
+## FILE 6 — app/(marketing)/book/page.tsx (REWRITE)
+
+Read the current file first. Replace entirely with:
+
+import { BookingPageClient }        from '@/components/booking/BookingPageClient'
+import type { BookingService, BookingBarber } from '@/components/booking/NativeBookingFlow'
+import { db }                        from '@/lib/db'
+import { barbers, services, users }  from '@/lib/db/schema'
+import { asc, eq }                   from 'drizzle-orm'
+import { bookableBarbersCondition }  from '@/lib/barbers/public-queries'
+
+export const dynamic = 'force-dynamic'
+
+export const metadata = {
+  title: "Book | Headz Ain't Ready",
+  description: "Book your haircut at Headz Ain't Ready Barbershop, Jackson Heights Queens.",
+}
+
+export default async function BookPage() {
+  const [barberRows, serviceRows] = await Promise.allSettled([
+    db
+      .select({ barber: barbers })
+      .from(barbers)
+      .innerJoin(users, eq(barbers.userId, users.id))
+      .where(bookableBarbersCondition)
+      .orderBy(asc(barbers.sortOrder))
+      .then(rows =>
+        rows.map((r): BookingBarber => ({
+          id:        r.barber.id,
+          name:      r.barber.name,
+          avatarUrl: r.barber.avatarUrl ?? null,
+        }))
+      ),
+    db
+      .select({
+        id:                   services.id,
+        name:                 services.name,
+        price:                services.price,
+        priceDisplayOverride: services.priceDisplayOverride,
+        durationMinutes:      services.durationMinutes,
+      })
+      .from(services)
+      .where(eq(services.isActive, true))
+      .orderBy(asc(services.displayOrder))
+      .then(rows => rows as BookingService[]),
+  ])
+
+  const barbersList:  BookingBarber[]  = barberRows.status  === 'fulfilled' ? barberRows.value  : []
+  const servicesList: BookingService[] = serviceRows.status === 'fulfilled' ? serviceRows.value : []
+
+  return (
+    <div className="min-h-screen bg-headz-black">
+      {/* Sticky branded header */}
+      <div className="sticky top-0 z-10 border-b border-white/10 bg-headz-black/95 px-4 py-4 text-center backdrop-blur-sm">
+        <p className="mb-0.5 text-xs font-semibold uppercase tracking-[0.25em] text-headz-red">
+          Jackson Heights, Queens · NYC
+        </p>
+        <h1 className="font-headz-display text-xl text-white sm:text-2xl">
+          Book Your Cut
+        </h1>
+      </div>
+
+      {/* Main content card */}
+      <div className="px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <BookingPageClient services={servicesList} barbers={barbersList} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+---
+
+## FILE 7 — next.config.js (UPDATE)
+
+Read the file. Find the CSP header value string and make two updates:
+
+1. frame-src: ensure `https://widget.getsquire.com` is included.
+   Current frame-src contains: `https://getsquire.com https://*.getsquire.com https://app.getsquire.com`
+   Since `https://*.getsquire.com` already covers widget.getsquire.com, just verify it's there. If the wildcard is missing, add `https://widget.getsquire.com` explicitly.
+
+2. connect-src: add Squire domains so the widget can make API calls.
+   Find: `connect-src 'self' https://*.supabase.co wss://*.supabase.co`
+   Replace with: `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.getsquire.com https://getsquire.com https://widget.getsquire.com`
+
+Also add `https://images.squarecdn.com` and `https://seller-brand-assets-f.squarecdn.com` to img-src if not already present (Squire uses these for barber profile images).
+
+---
+
+## GENERAL RULES
+
+- 'use client' on all 3 component files (SquireWidgetEmbed, NativeBookingFlow, BookingPageClient). The page file stays a server component.
+- Import 'react-day-picker/dist/style.css' inside NativeBookingFlow.tsx (client component, so CSS import is fine).
+- All date/time math uses date-fns and date-fns-tz — both already in package.json.
+- DayPicker version in this project is v9 — use the v9 API (mode="single", disabled array with before/after objects, modifiersClassNames).
+- Use formatServicePriceDisplay from @/lib/services/format-service-price for all price display.
+- Use next/image for all barber avatars.
+- Do NOT delete components/booking/BookingFlow.tsx if it exists — just stop importing it from the page.
+- After all files are written: run npx tsc --noEmit and fix every type error before finishing.
+```
+
+---
+
 ## ACTIVE PROMPT 2: Squire Booking Embed + Full Dashboard Revamp
 
 Paste the entire block below into Cursor's composer as a second pass after Prompt 1.

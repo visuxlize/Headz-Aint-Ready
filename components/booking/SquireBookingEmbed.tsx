@@ -1,6 +1,6 @@
 'use client'
 
-import { SQUIRE_PUBLIC_BOOKING_URL } from '@/lib/squire/public-booking'
+import { SQUIRE_ONLINE_BOOKING_URL, SQUIRE_PUBLIC_BOOKING_URL } from '@/lib/squire/public-booking'
 
 /** Opens Squire booking in a new tab — getsquire.com sends X-Frame-Options: DENY, so iframe embeds always fail. */
 export default function SquireBookingEmbed() {
@@ -19,6 +19,14 @@ export default function SquireBookingEmbed() {
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
         </svg>
+      </a>
+      <a
+        href={SQUIRE_ONLINE_BOOKING_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 block text-center text-sm font-semibold text-headz-red underline-offset-4 hover:underline"
+      >
+        Inline Location
       </a>
     </div>
   )

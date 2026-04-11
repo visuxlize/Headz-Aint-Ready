@@ -21,6 +21,18 @@ type FadeInDivProps = {
   delayMs?: number
 }
 
+function isElementInViewport(el: Element, marginPx: number) {
+  const rect = el.getBoundingClientRect()
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 0
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 0
+  return (
+    rect.top < vh + marginPx &&
+    rect.bottom > -marginPx &&
+    rect.left < vw + marginPx &&
+    rect.right > -marginPx
+  )
+}
+
 export function FadeInOnScroll({ children, className, delayMs = 0 }: FadeInDivProps) {
   const ref = useRef<HTMLDivElement>(null)
   const reduced = useMotionSafeVisible()
@@ -28,6 +40,11 @@ export function FadeInOnScroll({ children, className, delayMs = 0 }: FadeInDivPr
 
   useLayoutEffect(() => {
     if (reduced) {
+      setVisible(true)
+      return
+    }
+    const el = ref.current
+    if (el && isElementInViewport(el, 80)) {
       setVisible(true)
     }
   }, [reduced])
@@ -40,7 +57,7 @@ export function FadeInOnScroll({ children, className, delayMs = 0 }: FadeInDivPr
       ([e]) => {
         if (e.isIntersecting) setVisible(true)
       },
-      { threshold: 0.1, rootMargin: '0px 0px -32px 0px' }
+      { threshold: 0.05, rootMargin: '80px 0px 80px 0px' }
     )
     obs.observe(el)
     return () => obs.disconnect()
@@ -76,6 +93,11 @@ export function FadeInOnScrollLi({ children, className, delayMs = 0 }: FadeInLiP
   useLayoutEffect(() => {
     if (reduced) {
       setVisible(true)
+      return
+    }
+    const el = ref.current
+    if (el && isElementInViewport(el, 80)) {
+      setVisible(true)
     }
   }, [reduced])
 
@@ -87,7 +109,7 @@ export function FadeInOnScrollLi({ children, className, delayMs = 0 }: FadeInLiP
       ([e]) => {
         if (e.isIntersecting) setVisible(true)
       },
-      { threshold: 0.1, rootMargin: '0px 0px -32px 0px' }
+      { threshold: 0.05, rootMargin: '80px 0px 80px 0px' }
     )
     obs.observe(el)
     return () => obs.disconnect()

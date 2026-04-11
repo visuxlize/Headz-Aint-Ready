@@ -79,14 +79,12 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
     setHeroTimeline('bgRevealing')
   }, [bgMediaReady, heroTimeline, prefersReducedMotion])
 
+  /** If media is slow or blocked, do not keep headline/CTA unmounted — unstick after a short grace period. */
   useEffect(() => {
-    if (heroTimeline !== 'bgRevealing') return
-    const t = window.setTimeout(() => {
-      setContentMountKey((k) => k + 1)
-      setHeroTimeline('contentAnimating')
-    }, HERO_BG_REVEAL_MS)
+    if (prefersReducedMotion || bgMediaReady) return
+    const t = window.setTimeout(() => setBgMediaReady(true), 2200)
     return () => window.clearTimeout(t)
-  }, [heroTimeline])
+  }, [bgMediaReady, prefersReducedMotion])
 
   useEffect(() => {
     const el = sectionRef.current
@@ -179,8 +177,6 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
     }
   }, [videoEpoch, prefersReducedMotion, videoFailed, heroInView])
 
-  const showHeroMotion = heroTimeline === 'contentAnimating' || prefersReducedMotion
-
   /** After scissors: line 0 = Queens NYC, line 1 = Welcome…; step 2+ = rest together (bg already revealed). */
   const heroLineDelay = (step: number): CSSProperties => ({
     animationDelay: `${HERO_SCISSORS_TOTAL_MS + step * HERO_LINE_ENTER_MS}ms`,
@@ -196,6 +192,10 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
 
   const markBgMediaReady = () => setBgMediaReady(true)
 
+  /** Background reveal only — copy is always mounted so text/GIF never wait on the state machine. */
+  const showBgReveal =
+    prefersReducedMotion || heroTimeline === 'bgRevealing' || heroTimeline === 'contentAnimating'
+
   return (
     <section
       ref={sectionRef}
@@ -208,9 +208,7 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
         {!prefersReducedMotion && !videoFailed ? (
           <div
             className={
-              heroTimeline === 'waitingMedia'
-                ? 'absolute inset-0 opacity-0'
-                : 'marketing-hero-bg-reveal absolute inset-0'
+              showBgReveal ? 'marketing-hero-bg-reveal absolute inset-0' : 'absolute inset-0 opacity-0'
             }
           >
             <video
@@ -224,6 +222,7 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
               className="absolute inset-0 h-full w-full object-cover opacity-30 motion-reduce:opacity-[0.12]"
               aria-hidden
               onError={() => setVideoFailed(true)}
+              onLoadedMetadata={markBgMediaReady}
               onLoadedData={markBgMediaReady}
               onCanPlay={markBgMediaReady}
               onPlaying={markBgMediaReady}
@@ -233,9 +232,7 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
         {!prefersReducedMotion && videoFailed ? (
           <div
             className={
-              heroTimeline === 'waitingMedia'
-                ? 'absolute inset-0 opacity-0'
-                : 'marketing-hero-bg-reveal absolute inset-0'
+              showBgReveal ? 'marketing-hero-bg-reveal absolute inset-0' : 'absolute inset-0 opacity-0'
             }
           >
             <img
@@ -259,8 +256,7 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
       />
 
       <div className="relative z-10 mx-auto flex min-h-[min(42vh,320px)] max-w-4xl flex-col items-center px-4 py-16 text-center sm:min-h-0 sm:px-6 sm:py-20">
-        {showHeroMotion ? (
-          <div key={contentMountKey} className="flex flex-col items-center">
+        <div key={contentMountKey} className="flex flex-col items-center">
             <span
               className="marketing-hero-scissors mb-2 text-5xl text-white/95 drop-shadow-md select-none sm:text-6xl"
               style={scissorsStyle}
@@ -316,7 +312,6 @@ export function MarketingHero({ playfairClassName }: MarketingHeroProps) {
               </a>
             </div>
           </div>
-        ) : null}
       </div>
     </section>
   )
