@@ -77,6 +77,7 @@ export async function POST(request: Request) {
         total: totalStr,
         paymentMethod: d.paymentMethod,
         paymentStatus: 'pending',
+        source: 'pos',
       })
       .returning({ id: posTransactions.id })
 

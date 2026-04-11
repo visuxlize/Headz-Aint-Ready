@@ -90,6 +90,7 @@ async function upsertFromPaymentPayload(data: Record<string, unknown>) {
     paymentMethod: method,
     paymentStatus: 'paid' as const,
     squarePaymentId: paymentId,
+    source: 'squire' as const,
   }
 
   if (existing) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { appointments, services, users } from '@/lib/db/schema'
+import { appointments, posTransactions, services, users } from '@/lib/db/schema'
 import { and, eq, gte, lte, ne, sql } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 
@@ -24,7 +24,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'start and end required' }, { status: 400 })
   }
 
-  const [rev, apptCount, byBarber, byService, byHour, tableRows, activeBarbers] = await Promise.all([
+  const rangeStart = new Date(`${start}T00:00:00.000`)
+  const rangeEnd = new Date(`${end}T23:59:59.999`)
+
+  const [
+    rev,
+    apptCount,
+    byBarber,
+    byService,
+    byHour,
+    tableRows,
+    activeBarbers,
+    posRev,
+    posByBarberAgg,
+    posByMethodAgg,
+  ] = await Promise.all([
     db
       .select({ total: sql<string>`coalesce(sum(${services.price}::numeric), 0)` })
       .from(appointments)
@@ -109,9 +123,69 @@ export async function GET(request: Request) {
       .where(and(gte(appointments.appointmentDate, start), lte(appointments.appointmentDate, end)))
       .groupBy(appointments.barberId, users.fullName),
     countActiveBarbers(),
+    db
+      .select({ total: sql<string>`coalesce(sum(${posTransactions.total}::numeric), 0)` })
+      .from(posTransactions)
+      .where(
+        and(
+          eq(posTransactions.paymentStatus, 'paid'),
+          gte(posTransactions.createdAt, rangeStart),
+          lte(posTransactions.createdAt, rangeEnd)
+        )
+      ),
+    db
+      .select({
+        barberId: posTransactions.barberId,
+        name: users.fullName,
+        revenue: sql<string>`coalesce(sum(${posTransactions.total}::numeric), 0)`,
+        tickets: sql<number>`count(*)::int`,
+      })
+      .from(posTransactions)
+      .innerJoin(users, eq(posTransactions.barberId, users.id))
+      .where(
+        and(
+          eq(posTransactions.paymentStatus, 'paid'),
+          gte(posTransactions.createdAt, rangeStart),
+          lte(posTransactions.createdAt, rangeEnd)
+        )
+      )
+      .groupBy(posTransactions.barberId, users.fullName),
+    db
+      .select({
+        method: posTransactions.paymentMethod,
+        total: sql<string>`coalesce(sum(${posTransactions.total}::numeric), 0)`,
+      })
+      .from(posTransactions)
+      .where(
+        and(
+          eq(posTransactions.paymentStatus, 'paid'),
+          gte(posTransactions.createdAt, rangeStart),
+          lte(posTransactions.createdAt, rangeEnd)
+        )
+      )
+      .groupBy(posTransactions.paymentMethod),
   ])
 
   const totalRevenue = Number(rev[0]?.total ?? 0)
+  const posRevenue = Number(posRev[0]?.total ?? 0)
+  const combinedRevenue = totalRevenue + posRevenue
+
+  let cashTotal = 0
+  let cardTotal = 0
+  for (const row of posByMethodAgg) {
+    const v = Number(row.total ?? 0)
+    if (row.method === 'cash') cashTotal += v
+    if (row.method === 'card') cardTotal += v
+  }
+
+  const ticketsByBarber = posByBarberAgg
+    .map((r) => ({
+      barber: r.name ?? 'Barber',
+      tickets: r.tickets ?? 0,
+      revenue: Number(r.revenue ?? 0),
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+
   const totalAppointments = apptCount[0]?.count ?? 0
   const avgPer = totalAppointments > 0 ? totalRevenue / totalAppointments : 0
 
@@ -119,6 +193,11 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     activeBarbers,
+    posRevenue,
+    combinedRevenue,
+    cashTotal,
+    cardTotal,
+    ticketsByBarber,
     summary: {
       totalRevenue,
       totalAppointments,

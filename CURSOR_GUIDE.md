@@ -2,6 +2,503 @@
 
 ---
 
+## ACTIVE PROMPT 4: Ticket System + EOD Reports + Dashboard Revamp
+
+Paste the entire block below into Cursor's composer.
+
+```
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM (PostgreSQL), Supabase Auth. Color palette: headz-red (#C41E3A), headz-black (#111 / #0c0c0c), headz-cream (#f5f0e8), headz-gray (#6b7280). Dashboard background: #FAFAF8. No Framer Motion — all animations use CSS keyframes defined in app/globals.css and Tailwind transition classes. Lucide-react is installed for icons. All dashboard pages are admin-only (requireAdminApi / requireAdmin guards already exist).
+
+Read every existing file before editing it. Run npx tsc --noEmit after all changes and fix every error.
+
+---
+
+## CONTEXT — WHAT EXISTS
+
+The `posTransactions` table (lib/db/schema.ts) already stores POS sales with: id, customerName, barberId (→ users.id), serviceId, items (jsonb), subtotal, tipAmount, total, paymentMethod ('cash'|'card'), paymentStatus, squarePaymentId, cardBrand, cardLastFour, refundedAt, createdAt.
+
+The `barbers` table stores public profiles (name, avatarUrl, sortOrder). The `users` table stores staff with role='barber'.
+
+`posTransactions.barberId` references `users.id` — not `barbers.id`. When displaying barber names, join to `users.fullName`.
+
+The existing payments page reads from posTransactions. The existing reports page reads from appointments. Both need to be updated to include posTransactions ticket data.
+
+---
+
+## TASK 1 — DB SCHEMA: add `source` column to posTransactions
+
+Read lib/db/schema.ts. In the posTransactions table definition, add one new column after `squareTerminalCheckoutId`:
+
+  source: text('source').notNull().default('manual'),
+
+Valid values: 'manual' (admin entered), 'squire' (Squire webhook mirror), 'pos' (POS terminal).
+
+Then run: npx drizzle-kit generate && npx drizzle-kit migrate
+(If the migration command is different in package.json, use the correct one from the scripts field.)
+
+---
+
+## TASK 2 — KEYFRAME ANIMATIONS (add to app/globals.css)
+
+Read app/globals.css first. Append these keyframes at the end of the file:
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 30, 58, 0); }
+  50%       { box-shadow: 0 0 0 8px rgba(196, 30, 58, 0.12); }
+}
+@keyframes progressFill {
+  from { width: 0%; }
+  to   { width: var(--progress-target); }
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+Add Tailwind utility classes in @layer utilities:
+  .animate-count-up    { animation: countUp    0.4s cubic-bezier(0.16,1,0.3,1) both; }
+  .animate-slide-right { animation: slideInRight 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+  .animate-slide-up    { animation: slideInUp   0.4s cubic-bezier(0.16,1,0.3,1) both; }
+  .animate-pulse-glow  { animation: pulseGlow  2s ease-in-out infinite; }
+  .animate-fade-slide  { animation: fadeSlideIn 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+
+---
+
+## TASK 3 — ANIMATED NUMBER COUNTER HOOK (CREATE)
+
+Create lib/hooks/useAnimatedCounter.ts:
+
+'use client'
+import { useEffect, useRef, useState } from 'react'
+
+export function useAnimatedCounter(target: number, duration = 600): number {
+  const [value, setValue] = useState(target)
+  const prev = useRef(target)
+  useEffect(() => {
+    const from = prev.current
+    const diff = target - from
+    if (diff === 0) return
+    const start = performance.now()
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setValue(from + diff * eased)
+      if (t < 1) requestAnimationFrame(tick)
+      else { setValue(target); prev.current = target }
+    }
+    requestAnimationFrame(tick)
+  }, [target, duration])
+  return value
+}
+
+---
+
+## TASK 4 — API: GET/POST /api/dashboard/tickets (CREATE)
+
+Create app/api/dashboard/tickets/route.ts:
+
+GET — returns today's tickets (posTransactions where createdAt >= today midnight) plus running totals.
+POST — creates a new posTransactions row with source='manual'.
+
+### GET handler
+Query posTransactions for today (midnight to now, America/New_York — use UTC offset aware bounds):
+  - Join to users on barberId to get barber fullName
+  - Return: { tickets: Ticket[], totals: { cash: number, card: number, count: number, byBarber: BarberTotal[] } }
+
+Ticket shape:
+  { id, customerName, barberName, barberId, serviceName: string|null (from items[0].name or null), total: number, tipAmount: number, paymentMethod, createdAt: string, source }
+
+BarberTotal shape:
+  { barberId, barberName, cash: number, card: number, tickets: number, total: number }
+
+### POST handler
+Body: { barberId: string, customerName: string, paymentMethod: 'cash'|'card', amount: number, tipAmount?: number, serviceLabel?: string }
+Validate: barberId required, amount > 0, paymentMethod in ['cash','card'].
+Insert into posTransactions:
+  customerName (default 'Walk-in' if empty),
+  barberId,
+  items: serviceLabel ? [{ serviceId: '', name: serviceLabel, price: amount.toFixed(2) }] : null,
+  subtotal: amount,
+  tipAmount: tipAmount ?? 0,
+  total: amount + (tipAmount ?? 0),
+  paymentMethod,
+  paymentStatus: 'paid',
+  source: 'manual'
+Return the new row + updated totals.
+
+---
+
+## TASK 5 — API: DELETE /api/dashboard/tickets/[id] (CREATE)
+
+Create app/api/dashboard/tickets/[id]/route.ts:
+DELETE — soft-delete by setting paymentStatus = 'voided'. Admin only. Return { ok: true }.
+
+---
+
+## TASK 6 — TICKET ENTRY PAGE (CREATE)
+
+Create app/dashboard/(admin)/tickets/page.tsx as a server component shell.
+Create components/dashboard/TicketsPageClient.tsx as the 'use client' component.
+
+### Layout (TicketsPageClient)
+
+The page has 3 zones:
+
+ZONE A — Running Totals Banner (sticky top of content area, not the shell header):
+  Three animated stat cards in a row (responsive: 3 cols on sm+, stacked on xs):
+  Card 1 — CASH TODAY:      green accent (bg-emerald-950/60 border-emerald-500/20 text-emerald-400)
+  Card 2 — CARD TODAY:      blue accent  (bg-blue-950/60   border-blue-400/20   text-blue-300)
+  Card 3 — TICKETS TODAY:   red accent   (bg-headz-red/10   border-headz-red/20   text-headz-red)
+
+  Each card shows:
+  - Label in text-xs uppercase tracking-widest
+  - Value using useAnimatedCounter (formatted as $X,XXX.XX for money, integer for count)
+  - Small sparkline bar at the bottom (3px tall strip, just decorative, 70% filled with accent color, 30% faded)
+  - On value change: apply animate-count-up with animation-key={Math.round(value)} to trigger replay
+
+  These values re-fetch every 30 seconds using setInterval.
+
+ZONE B — Two-column grid (grid-cols-1 lg:grid-cols-[420px_1fr] gap-6):
+
+  LEFT COLUMN — Ticket Entry Form:
+  Heading: "Add Ticket" font-bold text-lg text-headz-black
+  Card: rounded-2xl border border-black/[0.08] bg-white shadow-sm p-6 space-y-5
+
+  [Barber Selector]
+  Label: "Who's cutting?" text-xs uppercase tracking-wider text-headz-gray mb-2
+  Render one pill button per barber (from a barbers prop fetched server-side):
+    Default: border border-black/10 rounded-full px-4 py-2 text-sm text-headz-gray hover:border-headz-red/40 transition
+    Selected: bg-headz-red text-white border-headz-red rounded-full px-4 py-2 text-sm font-semibold animate-pulse-glow
+  Barbers displayed as avatar+name pills horizontally (flex-wrap gap-2).
+  Avatar: 24×24 rounded-full object-cover, or initials circle if no avatar.
+
+  [Service / Amount]
+  Label: "Service & Amount"
+  Two inputs side by side (grid-cols-[1fr_120px] gap-3):
+    Left: text input placeholder "e.g. Fade, Shape Up…" (serviceLabel)
+    Right: number input placeholder "0.00" prefixed with "$" (amount) — text-right font-mono text-lg
+
+  [Tip Amount — collapsible]
+  A small "＋ Add Tip" link that expands to show a tip input (number, prefixed "$").
+  When tip is entered, show it below in a small "Tip: $X.XX" badge.
+
+  [Payment Method Toggle]
+  Two large toggle buttons side by side, full width:
+    CASH button: when selected → bg-emerald-600 text-white font-bold rounded-xl
+    CARD button: when selected → bg-blue-600 text-white font-bold rounded-xl
+    Default (neither): border-2 border-black/10 text-headz-gray rounded-xl
+    Height: py-4. Both span equal width (grid-cols-2 gap-3).
+    CASH shows: 💵 CASH label. CARD shows: 💳 CARD label. Use lucide-react Banknote + CreditCard icons instead of emoji.
+
+  [Customer Name — optional]
+  Small input "Customer name (optional)" text-sm. Defaults to "Walk-in".
+
+  [Add Ticket Button]
+  Full-width. Loading state (spinner + "Adding…"). Success state (green checkmark flash for 1.5s then reset form).
+  Default: bg-headz-red hover:bg-headz-redDark text-white font-bold uppercase tracking-widest text-sm py-4 rounded-xl shadow-md shadow-headz-red/20 transition-all
+  Disabled when: no barber selected, amount <= 0, no payment method.
+
+  Below the button: a small note in text-xs text-headz-gray: "Tickets are recorded to the daily report."
+
+  RIGHT COLUMN — Today's Ticket List:
+  Heading: "Today — {format(new Date(), 'EEEE MMMM d')}" + ticket count badge (rounded-full bg-headz-red/10 text-headz-red px-2 py-0.5 text-xs font-semibold)
+  Search: input "Search barber or customer…" with a search icon, filters the list client-side.
+
+  Ticket list (reverse-chronological, newest first):
+  Each ticket row (animate-fade-slide with staggered animation-delay: 0ms, 40ms, 80ms... capped at 300ms):
+  ┌──────────────────────────────────────────────────────────┐
+  │ [Avatar/initials 36px] [Name + Barber]   [CASH/CARD pill] │
+  │                        [Service label]   [$XX.XX + tip?]  │
+  │                                          [time ago]  [×]  │
+  └──────────────────────────────────────────────────────────┘
+  - CASH pill: bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full px-2 py-0.5
+  - CARD pill: bg-blue-100 text-blue-700 same style
+  - Void (×) button: text-headz-gray/40 hover:text-headz-red transition, on click → DELETE /api/dashboard/tickets/[id] → remove from list with a fade-out animation
+  - "time ago": use date-fns formatDistanceToNow
+  - On newly added ticket: animate-slide-right applied to the new row
+
+  If no tickets yet: empty state with a scissors icon (Scissors from lucide-react, text-4xl text-headz-red/20) and "No tickets yet today. Add the first one."
+
+ZONE C — End of Day Summary (full width, below the two-column zone):
+  Section heading: "End of Day Summary" in font-bold text-xl + current date
+  Card: rounded-2xl border border-black/[0.08] bg-white shadow-sm overflow-hidden
+
+  Top row — 3 big animated metric blocks (grid-cols-3 divide-x divide-black/5):
+    Block 1: TOTAL CASH — useAnimatedCounter, text-4xl font-black text-emerald-600, formatted as $X,XXX.XX
+    Block 2: TOTAL CARD — useAnimatedCounter, text-4xl font-black text-blue-600
+    Block 3: GRAND TOTAL — useAnimatedCounter, text-4xl font-black text-headz-red
+  Each block has a small label above (text-xs uppercase tracking-wider text-headz-gray) and is padded py-6 px-5.
+
+  Cash vs Card progress bar (full width):
+  A 2-segment horizontal bar, 8px tall, rounded-full, transition-all duration-700:
+    Left segment: bg-emerald-500 (cash %)
+    Right segment: bg-blue-500 (card %)
+  Below bar: "Cash: $X · Card: $X · {cashPct}% / {cardPct}%"
+
+  Per-Barber Breakdown Table:
+  Heading: "Breakdown by Barber" text-sm font-semibold text-headz-black mb-3
+  Table: w-full text-sm
+  Headers: Barber | Tickets | Cash | Card | Tips | Total — text-xs uppercase tracking-wider text-headz-gray border-b
+  Rows (sorted by total desc):
+    - Barber: avatar circle (32px) + name
+    - Tickets: integer badge (rounded-full bg-headz-black/5 px-2 text-xs)
+    - Cash: text-emerald-600 font-semibold
+    - Card: text-blue-600 font-semibold
+    - Tips: text-headz-gray
+    - Total: text-headz-black font-bold
+  Row entry animation: animate-fade-slide with stagger
+
+  Footer row: totals row in bold, bg-headz-black/[0.02] border-t.
+
+  "Print Summary" ghost button bottom-right (no functionality needed — just a UI placeholder for future).
+
+---
+
+## TASK 7 — UPDATE DashboardNav.tsx
+
+Read components/dashboard/DashboardNav.tsx. Add "Tickets" as the SECOND item (after Overview, before Schedule):
+
+  import { ReceiptText } from 'lucide-react'
+  { href: '/dashboard/tickets', label: 'Tickets', icon: ReceiptText }
+
+Final nav order:
+  1. Overview      → /dashboard
+  2. Tickets       → /dashboard/tickets       ← NEW
+  3. Schedule      → /dashboard/schedule
+  4. Payments      → /dashboard/payments
+  5. Reports       → /dashboard/reports
+  6. Staff Profiles → /dashboard/settings/staff
+  7. Squire Settings → /dashboard/settings/squire
+
+---
+
+## TASK 8 — OVERVIEW DASHBOARD REVAMP
+
+Read components/dashboard/AdminOverviewTab.tsx and components/dashboard/AdminDashboardClient.tsx in full.
+
+Replace AdminOverviewTab with a complete revamp. The new overview is a beautiful command-center dashboard.
+
+### Structure (AdminOverviewTab.tsx — full rewrite)
+
+'use client'
+
+Fetches: GET /api/dashboard/overview (already exists), GET /api/dashboard/tickets (new), GET /api/dashboard/reports?start=today&end=today
+
+Loading state: 3 skeleton cards + 2 skeleton rows (use existing Skeleton component).
+Error state: red pill with retry button.
+
+#### Section 1 — Hero Stat Row
+4 cards in a grid (grid-cols-2 lg:grid-cols-4 gap-4) with animate-slide-up stagger (delay 0, 60, 120, 180ms):
+
+Card 1 — CASH TODAY
+  Icon: Banknote (lucide) in bg-emerald-500/15 rounded-xl p-2.5
+  Value: $X,XXX.XX (useAnimatedCounter, text-2xl font-black text-emerald-600)
+  Label: "Cash today"
+  Trend: tiny bar showing cash as % of daily total
+
+Card 2 — CARD TODAY
+  Icon: CreditCard (lucide) in bg-blue-500/15 rounded-xl p-2.5
+  Value: $X,XXX.XX (useAnimatedCounter, text-2xl font-black text-blue-600)
+  Label: "Card today"
+  Trend: tiny bar
+
+Card 3 — TICKETS TODAY
+  Icon: ReceiptText (lucide) in bg-headz-red/15 rounded-xl p-2.5
+  Value: integer count (useAnimatedCounter no decimal)
+  Label: "Tickets today"
+  Sub: "X cash · X card" in text-xs text-headz-gray
+
+Card 4 — ACTIVE BARBERS
+  Icon: Users (lucide) in bg-purple-500/15 rounded-xl p-2.5
+  Value: integer count
+  Label: "Active barbers"
+  Sub: date formatted as "Mon Apr 14" text-xs text-headz-gray
+
+Card style: rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm hover:shadow-md transition-shadow
+
+#### Section 2 — Squire Command Center Card
+Full-width card: rounded-2xl overflow-hidden (no border, uses gradient)
+Background: bg-gradient-to-br from-headz-black via-[#1a0a0d] to-headz-black
+Content (flex justify-between items-center px-7 py-6):
+  Left:
+    Small label: "POWERED BY SQUIRE" text-xs tracking-[0.2em] text-headz-red/80 uppercase mb-1
+    Heading: "Manage Appointments & Staff" text-xl font-bold text-white
+    Sub: "Live scheduling, availability, and client management live in Squire." text-sm text-white/50 mt-1
+  Right: two buttons stacked (flex-col gap-2 sm:flex-row):
+    "Open Squire Admin →" bg-headz-red hover:bg-headz-redDark text-white font-bold text-sm px-6 py-3 rounded-xl → href="https://app.getsquire.com" target="_blank"
+    "Add Ticket" border border-white/20 text-white hover:bg-white/5 text-sm px-6 py-3 rounded-xl → href="/dashboard/tickets"
+
+#### Section 3 — Two-column lower section (grid-cols-1 lg:grid-cols-2 gap-5)
+
+LEFT — Today's Ticket Activity:
+  Heading: "Today's Tickets" + "View all →" link to /dashboard/tickets
+  Show last 5 tickets from GET /api/dashboard/tickets (newest first).
+  Each row: avatar/initials + customer name + barber name + payment method pill + amount
+  Same styling as the ticket list rows from Task 6 but compact (py-2 not py-3).
+  If none: "No tickets recorded yet today." in text-sm text-headz-gray italic.
+
+RIGHT — Barber Performance Today:
+  Heading: "Barber Totals" + "Full report →" link to /dashboard/reports
+  Show byBarber from GET /api/dashboard/tickets.
+  Each barber row: initials circle (32px bg-headz-red/10 text-headz-red) + name + right-aligned total
+  Mini cash/card bar (4px, emerald=cash, blue=card) below the name — width based on proportion
+  Sort by total desc.
+  If no data: "No sales recorded yet." text-sm text-headz-gray italic.
+
+#### Section 4 — Quick Nav Cards (grid-cols-2 sm:grid-cols-4 gap-3)
+Heading: "Jump to" text-xs uppercase tracking-wider text-headz-gray mb-3
+
+4 mini nav cards (rounded-xl border border-black/[0.07] bg-white p-4 hover:border-headz-red/30 hover:shadow-sm transition-all cursor-pointer group):
+  1. "Tickets"  icon=ReceiptText → /dashboard/tickets
+  2. "Payments" icon=DollarSign  → /dashboard/payments
+  3. "Reports"  icon=TrendingUp  → /dashboard/reports
+  4. "Squire"   icon=ExternalLink → https://app.getsquire.com (target _blank)
+
+Each card: icon in rounded-lg bg-black/5 group-hover:bg-headz-red/10 group-hover:text-headz-red p-2 mb-2, then label in text-sm font-medium text-headz-black.
+
+---
+
+## TASK 9 — PAYMENTS PAGE REDESIGN
+
+Read app/dashboard/payments/page.tsx in full.
+
+Redesign it to be the historical ledger — all transactions from posTransactions, not just today.
+
+### Key changes:
+
+1. Rename page title to "Payment History" (was "Payments").
+
+2. Replace the subtitle "Payments processed through Squire POS" with a tab bar:
+   Two tabs: "All Transactions" | "Manual Tickets"
+   - "All Transactions": shows all posTransactions (current behavior)
+   - "Manual Tickets": filters where source='manual' (manually entered via tickets page)
+   Tab styling: pill tabs (not underline). Active: bg-headz-red text-white rounded-full px-4 py-1.5 text-sm font-semibold. Inactive: text-headz-gray hover:text-headz-black px-4 py-1.5 text-sm.
+
+3. Summary cards at top (keep the today/week/month pattern but simplify to 3 cards):
+   - Today: $X total (X cash / X card)
+   - This Week: $X total
+   - This Month: $X total
+   Card style: rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm. Total in text-2xl font-black. Cash/card breakdown in text-xs text-headz-gray.
+
+4. Cash vs Card bar: keep the existing bar but widen it (max-w-full instead of max-w-lg), make it 10px tall, and add animated width transition (transition-all duration-700).
+
+5. Transaction table — redesign the columns:
+   Remove: "Subtotal" column (keep total only).
+   Reorder: Time | Barber | Customer | Service | Method | Total | Status | Actions
+   - "Service" column: show items[0].name if items exist, else "—"
+   - "Barber" column: show barber name (join through barberId → users)
+   - Method badge: CASH → bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 text-xs font-semibold. CARD → bg-blue-100 text-blue-700 same. Add card brand + last4 below if present.
+   - Source badge (small, secondary): if source='manual', show "manual" in text-headz-gray/50 text-[10px] below the method badge.
+   - Total: text-headz-black font-bold tabular-nums. If tip > 0, show "+$X.XX tip" below in text-xs text-headz-gray.
+   - Status: keep existing StatusBadge component.
+   - Actions: Void button (replaces refund for manual tickets, calls DELETE /api/dashboard/tickets/[id]). Refund button for card transactions. External Squire link icon → https://app.getsquire.com/payments.
+
+6. Add date range picker to filters:
+   Alongside the existing method/barber/search filters, add:
+   From date input (type="date") and To date input (type="date") with defaults of today.
+   Pass as ?from=YYYY-MM-DD&to=YYYY-MM-DD to the API (already supported).
+
+7. Export CSV button (top right, next to Refresh):
+   On click: download a CSV of current filtered transactions.
+   Columns: Date, Time, Barber, Customer, Service, Method, Subtotal, Tip, Total, Status.
+   Use client-side CSV generation (build a data: URI, no server endpoint needed).
+
+---
+
+## TASK 10 — REPORTS PAGE: FEED FROM TICKETS
+
+Read app/dashboard/(admin)/reports/page.tsx in full.
+Read app/api/dashboard/reports/route.ts in full.
+
+### API update (app/api/dashboard/reports/route.ts):
+
+The existing reports route reads only from `appointments`. Add posTransactions data:
+
+1. Add to the parallel Promise.all fetches:
+   - posRevenue: sum of posTransactions.total for the date range (convert date range to timestamp bounds)
+   - posByBarber: group posTransactions by barberId, sum total, count rows, join to users.fullName
+   - posByMethod: group posTransactions by paymentMethod for the date range
+
+2. In the response, add:
+   posRevenue: number  (from posTransactions totals)
+   combinedRevenue: appointments revenue + posRevenue
+   cashTotal: number (from posByMethod where method='cash')
+   cardTotal: number (from posByMethod where method='card')
+   ticketsByBarber: { barber: string, tickets: number, revenue: number }[]  (from posByBarber)
+
+### UI update (app/dashboard/(admin)/reports/page.tsx):
+
+Read the existing full file.
+
+1. Add a "Ticket Revenue" card to the summary row (4th card):
+   Label: "Ticket Revenue"
+   Value: $posRevenue.toFixed(2)
+   Sub: "Manual + POS entries"
+   Style matching existing summary cards.
+
+2. Add a new section "Cash vs Card Split" between the existing "Revenue by barber" chart and "Bookings by service" chart:
+   A horizontal bar visualization (not a Recharts chart — just divs):
+   Cash bar: emerald, Card bar: blue
+   Width proportional to amounts.
+   Labels: "CASH $X,XXX" left, "CARD $X,XXX" right.
+   Center: percentage split "X% / X%"
+   Full-width card: rounded-xl border border-black/10 bg-white p-5 shadow-sm.
+
+3. Add a new "Tickets by Barber" table section at the bottom (before the existing "Barber performance" table):
+   Simple table: Barber | Tickets | Revenue | Avg/Ticket
+   Sourced from ticketsByBarber in the API response.
+   Style: match existing table styles in the file.
+
+---
+
+## TASK 11 — GENERAL WIRING
+
+1. The server component app/dashboard/(admin)/tickets/page.tsx should:
+   - Fetch barbers list (db.select from barbers where isActive=true orderBy sortOrder)
+   - Fetch users with role='barber' and isActive=true to get the userId→name mapping
+   - Build a BarberOption array: { id: users.id, name: barber.name ?? users.fullName, avatarUrl: barber.avatarUrl ?? users.avatarUrl }
+   - Pass to TicketsPageClient as props
+   - Metadata: { title: "Tickets | Headz Staff" }
+
+2. The tickets page needs auth: same requireAdminApi pattern — add it to the layout (it's already covered by the admin layout guard).
+
+3. All money values: use a helper formatMoney(n: number): string that returns `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`. Define this in lib/utils/format-money.ts.
+
+4. The TicketsPageClient should auto-refresh tickets every 30 seconds (setInterval in useEffect, clearInterval on cleanup). Show a subtle "Updated just now" timestamp below the ticket list header.
+
+5. When a ticket is added successfully:
+   - Flash the corresponding stat card (animate-pulse-glow for 2 seconds)
+   - Animate the new ticket row in with animate-slide-right
+   - Update totals immediately (optimistic update from the API response)
+   - Reset form: clear serviceLabel, amount, tip, customerName. Keep barberId and paymentMethod selected (so the same barber can quickly add another ticket).
+
+---
+
+## GENERAL RULES
+
+- 'use client' on all interactive components. Server components only for data fetching shells.
+- All money formatted via formatMoney() helper — no inline .toFixed(2) in JSX.
+- useAnimatedCounter is used on all dollar amounts in the overview and tickets page.
+- No new npm packages. date-fns (installed) for all date math. lucide-react (installed) for icons.
+- Animations: CSS keyframes in globals.css + Tailwind utility classes. No inline style animations except where necessary for dynamic progress bar widths (use CSS custom property --progress-target or inline style width).
+- TypeScript strict. No `any`. Type all API responses at the call site.
+- After all changes: npx tsc --noEmit. Fix every error before submitting.
+```
+
+---
+
 ## ACTIVE PROMPT 3: Native Squire Booking Flow (3-Layer System)
 
 Paste the entire block below into Cursor's composer.

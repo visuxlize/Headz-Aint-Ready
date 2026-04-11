@@ -158,7 +158,7 @@ export const appointments = pgTable('appointments', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-export type PosLineItem = { serviceId: string; name: string; price: string }
+export type PosLineItem = { serviceId?: string; name: string; price: string }
 
 /** Walk-in / POS sales not tied to a prior appointment */
 export const posTransactions = pgTable('pos_transactions', {
@@ -178,6 +178,8 @@ export const posTransactions = pgTable('pos_transactions', {
   stripeChargeId: text('stripe_charge_id'),
   squarePaymentId: text('square_payment_id'),
   squareTerminalCheckoutId: text('square_terminal_checkout_id'),
+  /** 'manual' | 'squire' | 'pos' — how the row was created */
+  source: text('source').notNull().default('manual'),
   cardBrand: text('card_brand'),
   cardLastFour: text('card_last_four'),
   refundedAt: timestamp('refunded_at'),

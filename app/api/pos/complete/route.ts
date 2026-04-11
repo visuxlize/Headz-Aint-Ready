@@ -127,6 +127,7 @@ export async function POST(request: Request) {
       paymentStatus: 'paid',
       stripeChargeId: d.stripeChargeId ?? null,
       receiptSentAt,
+      source: 'pos',
     })
 
     return NextResponse.json({ ok: true, mode: 'walk_in' })

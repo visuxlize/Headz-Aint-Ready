@@ -47,6 +47,7 @@ export async function GET(request: Request) {
   const method = searchParams.get('method')
   const barberId = searchParams.get('barberId')
   const q = searchParams.get('q')?.trim()
+  const sourceFilter = searchParams.get('source')
 
   const conditions = []
   if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) {
@@ -63,6 +64,9 @@ export async function GET(request: Request) {
   }
   if (q) {
     conditions.push(ilike(posTransactions.customerName, `%${q}%`))
+  }
+  if (sourceFilter === 'manual') {
+    conditions.push(eq(posTransactions.source, 'manual'))
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined
@@ -85,6 +89,7 @@ export async function GET(request: Request) {
         cardLastFour: posTransactions.cardLastFour,
         refundedAt: posTransactions.refundedAt,
         createdAt: posTransactions.createdAt,
+        source: posTransactions.source,
       })
       .from(posTransactions)
       .leftJoin(users, eq(posTransactions.barberId, users.id))

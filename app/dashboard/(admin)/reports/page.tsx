@@ -15,19 +15,45 @@ import {
 } from 'recharts'
 import { subDays, format } from 'date-fns'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { formatMoney } from '@/lib/utils/format-money'
 
 const COLORS = ['#C0392B', '#FDF6EC', '#1A1A1A', '#6b7280', '#14532d']
+
+type ReportsPayload = {
+  summary: {
+    totalRevenue: number
+    totalAppointments: number
+    avgPerAppointment: number
+    noShowRate: number
+  }
+  posRevenue?: number
+  combinedRevenue?: number
+  cashTotal?: number
+  cardTotal?: number
+  ticketsByBarber?: { barber: string; tickets: number; revenue: number }[]
+  revenueByBarber: { name: string; revenue: number }[]
+  bookingsByService: { name: string; value: number }[]
+  heatmap: { dow: number; hour: number; count: number }[]
+  barberTable: {
+    barber: string
+    cuts: number
+    revenue: number
+    noShows: number
+    completionRate: number
+    avgRating: number
+  }[]
+}
 
 export default function ReportsPage() {
   const end = format(new Date(), 'yyyy-MM-dd')
   const start = format(subDays(new Date(), 30), 'yyyy-MM-dd')
-  const [data, setData] = useState<unknown>(null)
+  const [data, setData] = useState<ReportsPayload | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     void fetch(`/api/dashboard/reports?start=${start}&end=${end}`, { credentials: 'include' })
       .then((r) => r.json())
-      .then(setData)
+      .then((j) => setData(j as ReportsPayload))
       .finally(() => setLoading(false))
   }, [start, end])
 
@@ -35,8 +61,8 @@ export default function ReportsPage() {
     return (
       <div className="space-y-4">
         <Skeleton variant="line" className="h-8 w-64" />
-        <div className="grid gap-4 sm:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} variant="card" />
           ))}
         </div>
@@ -45,25 +71,7 @@ export default function ReportsPage() {
     )
   }
 
-  const payload = data as {
-    summary: {
-      totalRevenue: number
-      totalAppointments: number
-      avgPerAppointment: number
-      noShowRate: number
-    }
-    revenueByBarber: { name: string; revenue: number }[]
-    bookingsByService: { name: string; value: number }[]
-    heatmap: { dow: number; hour: number; count: number }[]
-    barberTable: {
-      barber: string
-      cuts: number
-      revenue: number
-      noShows: number
-      completionRate: number
-      avgRating: number
-    }[]
-  }
+  const payload = data
 
   const heatCells = Array.from({ length: 7 * 14 }).map((_, i) => {
     const dow = i % 7
@@ -73,36 +81,50 @@ export default function ReportsPage() {
   })
   const maxH = Math.max(...heatCells.map((c) => c.count), 1)
 
+  const posRev = payload.posRevenue ?? 0
+  const cashT = payload.cashTotal ?? 0
+  const cardT = payload.cardTotal ?? 0
+  const splitDenom = cashT + cardT
+  const cashPct = splitDenom > 0 ? (100 * cashT) / splitDenom : 50
+  const cardPct = 100 - cashPct
+
+  const ticketsRows = [...(payload.ticketsByBarber ?? [])].sort((a, b) => b.revenue - a.revenue)
+
   return (
     <div className="space-y-8 text-headz-black">
       <div>
         <h1 className="text-2xl font-bold">Reports</h1>
-        <p className="text-headz-gray text-sm mt-1">
-          Sourced from local transaction log (mirrored from Squire webhooks). Last 30 days ({start} → {end})
+        <p className="mt-1 text-sm text-headz-gray">
+          Appointments + POS ticket revenue. Last 30 days ({start} → {end})
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-          <p className="text-xs uppercase text-headz-gray">Total Revenue</p>
-          <p className="text-2xl font-bold mt-1">${payload.summary.totalRevenue.toFixed(2)}</p>
+          <p className="text-xs uppercase text-headz-gray">Appointment Revenue</p>
+          <p className="mt-1 text-2xl font-bold">${payload.summary.totalRevenue.toFixed(2)}</p>
         </div>
         <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
           <p className="text-xs uppercase text-headz-gray">Appointments</p>
-          <p className="text-2xl font-bold mt-1">{payload.summary.totalAppointments}</p>
+          <p className="mt-1 text-2xl font-bold">{payload.summary.totalAppointments}</p>
         </div>
         <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
           <p className="text-xs uppercase text-headz-gray">Avg / appt</p>
-          <p className="text-2xl font-bold mt-1">${payload.summary.avgPerAppointment.toFixed(2)}</p>
+          <p className="mt-1 text-2xl font-bold">${payload.summary.avgPerAppointment.toFixed(2)}</p>
+        </div>
+        <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+          <p className="text-xs uppercase text-headz-gray">Ticket Revenue</p>
+          <p className="mt-1 text-2xl font-bold">{formatMoney(posRev)}</p>
+          <p className="mt-1 text-[11px] text-headz-gray">Manual + POS entries</p>
         </div>
         <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
           <p className="text-xs uppercase text-headz-gray">No-show rate</p>
-          <p className="text-2xl font-bold mt-1">{payload.summary.noShowRate}%</p>
+          <p className="mt-1 text-2xl font-bold">{payload.summary.noShowRate}%</p>
         </div>
       </div>
 
       <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold mb-4">Revenue by barber</h2>
+        <h2 className="mb-4 font-semibold">Revenue by barber</h2>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={payload.revenueByBarber} layout="vertical">
@@ -116,8 +138,23 @@ export default function ReportsPage() {
       </div>
 
       <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold mb-4">Bookings by service</h2>
-        <div className="h-64 flex">
+        <h2 className="mb-4 font-semibold">Cash vs Card Split (POS)</h2>
+        <div className="flex h-4 w-full overflow-hidden rounded-full bg-black/5">
+          <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${cashPct}%` }} />
+          <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${cardPct}%` }} />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="font-semibold text-emerald-700">CASH {formatMoney(cashT)}</span>
+          <span className="text-headz-gray">
+            {cashPct.toFixed(0)}% / {cardPct.toFixed(0)}%
+          </span>
+          <span className="font-semibold text-blue-700">CARD {formatMoney(cardT)}</span>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 font-semibold">Bookings by service</h2>
+        <div className="flex h-64">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={payload.bookingsByService} dataKey="value" nameKey="name" cx="40%" cy="50%" outerRadius={80}>
@@ -133,11 +170,8 @@ export default function ReportsPage() {
       </div>
 
       <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold mb-4">Busiest hours (heatmap)</h2>
-        <div
-          className="grid gap-0.5"
-          style={{ gridTemplateColumns: `repeat(7, minmax(0, 1fr))` }}
-        >
+        <h2 className="mb-4 font-semibold">Busiest hours (heatmap)</h2>
+        <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(7, minmax(0, 1fr))` }}>
           {heatCells.map((c) => (
             <div
               key={c.key}
@@ -151,11 +185,43 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-black/10 bg-white p-5 shadow-sm overflow-x-auto">
-        <h2 className="font-semibold mb-4">Barber performance</h2>
+      <div className="overflow-x-auto rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 font-semibold">Tickets by Barber</h2>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-headz-gray border-b">
+            <tr className="border-b text-left text-headz-gray">
+              <th className="py-2 pr-4">Barber</th>
+              <th className="py-2 pr-4">Tickets</th>
+              <th className="py-2 pr-4">Revenue</th>
+              <th className="py-2">Avg / ticket</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ticketsRows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-6 text-center text-headz-gray">
+                  No POS tickets in this range.
+                </td>
+              </tr>
+            ) : (
+              ticketsRows.map((row) => (
+                <tr key={row.barber} className="border-b border-black/5">
+                  <td className="py-2 pr-4 font-medium">{row.barber}</td>
+                  <td className="py-2 pr-4">{row.tickets}</td>
+                  <td className="py-2 pr-4">{formatMoney(row.revenue)}</td>
+                  <td className="py-2">{formatMoney(row.tickets > 0 ? row.revenue / row.tickets : 0)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 font-semibold">Barber performance</h2>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-headz-gray">
               <th className="py-2 pr-4">Barber</th>
               <th className="py-2 pr-4">Cuts</th>
               <th className="py-2 pr-4">Revenue</th>

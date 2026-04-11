@@ -2,11 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart2, CalendarDays, Contact, DollarSign, Settings, TrendingUp } from 'lucide-react'
+import {
+  BarChart2,
+  CalendarDays,
+  Contact,
+  DollarSign,
+  ReceiptText,
+  Settings,
+  TrendingUp,
+} from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const items: { href: string; label: string; icon: typeof BarChart2 }[] = [
   { href: '/dashboard', label: 'Overview', icon: BarChart2 },
+  { href: '/dashboard/tickets', label: 'Tickets', icon: ReceiptText },
   { href: '/dashboard/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/dashboard/payments', label: 'Payments', icon: DollarSign },
   { href: '/dashboard/reports', label: 'Reports', icon: TrendingUp },
