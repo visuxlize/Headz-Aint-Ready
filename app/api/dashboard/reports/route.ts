@@ -4,6 +4,14 @@ import { appointments, services, users } from '@/lib/db/schema'
 import { and, eq, gte, lte, ne, sql } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 
+async function countActiveBarbers() {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(users)
+    .where(and(eq(users.role, 'barber'), eq(users.isActive, true)))
+  return row?.count ?? 0
+}
+
 /** GET /api/dashboard/reports?start=YYYY-MM-DD&end=YYYY-MM-DD */
 export async function GET(request: Request) {
   const auth = await requireAdminApi()
@@ -16,7 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'start and end required' }, { status: 400 })
   }
 
-  const [rev, apptCount, byBarber, byService, byHour, tableRows] = await Promise.all([
+  const [rev, apptCount, byBarber, byService, byHour, tableRows, activeBarbers] = await Promise.all([
     db
       .select({ total: sql<string>`coalesce(sum(${services.price}::numeric), 0)` })
       .from(appointments)
@@ -100,6 +108,7 @@ export async function GET(request: Request) {
       .innerJoin(users, eq(appointments.barberId, users.id))
       .where(and(gte(appointments.appointmentDate, start), lte(appointments.appointmentDate, end)))
       .groupBy(appointments.barberId, users.fullName),
+    countActiveBarbers(),
   ])
 
   const totalRevenue = Number(rev[0]?.total ?? 0)
@@ -109,6 +118,7 @@ export async function GET(request: Request) {
   const noShowDen = totalAppointments > 0 ? (tableRows.reduce((s, r) => s + (r.noShows ?? 0), 0) / totalAppointments) * 100 : 0
 
   return NextResponse.json({
+    activeBarbers,
     summary: {
       totalRevenue,
       totalAppointments,

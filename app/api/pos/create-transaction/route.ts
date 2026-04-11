@@ -24,7 +24,7 @@ const bodySchema = z.object({
   paymentMethod: z.enum(['card', 'cash']),
 })
 
-/** POST — create a pending POS row before Square Terminal checkout or cash recording */
+/** POST — create a pending POS row before Squire terminal checkout or cash recording */
 export async function POST(request: Request) {
   const auth = await requireStaffApi()
   if ('error' in auth) return auth.error

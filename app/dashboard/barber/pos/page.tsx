@@ -5,19 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, ChevronLeft, Loader2, XCircle } from 'lucide-react'
 import { SquirePOSStatus } from '@/components/pos/SquirePOSStatus'
 
-type BootstrapAppointment = {
-  id: string
-  customerName: string
-  barberId: string
-  serviceId: string
-  serviceName: string
-  servicePrice: string
-}
-
+type ServiceRow = { id: string; name: string; price: string }
 type BootstrapPayload = {
   viewerId?: string
-  viewerRole?: string
-  appointments?: BootstrapAppointment[]
+  services?: ServiceRow[]
 }
 
 function parsePrice(s: string) {
@@ -43,10 +34,10 @@ export default function BarberSquirePosPage() {
         fetch('/api/squire/status', { credentials: 'include' }),
       ])
       const bootJson = (await bootRes.json().catch(() => ({}))) as BootstrapPayload & { error?: string }
-      if (!bootRes.ok) throw new Error(bootJson.error || 'Could not load appointments')
+      if (!bootRes.ok) throw new Error(bootJson.error || 'Could not load POS data')
       setData(bootJson)
       const stJson = await stRes.json().catch(() => ({}))
-      setSquireConnected(stRes.ok && Boolean(stJson.connected))
+      setSquireConnected(stRes.ok && Boolean((stJson as { connected?: boolean }).connected))
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Failed to load')
       setData(null)
@@ -59,13 +50,7 @@ export default function BarberSquirePosPage() {
     void load()
   }, [load])
 
-  const nextAppt = useMemo(() => {
-    const list = data?.appointments ?? []
-    const role = data?.viewerRole
-    const vid = data?.viewerId
-    const mine = role === 'barber' && vid ? list.filter((a) => a.barberId === vid) : list
-    return mine[0] ?? null
-  }, [data])
+  const defaultService = useMemo(() => data?.services?.[0] ?? null, [data])
 
   const stopPoll = useCallback(() => {
     if (pollRef.current) {
@@ -109,12 +94,16 @@ export default function BarberSquirePosPage() {
     return () => stopPoll()
   }, [checkoutId, phase, stopPoll])
 
-  const chargeCustomer = async () => {
-    if (!nextAppt) return
+  const runCardCheckout = async () => {
+    const barberId = data?.viewerId
+    const svc = defaultService
+    if (!barberId || !svc) {
+      setErr('Missing barber or service — contact admin.')
+      return
+    }
     setErr(null)
     setPhase('pending')
-    const subtotal = parsePrice(nextAppt.servicePrice)
-    const total = subtotal
+    const total = parsePrice(svc.price)
 
     try {
       const createRes = await fetch('/api/pos/create-transaction', {
@@ -122,43 +111,35 @@ export default function BarberSquirePosPage() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          barberId: nextAppt.barberId,
-          customerName: nextAppt.customerName,
-          appointmentId: nextAppt.id,
-          items: [
-            {
-              serviceId: nextAppt.serviceId,
-              name: nextAppt.serviceName,
-              price: nextAppt.servicePrice,
-            },
-          ],
-          subtotal,
+          barberId,
+          customerName: 'Walk-in',
+          items: [{ serviceId: svc.id, name: svc.name, price: svc.price }],
+          subtotal: total,
           tipAmount: 0,
           total,
           paymentMethod: 'card',
         }),
       })
       const createJson = await createRes.json().catch(() => ({}))
-      if (!createRes.ok) throw new Error(createJson.error || 'Could not start sale')
+      if (!createRes.ok) throw new Error((createJson as { error?: string }).error || 'Could not start sale')
 
-      const transactionId = createJson.id as string
+      const transactionId = (createJson as { id: string }).id
 
       const tcRes = await fetch('/api/squire/checkout', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          barberId: nextAppt.barberId,
-          serviceId: nextAppt.serviceId,
-          appointmentId: nextAppt.id,
+          barberId,
+          serviceId: svc.id,
           amount: total,
           transactionId,
         }),
       })
       const tcJson = await tcRes.json().catch(() => ({}))
-      if (!tcRes.ok) throw new Error(tcJson.error || 'Squire checkout failed')
+      if (!tcRes.ok) throw new Error((tcJson as { error?: string }).error || 'Squire checkout failed')
 
-      const cid = tcJson.checkoutId as string | undefined
+      const cid = (tcJson as { checkoutId?: string }).checkoutId
       if (!cid) throw new Error('No checkout id returned')
 
       setCheckoutId(cid)
@@ -170,36 +151,33 @@ export default function BarberSquirePosPage() {
     }
   }
 
-  const recordCash = async () => {
-    if (!nextAppt) return
+  const runCash = async () => {
+    const barberId = data?.viewerId
+    const svc = defaultService
+    if (!barberId || !svc) {
+      setErr('Missing barber or service — contact admin.')
+      return
+    }
     setErr(null)
-    const subtotal = parsePrice(nextAppt.servicePrice)
-    const total = subtotal
+    const total = parsePrice(svc.price)
     try {
       const createRes = await fetch('/api/pos/create-transaction', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          barberId: nextAppt.barberId,
-          customerName: nextAppt.customerName,
-          appointmentId: nextAppt.id,
-          items: [
-            {
-              serviceId: nextAppt.serviceId,
-              name: nextAppt.serviceName,
-              price: nextAppt.servicePrice,
-            },
-          ],
-          subtotal,
+          barberId,
+          customerName: 'Walk-in',
+          items: [{ serviceId: svc.id, name: svc.name, price: svc.price }],
+          subtotal: total,
           tipAmount: 0,
           total,
           paymentMethod: 'cash',
         }),
       })
       const createJson = await createRes.json().catch(() => ({}))
-      if (!createRes.ok) throw new Error(createJson.error || 'Could not start sale')
-      const transactionId = createJson.id as string
+      if (!createRes.ok) throw new Error((createJson as { error?: string }).error || 'Could not start sale')
+      const transactionId = (createJson as { id: string }).id
 
       const cashRes = await fetch('/api/squire/record-cash', {
         method: 'POST',
@@ -209,12 +187,11 @@ export default function BarberSquirePosPage() {
           amountCents: Math.round(total * 100),
           cashGivenCents: Math.round(total * 100),
           transactionId,
-          appointmentId: nextAppt.id,
         }),
       })
       if (!cashRes.ok) {
         const j = await cashRes.json().catch(() => ({}))
-        throw new Error(j.error || 'Cash record failed')
+        throw new Error((j as { error?: string }).error || 'Cash record failed')
       }
       setPhase('complete')
       void load()
@@ -225,15 +202,15 @@ export default function BarberSquirePosPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-headz-gray">
+      <div className="-mx-4 flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-headz-black px-4 sm:-mx-6 sm:px-6">
         <Loader2 className="h-8 w-8 animate-spin text-headz-red/80" />
-        <p className="text-sm">Loading checkout…</p>
+        <p className="text-sm text-white/50">Loading checkout…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-8 pb-16 pt-2">
+    <div className="-mx-4 min-h-[calc(100vh-8rem)] bg-headz-black px-4 pb-12 pt-4 sm:-mx-6 sm:px-6">
       <Link
         href="/dashboard/barber"
         className="inline-flex items-center gap-1 text-sm font-medium text-white/60 transition hover:text-white"
@@ -242,42 +219,48 @@ export default function BarberSquirePosPage() {
         Back
       </Link>
 
-      <div className="rounded-2xl border border-white/10 bg-[#111] p-6 shadow-xl ring-1 ring-headz-red/15">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="font-serif text-2xl font-bold text-white">Checkout</h1>
-          <SquirePOSStatus connected={squireConnected} variant="dark" />
-        </div>
-        <p className="mt-2 text-sm text-white/60">Squire terminal — charge the next guest on the books.</p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-serif text-2xl font-bold text-white">Checkout</h1>
+        <SquirePOSStatus connected={squireConnected} variant="dark" />
+      </div>
 
-        {err ? <p className="mt-4 text-sm text-red-300">{err}</p> : null}
+      <a
+        href="https://app.getsquire.com/pos"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-6 flex w-full items-center justify-center rounded-2xl bg-headz-red py-4 text-center text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-headz-red/30 transition hover:bg-headz-redDark"
+      >
+        Open Squire POS Terminal
+      </a>
 
-        {nextAppt ? (
-          <div className="mt-6 rounded-xl border border-white/10 bg-black/40 p-4 text-white">
-            <p className="text-xs uppercase tracking-widest text-headz-red">Next appointment</p>
-            <p className="mt-2 text-lg font-semibold">{nextAppt.customerName}</p>
-            <p className="text-sm text-white/70">{nextAppt.serviceName}</p>
-            <p className="mt-2 text-xl font-bold text-headz-red">${parsePrice(nextAppt.servicePrice).toFixed(2)}</p>
-          </div>
-        ) : (
-          <p className="mt-6 text-sm text-white/55">No pending appointments for you today.</p>
-        )}
+      {defaultService ? (
+        <p className="mt-3 text-center text-xs text-white/45">
+          Device checkout uses your first active service ({defaultService.name} · ${parsePrice(defaultService.price).toFixed(2)}).
+        </p>
+      ) : (
+        <p className="mt-3 text-center text-xs text-amber-200/90">Add active services in the dashboard for device checkout.</p>
+      )}
 
-        <div className="mt-8 flex flex-col gap-3">
+      <div className="mt-10 rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Or charge from this device</p>
+        {err ? <p className="mt-3 text-sm text-red-300">{err}</p> : null}
+
+        <div className="mt-6 flex flex-col gap-3">
           <button
             type="button"
-            disabled={!nextAppt || phase === 'processing' || phase === 'pending' || !squireConnected}
-            onClick={() => void chargeCustomer()}
-            className="w-full rounded-xl bg-headz-red py-4 text-sm font-bold uppercase tracking-wide text-white transition enabled:hover:bg-headz-redDark disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!defaultService || phase === 'processing' || phase === 'pending' || !squireConnected}
+            onClick={() => void runCardCheckout()}
+            className="w-full rounded-xl bg-headz-red py-3.5 text-sm font-bold text-white transition enabled:hover:bg-headz-redDark disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {phase === 'processing' ? 'Processing…' : 'Charge customer'}
+            Charge Card
           </button>
           <button
             type="button"
-            disabled={!nextAppt || phase === 'processing' || phase === 'pending'}
-            onClick={() => void recordCash()}
-            className="w-full rounded-xl border-2 border-white/20 py-4 text-sm font-bold uppercase tracking-wide text-white transition hover:border-headz-red hover:text-headz-red disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!defaultService || phase === 'processing' || phase === 'pending'}
+            onClick={() => void runCash()}
+            className="w-full rounded-xl border-2 border-white/20 py-3.5 text-sm font-bold text-white transition hover:border-headz-red hover:text-headz-red disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Record cash payment
+            Record Cash Payment
           </button>
         </div>
 
@@ -291,7 +274,6 @@ export default function BarberSquirePosPage() {
           <div className="mt-8 flex flex-col items-center gap-2 text-white/80">
             <Loader2 className="h-8 w-8 animate-spin text-headz-red/90" />
             <p className="text-sm font-medium">Pending</p>
-            <p className="text-center text-xs text-white/50">Starting Squire checkout…</p>
           </div>
         ) : null}
 
@@ -299,7 +281,7 @@ export default function BarberSquirePosPage() {
           <div className="mt-8 flex flex-col items-center gap-2 text-white">
             <Loader2 className="h-10 w-10 animate-spin text-headz-red" />
             <p className="text-sm font-medium">Processing</p>
-            <p className="text-center text-xs text-white/50">Waiting for Squire terminal (polling every 3s)</p>
+            <p className="text-center text-xs text-white/50">Checking Squire every 3s…</p>
           </div>
         ) : null}
 
@@ -323,7 +305,7 @@ export default function BarberSquirePosPage() {
         {phase === 'cancelled' ? (
           <div className="mt-8 flex flex-col items-center gap-2 text-red-400">
             <XCircle className="h-12 w-12" strokeWidth={1.75} />
-            <p className="text-sm font-semibold text-white">Cancelled</p>
+            <p className="text-sm font-semibold text-white">Failed</p>
             <button
               type="button"
               onClick={() => setPhase('idle')}

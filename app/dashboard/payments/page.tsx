@@ -135,7 +135,7 @@ export default function PaymentsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-2xl font-bold text-headz-black md:text-3xl">Payments</h1>
-          <p className="text-headz-gray mt-1 text-sm">Card and cash from Square — same totals as your Square dashboard</p>
+          <p className="text-headz-gray mt-1 text-sm">Payments processed through Squire POS</p>
         </div>
         <button
           type="button"
@@ -309,12 +309,12 @@ export default function PaymentsPage() {
                           )}
                         {t.squarePaymentId && (
                           <a
-                            href={`https://squareup.com/dashboard/sales/transactions/${t.squarePaymentId}`}
+                            href="https://app.getsquire.com/payments"
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-0.5 text-xs text-headz-gray hover:text-headz-black"
                           >
-                            Square <ExternalLink className="h-3 w-3" />
+                            Squire <ExternalLink className="h-3 w-3" />
                           </a>
                         )}
                       </td>

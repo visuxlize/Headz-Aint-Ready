@@ -1,3 +1,6 @@
+/**
+ * ICS calendar export for legacy workflows. Scheduling source of truth is Squire.
+ */
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { appointments, barbers, services } from '@/lib/db/schema'

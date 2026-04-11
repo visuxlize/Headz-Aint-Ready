@@ -36,7 +36,7 @@ export default async function StaffServiceUnavailablePage({ searchParams }: Prop
                 Transaction pool / port <strong>6543</strong>).
               </li>
               <li>
-                Add any other server secrets you use locally (e.g. Square, Resend) if those features should work in
+                Add any other server secrets you use locally (e.g. Squire, Resend) if those features should work in
                 production.
               </li>
               <li>

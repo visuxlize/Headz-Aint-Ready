@@ -12,7 +12,7 @@ function friendlyPaymentsError(e: unknown): string {
     return 'Database is missing the payments table. In Supabase → SQL Editor, run scripts/ensure-pos-payments-schema.sql, then refresh.'
   }
   if (/relation ["']?square_devices["']? does not exist/i.test(raw)) {
-    return 'Database is missing Square device tables. Run scripts/ensure-pos-payments-schema.sql in Supabase.'
+    return 'Database is missing optional device tables. Run scripts/ensure-pos-payments-schema.sql in Supabase.'
   }
   if (/Failed query:/i.test(raw)) {
     return 'Could not load payments from the database. If this persists, run scripts/ensure-pos-payments-schema.sql in Supabase (or check DATABASE_URL).'

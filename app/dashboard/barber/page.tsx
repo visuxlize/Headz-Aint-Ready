@@ -23,7 +23,6 @@ export default async function BarberSchedulePage() {
 
   return (
     <BarberDashboardClient
-      userId={user.id}
       displayName={name}
       barberColumn={{
         id: user.id,

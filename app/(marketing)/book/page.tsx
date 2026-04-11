@@ -1,60 +1,28 @@
-import { bookableBarbersCondition } from '@/lib/barbers/public-queries'
-import { db } from '@/lib/db'
-import { barbers, services, users } from '@/lib/db/schema'
-import { asc, eq } from 'drizzle-orm'
-import { BookingFlow } from '@/components/booking/BookingFlow'
-import type { Barber, Service } from '@/lib/db/schema'
-
-export const dynamic = 'force-dynamic'
-
 export const metadata = {
-  title: 'Book | Headz Ain\'t Ready',
-  description: 'Book your haircut at Headz Ain\'t Ready, Jackson Heights.',
+  title: "Book | Headz Ain't Ready",
+  description: "Book your haircut at Headz Ain't Ready, Jackson Heights.",
 }
 
-export default async function BookPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ category?: string }>
-}) {
-  const { category } = await searchParams
-  let barbersList: Barber[] = []
-  let servicesList: Service[] = []
-  let backendUnavailable = false
-  try {
-    const [b, s] = await Promise.all([
-      db
-        .select({ barber: barbers })
-        .from(barbers)
-        .innerJoin(users, eq(barbers.userId, users.id))
-        .where(bookableBarbersCondition)
-        .orderBy(asc(barbers.sortOrder))
-        .then((rows) => rows.map((r) => r.barber)),
-      db.select().from(services).where(eq(services.isActive, true)).orderBy(asc(services.displayOrder)),
-    ])
-    barbersList = b
-    servicesList = s
-  } catch (err) {
-    console.error('BookPage: could not load barbers/services', err)
-    backendUnavailable = true
-  }
+export default function BookPage() {
   return (
-    <div className="min-h-screen bg-[var(--background)] py-8 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-5xl mx-auto w-full">
-        <h1 className="font-headz-display mb-2 text-center text-2xl sm:text-left sm:text-3xl">Book your cut</h1>
-        <p className="text-headz-gray mb-6 sm:mb-8 text-center sm:text-left max-w-2xl">
-          Choose a service, barber, and time — like a calendar booking. We&apos;ll hold your slot.
+    <div className="min-h-screen bg-headz-black flex flex-col">
+      <div className="bg-headz-black border-b border-white/10 px-4 py-4 text-center">
+        <p className="text-headz-red text-xs uppercase tracking-[0.25em] font-semibold mb-1">
+          Jackson Heights, Queens
         </p>
-        {backendUnavailable && (
-          <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
-            <p className="font-medium">Booking is temporarily unavailable</p>
-            <p className="mt-1">Please call <a href="tel:+17184296841" className="text-headz-red font-medium underline">(718) 429-6841</a> to book, or try again in a few minutes.</p>
-          </div>
-        )}
-        <BookingFlow
-          barbers={barbersList}
-          services={servicesList}
-          defaultCategory={category ?? undefined}
+        <h1 className="font-headz-display text-white text-2xl sm:text-3xl">Book Your Cut</h1>
+        <p className="text-white/50 text-sm mt-1">
+          Powered by Squire — your time is locked in the moment you confirm.
+        </p>
+      </div>
+      <div className="flex-1 relative" style={{ minHeight: 'calc(100vh - 96px)' }}>
+        <iframe
+          src="https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1"
+          title="Book at Headz Ain't Ready"
+          className="w-full h-full absolute inset-0 border-0"
+          style={{ minHeight: 'calc(100vh - 96px)' }}
+          allow="payment; camera; microphone"
+          loading="eager"
         />
       </div>
     </div>

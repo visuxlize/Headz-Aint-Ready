@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
 import { DashboardNav } from './DashboardNav'
 
@@ -32,10 +32,7 @@ function ExternalIcon({ className }: { className?: string }) {
 
 function DashboardMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const calendarFullBleed =
-    (pathname === '/dashboard' && searchParams.get('view') === 'calendar') ||
-    pathname === '/dashboard/schedule'
+  const calendarFullBleed = pathname === '/dashboard/schedule'
 
   return (
     <main

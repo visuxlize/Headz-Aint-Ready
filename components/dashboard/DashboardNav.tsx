@@ -1,51 +1,29 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
-import {
-  AlertCircle,
-  BarChart2,
-  CalendarDays,
-  CalendarX,
-  Contact,
-  DollarSign,
-  Scissors,
-  Tablet,
-  TrendingUp,
-  Users,
-} from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { BarChart2, CalendarDays, Contact, DollarSign, Settings, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
-const items = [
-  { href: '/dashboard?view=overview', label: 'Overview', icon: BarChart2, match: 'overview' as const },
-  { href: '/dashboard?view=calendar', label: 'Calendar', icon: CalendarDays, match: 'calendar' as const },
-  { href: '/dashboard/schedule', label: 'Schedule', icon: CalendarDays, match: 'path' as const, path: '/dashboard/schedule' },
-  { href: '/dashboard/time-off', label: 'Time Off', icon: CalendarX, match: 'path' as const, path: '/dashboard/time-off' },
-  { href: '/dashboard/settings/services', label: 'Services', icon: Scissors, match: 'path' as const, path: '/dashboard/settings/services' },
-  { href: '/dashboard/settings/devices', label: 'Devices', icon: Tablet, match: 'path' as const, path: '/dashboard/settings/devices' },
-  { href: '/dashboard/settings/staff', label: 'Staff accounts', icon: Contact, match: 'path' as const, path: '/dashboard/settings/staff' },
-  { href: '/dashboard/settings/barbers', label: 'Barbers', icon: Users, match: 'path' as const, path: '/dashboard/settings/barbers' },
-  { href: '/dashboard/payments', label: 'Payments', icon: DollarSign, match: 'path' as const, path: '/dashboard/payments' },
-  { href: '/dashboard/no-shows', label: 'No-Shows', icon: AlertCircle, match: 'path' as const, path: '/dashboard/no-shows' },
-  { href: '/dashboard/reports', label: 'Reports', icon: TrendingUp, match: 'path' as const, path: '/dashboard/reports' },
+const items: { href: string; label: string; icon: typeof BarChart2 }[] = [
+  { href: '/dashboard', label: 'Overview', icon: BarChart2 },
+  { href: '/dashboard/schedule', label: 'Schedule', icon: CalendarDays },
+  { href: '/dashboard/payments', label: 'Payments', icon: DollarSign },
+  { href: '/dashboard/reports', label: 'Reports', icon: TrendingUp },
+  { href: '/dashboard/settings/staff', label: 'Staff Profiles', icon: Contact },
+  { href: '/dashboard/settings/squire', label: 'Squire Settings', icon: Settings },
 ]
 
 export function DashboardNav() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const view = searchParams.get('view') ?? 'overview'
 
   return (
     <ul className="space-y-1">
       {items.map((item) => {
-        let active = false
-        if (item.match === 'overview') {
-          active = pathname === '/dashboard' && view !== 'calendar'
-        } else if (item.match === 'calendar') {
-          active = pathname === '/dashboard' && view === 'calendar'
-        } else if (item.match === 'path' && 'path' in item) {
-          active = pathname === item.path || pathname.startsWith(item.path + '/')
-        }
+        const active =
+          item.href === '/dashboard'
+            ? pathname === '/dashboard'
+            : pathname === item.href || pathname.startsWith(item.href + '/')
         const Icon = item.icon
         return (
           <li key={item.href}>

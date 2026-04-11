@@ -1,3 +1,7 @@
+/**
+ * Appointments API — retained for staff listing and webhook-mirrored data.
+ * New customer bookings are created in Squire, not via POST here (use /book → Squire embed).
+ */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'

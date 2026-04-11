@@ -1,9 +1,5 @@
-import { AdminTimeOffClient } from '@/components/dashboard/AdminTimeOffClient'
+import { redirect } from 'next/navigation'
 
-export const metadata = {
-  title: 'Time off | Headz Staff',
-}
-
-export default function AdminTimeOffPage() {
-  return <AdminTimeOffClient />
+export default function TimeOffPage() {
+  redirect('/dashboard/settings/squire')
 }

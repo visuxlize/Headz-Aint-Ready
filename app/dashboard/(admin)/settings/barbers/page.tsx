@@ -1,9 +1,5 @@
-import { BarbersSettingsClient } from '@/components/dashboard/BarbersSettingsClient'
-
-export const metadata = {
-  title: 'Barbers | Headz Staff',
-}
+import { redirect } from 'next/navigation'
 
 export default function BarbersSettingsPage() {
-  return <BarbersSettingsClient />
+  redirect('/dashboard/settings/staff')
 }

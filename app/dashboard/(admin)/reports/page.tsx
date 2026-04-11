@@ -78,7 +78,7 @@ export default function ReportsPage() {
       <div>
         <h1 className="text-2xl font-bold">Reports</h1>
         <p className="text-headz-gray text-sm mt-1">
-          Last 30 days ({start} → {end})
+          Sourced from local transaction log (mirrored from Squire webhooks). Last 30 days ({start} → {end})
         </p>
       </div>
 

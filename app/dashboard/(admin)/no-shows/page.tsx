@@ -1,9 +1,5 @@
-import { NoShowsClient } from '@/components/dashboard/NoShowsClient'
-
-export const metadata = {
-  title: 'No-shows | Headz Staff',
-}
+import { redirect } from 'next/navigation'
 
 export default function NoShowsPage() {
-  return <NoShowsClient />
+  redirect('/dashboard/settings/squire')
 }

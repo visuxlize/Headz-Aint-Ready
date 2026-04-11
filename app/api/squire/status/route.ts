@@ -8,5 +8,8 @@ export async function GET() {
   const auth = await requireStaffApi()
   if ('error' in auth) return auth.error
 
-  return NextResponse.json({ connected: isSquireConfigured() })
+  return NextResponse.json({
+    connected: isSquireConfigured(),
+    hasLocationId: Boolean(process.env.SQUIRE_LOCATION_ID?.trim()),
+  })
 }
