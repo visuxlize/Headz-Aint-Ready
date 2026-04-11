@@ -142,14 +142,16 @@ async function main() {
       INSERT INTO staff_allowlist (email) VALUES (${barberEmail})
       ON CONFLICT (email) DO NOTHING
     `
+    await sql`ALTER TABLE barbers ADD COLUMN IF NOT EXISTS show_on_homepage boolean NOT NULL DEFAULT true`
+
     // Avoid unique conflicts on slug or user_id (dev-only cleanup)
     await sql`DELETE FROM barbers WHERE user_id = ${barberId}`
     await sql`DELETE FROM barbers WHERE slug = ${'barber-test'}`
     const barberAvatar =
       'https://headzaintready.com/wp-content/uploads/2023/02/LOUIELIVE.jpg'
     await sql`
-      INSERT INTO barbers (user_id, name, slug, email, avatar_url, is_active, sort_order)
-      VALUES (${barberId}, ${'Barber Test'}, ${'barber-test'}, ${barberEmail}, ${barberAvatar}, true, 99)
+      INSERT INTO barbers (user_id, name, slug, email, avatar_url, is_active, sort_order, show_on_homepage)
+      VALUES (${barberId}, ${'Barber Test'}, ${'barber-test'}, ${barberEmail}, ${barberAvatar}, true, 99, false)
     `
     console.log('  DB: users + staff_allowlist + barbers (with avatar) OK')
 

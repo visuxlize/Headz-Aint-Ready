@@ -7,11 +7,14 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { replaceStaffAllowlistEmail } from '@/lib/staff/staff-allowlist-email'
 
-const patchSchema = z.object({
-  fullName: z.string().min(1).max(200).optional(),
-  email: z.string().email().optional(),
-  phone: z.string().max(40).optional().nullable(),
-})
+const patchSchema = z
+  .object({
+    fullName: z.string().min(1).max(200).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().max(40).optional().nullable(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((o) => Object.keys(o).length > 0, { message: 'At least one field required' })
 
 /** PATCH — admin updates another staff member’s name, email, phone. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ userId: string }> }) {
@@ -43,6 +46,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
     return NextResponse.json({ error: 'Not a staff account' }, { status: 400 })
   }
 
+  if (parsed.data.isActive !== undefined && parsed.data.isActive === false && userId === auth.user.id) {
+    return NextResponse.json({ error: 'You cannot deactivate your own account.' }, { status: 400 })
+  }
+
   const emailIn = parsed.data.email?.trim().toLowerCase()
   if (emailIn && emailIn !== target.email) {
     const [dup] = await db.select({ id: users.id }).from(users).where(eq(users.email, emailIn)).limit(1)
@@ -68,6 +75,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
   const nextPhone =
     parsed.data.phone === undefined ? target.phone : parsed.data.phone?.trim() || null
   const nextEmail = emailIn ?? target.email
+  const nextActive = parsed.data.isActive !== undefined ? parsed.data.isActive : target.isActive
 
   await db
     .update(users)
@@ -75,6 +83,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
       email: nextEmail,
       fullName: nextFullName,
       phone: nextPhone,
+      ...(parsed.data.isActive !== undefined ? { isActive: nextActive } : {}),
       updatedAt: now,
     })
     .where(eq(users.id, userId))
@@ -88,6 +97,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
           name: nextFullName ?? b.name,
           email: nextEmail,
           phone: nextPhone,
+          ...(parsed.data.isActive !== undefined ? { isActive: nextActive } : {}),
           updatedAt: now,
         })
         .where(eq(barbers.id, b.id))

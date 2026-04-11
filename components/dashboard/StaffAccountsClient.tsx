@@ -26,6 +26,9 @@ export function StaffAccountsClient() {
   const [saving, setSaving] = useState(false)
   const [tempPassword, setTempPassword] = useState<string | null>(null)
   const [resetFor, setResetFor] = useState<StaffRow | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteName, setInviteName] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,6 +88,57 @@ export function StaffAccountsClient() {
     }
   }
 
+  const sendAdminInvite = async () => {
+    const fn = inviteName.trim()
+    const em = inviteEmail.trim().toLowerCase()
+    if (!fn || !em) {
+      toast.error('Name and email are required')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/staff', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: fn, email: em }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Invite failed')
+      toast.success(json.message ?? 'Invitation sent')
+      setInviteOpen(false)
+      setInviteName('')
+      setInviteEmail('')
+      void load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Invite failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const setStaffActive = async (r: StaffRow, next: boolean) => {
+    const verb = next ? 'reactivate' : 'deactivate'
+    if (!window.confirm(`${next ? 'Reactivate' : 'Deactivate'} ${r.displayName}?`)) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/admin/staff/${r.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: next }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Update failed')
+      toast.success(next ? 'Account reactivated' : 'Account deactivated')
+      void load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const doReset = async () => {
     if (!resetFor) return
     setSaving(true)
@@ -112,9 +166,27 @@ export function StaffAccountsClient() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-headz-gray max-w-2xl">
-        Edit names, emails, and phone numbers for every admin and barber account. Use <strong>Reset password</strong> to
-        set a one-time password — they sign in with it once, then choose their own password.
+        Add admins by email invite, edit login details, deactivate accounts, or reset passwords. Barber roster cards
+        and public photos are managed under{' '}
+        <a href="/dashboard/settings/barbers" className="font-medium text-headz-red hover:underline">
+          Barber management
+        </a>
+        .
       </p>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setInviteOpen(true)
+            setInviteName('')
+            setInviteEmail('')
+          }}
+          className="inline-flex items-center rounded-lg bg-headz-red px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-headz-redDark"
+        >
+          Invite admin
+        </button>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
         <table className="w-full text-sm text-left">
@@ -125,7 +197,7 @@ export function StaffAccountsClient() {
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">Role</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium w-40" />
+              <th className="px-4 py-3 font-medium min-w-[10rem]" />
             </tr>
           </thead>
           <tbody className="divide-y divide-black/[0.06]">
@@ -144,7 +216,7 @@ export function StaffAccountsClient() {
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
                     <button
                       type="button"
                       onClick={() => openEdit(r)}
@@ -152,6 +224,25 @@ export function StaffAccountsClient() {
                     >
                       Edit
                     </button>
+                    {r.isActive ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void setStaffActive(r, false)}
+                        className="text-headz-gray font-medium hover:underline disabled:opacity-50"
+                      >
+                        Deactivate
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void setStaffActive(r, true)}
+                        className="text-headz-red font-medium hover:underline disabled:opacity-50"
+                      >
+                        Reactivate
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -215,6 +306,55 @@ export function StaffAccountsClient() {
                 className="px-4 py-2 rounded-lg bg-headz-red text-white text-sm font-medium disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-black/10 bg-white p-6 shadow-xl" role="dialog">
+            <h2 className="text-lg font-semibold text-headz-black">Invite admin</h2>
+            <p className="mt-1 text-sm text-headz-gray">
+              Sends a Supabase email so they can set a password. They receive admin access after accepting.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-headz-black">Full name</label>
+                <input
+                  className="w-full rounded-lg border border-black/15 px-3 py-2"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-headz-black">Email</label>
+                <input
+                  type="email"
+                  className="w-full rounded-lg border border-black/15 px-3 py-2"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setInviteOpen(false)}
+                className="rounded-lg border border-black/15 px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void sendAdminInvite()}
+                className="rounded-lg bg-headz-red px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {saving ? 'Sending…' : 'Send invite'}
               </button>
             </div>
           </div>

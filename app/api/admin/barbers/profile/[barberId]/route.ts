@@ -11,6 +11,7 @@ const patchSchema = z
     name: z.string().min(1).max(200).optional(),
     email: z.string().email().optional(),
     phone: z.string().max(40).optional().nullable(),
+    showOnHomepage: z.boolean().optional(),
   })
   .refine((o) => Object.keys(o).length > 0, { message: 'At least one field required' })
 
@@ -71,6 +72,7 @@ export async function PATCH(
       ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
       ...(patch.email !== undefined ? { email: patch.email.trim().toLowerCase() } : {}),
       ...(patch.phone !== undefined ? { phone: patch.phone?.trim() || null } : {}),
+      ...(patch.showOnHomepage !== undefined ? { showOnHomepage: patch.showOnHomepage } : {}),
       updatedAt: now,
     })
     .where(eq(barbers.id, barberId))

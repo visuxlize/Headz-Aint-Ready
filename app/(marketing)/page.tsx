@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { db } from '@/lib/db'
-import { barbersForMarketingCondition } from '@/lib/barbers/public-queries'
+import { barbersForPublicMarketingCondition } from '@/lib/barbers/public-queries'
 import {
   getPublishedFallbackPrices,
   getPublishedFallbackTeam,
@@ -70,7 +70,7 @@ export default async function HomePage() {
     .select({ barber: barbers })
     .from(barbers)
     .leftJoin(users, eq(barbers.userId, users.id))
-    .where(barbersForMarketingCondition)
+    .where(barbersForPublicMarketingCondition)
     .orderBy(asc(barbers.sortOrder))
     .then((rows) => rows.map((r) => r.barber))
 

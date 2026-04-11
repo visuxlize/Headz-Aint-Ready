@@ -48,6 +48,8 @@ export async function GET() {
       phone: linked ? u.phone : (b.phone ?? ''),
       avatarUrl: b.avatarUrl,
       isActive: linked ? u.isActive : b.isActive,
+      showOnHomepage: b.showOnHomepage,
+      sortOrder: b.sortOrder,
       createdAt: linked ? u.createdAt : b.createdAt,
       slug: b.slug,
     }

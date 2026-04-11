@@ -1,6 +1,6 @@
 import { BookingPageClient } from '@/components/booking/BookingPageClient'
 import type { BookingBarber, BookingService } from '@/components/booking/NativeBookingFlow'
-import { bookableBarbersCondition } from '@/lib/barbers/public-queries'
+import { barbersForPublicBookingCondition } from '@/lib/barbers/public-queries'
 import { db } from '@/lib/db'
 import { barbers, services, users } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
@@ -17,7 +17,7 @@ export default async function BookPage() {
       .select({ barber: barbers })
       .from(barbers)
       .innerJoin(users, eq(barbers.userId, users.id))
-      .where(bookableBarbersCondition)
+      .where(barbersForPublicBookingCondition)
       .orderBy(asc(barbers.sortOrder))
       .then((rows): BookingBarber[] =>
         rows.map((r) => ({

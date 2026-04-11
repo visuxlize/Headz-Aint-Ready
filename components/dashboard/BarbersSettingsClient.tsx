@@ -13,6 +13,8 @@ type BarberRow = {
   phone?: string | null
   avatarUrl?: string | null
   isActive: boolean
+  showOnHomepage: boolean
+  sortOrder: number
   createdAt: string
 }
 
@@ -23,7 +25,7 @@ type BlockingAppt = {
   customerName: string
 }
 
-type ModalMode = 'invite' | 'roster' | null
+type ModalMode = 'invite' | 'roster' | 'edit' | null
 
 function formatJoin(iso: string) {
   try {
@@ -57,6 +59,12 @@ export function BarbersSettingsClient() {
   const [saving, setSaving] = useState(false)
   const [blocking, setBlocking] = useState<BlockingAppt[] | null>(null)
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null)
+  const [editRow, setEditRow] = useState<BarberRow | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editAvatarUrl, setEditAvatarUrl] = useState('')
+  const [editShowOnHomepage, setEditShowOnHomepage] = useState(true)
+  const [editSortOrder, setEditSortOrder] = useState('0')
+  const [visibilitySavingId, setVisibilitySavingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -64,7 +72,14 @@ export function BarbersSettingsClient() {
       const res = await fetch('/api/admin/barbers', { credentials: 'include' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || 'Failed to load')
-      setRows(json.data ?? [])
+      const raw = (json.data ?? []) as BarberRow[]
+      setRows(
+        raw.map((b) => ({
+          ...b,
+          showOnHomepage: b.showOnHomepage ?? true,
+          sortOrder: typeof b.sortOrder === 'number' ? b.sortOrder : 0,
+        }))
+      )
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to load barbers')
       setRows([])
@@ -79,9 +94,74 @@ export function BarbersSettingsClient() {
 
   const resetModal = () => {
     setModalMode(null)
+    setEditRow(null)
     setName('')
     setEmail('')
     setAvatarUrl('')
+  }
+
+  const openEditProfile = (row: BarberRow) => {
+    setEditRow(row)
+    setEditName(row.displayName)
+    setEditAvatarUrl(row.avatarUrl ?? '')
+    setEditShowOnHomepage(row.showOnHomepage)
+    setEditSortOrder(String(row.sortOrder ?? 0))
+    setModalMode('edit')
+  }
+
+  const saveProfileEdit = async () => {
+    if (!editRow) return
+    const n = editName.trim()
+    const so = Number.parseInt(editSortOrder, 10)
+    if (!n || Number.isNaN(so) || so < 0) {
+      toast.error('Enter a valid name and a sort order (0 or higher).')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/admin/barbers/record/${editRow.barberProfileId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: n,
+          avatarUrl: editAvatarUrl.trim() || '',
+          showOnHomepage: editShowOnHomepage,
+          sortOrder: so,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Save failed')
+      toast.success('Profile updated')
+      resetModal()
+      void load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const setShowOnWebsite = async (row: BarberRow, next: boolean) => {
+    setVisibilitySavingId(row.barberProfileId)
+    try {
+      const res = await fetch(`/api/admin/barbers/record/${row.barberProfileId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showOnHomepage: next }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Update failed')
+      setRows((prev) =>
+        prev.map((x) => (x.barberProfileId === row.barberProfileId ? { ...x, showOnHomepage: next } : x))
+      )
+      toast.success(next ? 'Shown on public site' : 'Hidden from homepage & booking picker')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setVisibilitySavingId(null)
+    }
   }
 
   const sendInvite = async () => {
@@ -256,12 +336,13 @@ export function BarbersSettingsClient() {
         <div>
           <h1 className="text-2xl font-bold text-headz-black">Barber management</h1>
           <p className="text-sm text-headz-gray mt-1 max-w-xl">
-            Roster shows everyone on the floor (photos + names). To edit login emails, phones, names, or reset a
-            barber&apos;s password, use{' '}
+            Add, remove, and edit barber profiles here. <strong>Show on website</strong> controls the public homepage
+            team grid and the barber list on <strong>/book</strong> (hide test or internal accounts). Login email and
+            password tools live under{' '}
             <a href="/dashboard/settings/staff" className="font-medium text-headz-red hover:underline">
               Staff accounts
             </a>
-            . Add roster rows before signup, or send an email invite so they can set a password.
+            .
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -376,6 +457,15 @@ export function BarbersSettingsClient() {
                     >
                       {b.isActive ? 'Active' : 'Inactive'}
                     </span>
+                    <span
+                      className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        b.showOnHomepage
+                          ? 'border border-sky-200 bg-sky-50 text-sky-900'
+                          : 'border border-black/10 bg-black/[0.04] text-headz-gray'
+                      }`}
+                    >
+                      {b.showOnHomepage ? 'On website' : 'Hidden on site'}
+                    </span>
                   </div>
                   <p className="text-sm text-headz-gray break-words" title={b.email || undefined}>
                     {b.email || '—'}
@@ -390,40 +480,59 @@ export function BarbersSettingsClient() {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-black/[0.06] pt-4">
-                {b.isActive ? (
+              <div className="mt-4 space-y-3 border-t border-black/[0.06] pt-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-headz-black">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-black/20 text-headz-red focus:ring-headz-red"
+                    checked={b.showOnHomepage}
+                    disabled={visibilitySavingId === b.barberProfileId}
+                    onChange={(e) => void setShowOnWebsite(b, e.target.checked)}
+                  />
+                  <span>Show on public website (home + book)</span>
+                </label>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button
                     type="button"
-                    disabled={pendingToggleId === b.barberProfileId}
-                    onClick={() => void setActiveState(b, false)}
-                    className="rounded-md px-1 py-0.5 text-sm font-medium text-headz-gray underline-offset-2 hover:text-headz-black hover:underline disabled:opacity-50"
+                    onClick={() => openEditProfile(b)}
+                    className="rounded-md px-1 py-0.5 text-sm font-medium text-headz-red underline-offset-2 hover:underline"
                   >
-                    {pendingToggleId === b.barberProfileId ? '…' : 'Deactivate'}
+                    Edit profile
                   </button>
-                ) : (
+                  {b.isActive ? (
+                    <button
+                      type="button"
+                      disabled={pendingToggleId === b.barberProfileId}
+                      onClick={() => void setActiveState(b, false)}
+                      className="rounded-md px-1 py-0.5 text-sm font-medium text-headz-gray underline-offset-2 hover:text-headz-black hover:underline disabled:opacity-50"
+                    >
+                      {pendingToggleId === b.barberProfileId ? '…' : 'Deactivate'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={pendingToggleId === b.barberProfileId}
+                      onClick={() => void setActiveState(b, true)}
+                      className="rounded-md px-1 py-0.5 text-sm font-medium text-headz-red underline-offset-2 hover:underline disabled:opacity-50"
+                    >
+                      {pendingToggleId === b.barberProfileId ? '…' : 'Reactivate'}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    disabled={pendingToggleId === b.barberProfileId}
-                    onClick={() => void setActiveState(b, true)}
-                    className="rounded-md px-1 py-0.5 text-sm font-medium text-headz-red underline-offset-2 hover:underline disabled:opacity-50"
+                    onClick={() => void removeBarber(b)}
+                    className="rounded-md px-1 py-0.5 text-sm font-medium text-red-700 underline-offset-2 hover:underline"
                   >
-                    {pendingToggleId === b.barberProfileId ? '…' : 'Reactivate'}
+                    Remove
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void removeBarber(b)}
-                  className="rounded-md px-1 py-0.5 text-sm font-medium text-red-700 underline-offset-2 hover:underline"
-                >
-                  Remove
-                </button>
+                </div>
               </div>
             </article>
           ))}
         </div>
       )}
 
-      {modalMode && (
+      {modalMode && modalMode !== 'edit' && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
           <div
             className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-black/10"
@@ -486,6 +595,77 @@ export function BarbersSettingsClient() {
                 className="px-4 py-2 rounded-lg bg-headz-red text-white text-sm font-medium disabled:opacity-50"
               >
                 {saving ? 'Saving…' : modalMode === 'invite' ? 'Send invite' : 'Add to roster'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalMode === 'edit' && editRow && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
+          <div
+            className="w-full max-w-md rounded-2xl border border-black/10 bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal
+            aria-labelledby="barber-edit-title"
+          >
+            <h2 id="barber-edit-title" className="text-lg font-semibold text-headz-black">
+              Edit barber profile
+            </h2>
+            <p className="mt-1 text-sm text-headz-gray">
+              Public name, photo, sort order, and website visibility. Linked accounts also update the staff display name.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-headz-black">Display name</label>
+                <input
+                  className="w-full rounded-lg border border-black/15 px-3 py-2"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-headz-black">Photo URL (optional)</label>
+                <input
+                  className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
+                  value={editAvatarUrl}
+                  onChange={(e) => setEditAvatarUrl(e.target.value)}
+                  placeholder="https://…"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-headz-black">Sort order</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full rounded-lg border border-black/15 px-3 py-2"
+                  value={editSortOrder}
+                  onChange={(e) => setEditSortOrder(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-headz-gray">Lower numbers appear first on the team grid.</p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-headz-black">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-black/20 text-headz-red focus:ring-headz-red"
+                  checked={editShowOnHomepage}
+                  onChange={(e) => setEditShowOnHomepage(e.target.checked)}
+                />
+                <span>Show on public website</span>
+              </label>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={resetModal} className="rounded-lg border border-black/15 px-4 py-2 text-sm">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveProfileEdit()}
+                className="rounded-lg bg-headz-red px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
