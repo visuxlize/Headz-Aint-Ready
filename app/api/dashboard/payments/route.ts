@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm'
-import type { SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { isMissingPosSourceColumnError } from '@/lib/db/pos-source-column-error'
-import { posTransactions, users } from '@/lib/db/schema'
+import { posTransactions, users, type PosLineItem } from '@/lib/db/schema'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +16,32 @@ function friendlyPaymentsError(e: unknown): string {
     return 'Payment history is temporarily unavailable. Try again later or ask your shop admin for help.'
   }
   return 'Could not load payment history. Please refresh the page or try again in a moment.'
+}
+
+/** Production DBs may not have run the `source` migration yet. */
+function isMissingPosSourceColumnError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return /source.*does not exist|column.*source/i.test(msg)
+}
+
+/** Row shape returned to the payments UI (stable typing for primary + fallback selects). */
+type PaymentListRow = {
+  id: string
+  customerName: string
+  barberId: string
+  barberName: string | null
+  items: PosLineItem[] | null
+  subtotal: string
+  tipAmount: string
+  total: string
+  paymentMethod: string
+  paymentStatus: string
+  squarePaymentId: string | null
+  cardBrand: string | null
+  cardLastFour: string | null
+  refundedAt: Date | null
+  createdAt: Date
+  source: string
 }
 
 async function sumPaidSince(method: 'card' | 'cash', since: Date) {
@@ -49,7 +73,7 @@ export async function GET(request: Request) {
   const q = searchParams.get('q')?.trim()
   const sourceFilter = searchParams.get('source')
 
-  const conditions: SQL[] = []
+  const conditions = []
   if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) {
     conditions.push(gte(posTransactions.createdAt, new Date(`${from}T00:00:00`)))
   }
@@ -66,9 +90,15 @@ export async function GET(request: Request) {
     conditions.push(ilike(posTransactions.customerName, `%${q}%`))
   }
 
-  const wantManualOnly = sourceFilter === 'manual'
+  const whereBase = conditions.length > 0 ? and(...conditions) : undefined
+  const whereWithManualSource =
+    sourceFilter === 'manual' && whereBase
+      ? and(whereBase, eq(posTransactions.source, 'manual'))
+      : sourceFilter === 'manual'
+        ? eq(posTransactions.source, 'manual')
+        : whereBase
 
-  const paymentSelectBase = {
+  const selectBase = {
     id: posTransactions.id,
     customerName: posTransactions.customerName,
     barberId: posTransactions.barberId,
@@ -84,64 +114,37 @@ export async function GET(request: Request) {
     cardLastFour: posTransactions.cardLastFour,
     refundedAt: posTransactions.refundedAt,
     createdAt: posTransactions.createdAt,
-  } as const
-
-  const whereWithSourceColumn = () => {
-    const c = [...conditions]
-    if (wantManualOnly) c.push(eq(posTransactions.source, 'manual'))
-    return c.length > 0 ? and(...c) : undefined
-  }
-
-  /** Without `source` column we cannot filter manual rows — return none for that tab. */
-  const whereWithoutSourceColumn = () => {
-    const c = [...conditions]
-    if (wantManualOnly) c.push(sql`false`)
-    if (c.length === 0) return undefined
-    return and(...c)
-  }
-
-  type PaymentsListRow = {
-    id: string
-    customerName: string
-    barberId: string
-    barberName: string | null
-    items: unknown
-    subtotal: string
-    tipAmount: string
-    total: string
-    paymentMethod: string
-    paymentStatus: string
-    squarePaymentId: string | null
-    cardBrand: string | null
-    cardLastFour: string | null
-    refundedAt: Date | null
-    createdAt: Date
-    source: string
   }
 
   try {
-    let rows: PaymentsListRow[]
+    let rows: PaymentListRow[]
+
     try {
-      rows = (await db
+      const raw = await db
         .select({
-          ...paymentSelectBase,
+          ...selectBase,
           source: posTransactions.source,
         })
         .from(posTransactions)
         .leftJoin(users, eq(posTransactions.barberId, users.id))
-        .where(whereWithSourceColumn())
+        .where(whereWithManualSource)
         .orderBy(desc(posTransactions.createdAt))
-        .limit(500)) as PaymentsListRow[]
+        .limit(500)
+      rows = raw.map((r) => ({
+        ...r,
+        source: r.source ?? 'manual',
+      }))
     } catch (e) {
       if (!isMissingPosSourceColumnError(e)) throw e
       const raw = await db
-        .select({ ...paymentSelectBase })
+        .select(selectBase)
         .from(posTransactions)
         .leftJoin(users, eq(posTransactions.barberId, users.id))
-        .where(whereWithoutSourceColumn())
+        .where(whereBase)
         .orderBy(desc(posTransactions.createdAt))
         .limit(500)
-      rows = raw.map((r) => ({ ...r, source: 'unknown' })) as PaymentsListRow[]
+      /* No `source` column yet — cannot filter manual vs POS; list matches “All” until migration. */
+      rows = raw.map((r) => ({ ...r, source: 'manual' }))
     }
 
     const now = new Date()
