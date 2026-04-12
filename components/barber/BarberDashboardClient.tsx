@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { SQUIRE } from '@/lib/squire-config'
 
 type ApptRow = {
   id: string
@@ -77,7 +78,7 @@ export function BarberDashboardClient({
               No mirrored appointments for today in this system. Your live schedule is in Squire.
             </p>
             <a
-              href="https://app.getsquire.com"
+              href={SQUIRE.adminAppUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-headz-red px-5 py-2.5 text-sm font-bold text-white hover:bg-headz-redDark"
@@ -104,7 +105,7 @@ export function BarberDashboardClient({
         <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray mb-3">Quick actions</p>
         <div className="flex flex-wrap gap-3">
           <a
-            href="https://app.getsquire.com"
+            href={SQUIRE.adminAppUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-xl bg-headz-red px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-headz-redDark"

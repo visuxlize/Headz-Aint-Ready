@@ -9,7 +9,7 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 })
 
-/** ESLint flat config — required so `next build` / Netlify CI never hit interactive `next lint` setup. */
+/** ESLint flat config — required so `next build` / CI never hit interactive `next lint` setup. */
 const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq, gte, ilike, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { posTransactions, users, type PosLineItem } from '@/lib/db/schema'
+import { barbers, posTransactions, users, type PosLineItem } from '@/lib/db/schema'
 import { requireAdminApi } from '@/lib/admin/require-admin'
+import { isMissingPosSourceColumnError } from '@/lib/db/postgres-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,17 +19,11 @@ function friendlyPaymentsError(e: unknown): string {
   return 'Could not load payment history. Please refresh the page or try again in a moment.'
 }
 
-/** Production DBs may not have run the `source` migration yet. */
-function isMissingPosSourceColumnError(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e)
-  return /source.*does not exist|column.*source/i.test(msg)
-}
-
 /** Row shape returned to the payments UI (stable typing for primary + fallback selects). */
 type PaymentListRow = {
   id: string
   customerName: string
-  barberId: string
+  barberId: string | null
   barberName: string | null
   items: PosLineItem[] | null
   subtotal: string
@@ -84,7 +79,9 @@ export async function GET(request: Request) {
     conditions.push(eq(posTransactions.paymentMethod, method))
   }
   if (barberId && /^[0-9a-f-]{36}$/i.test(barberId)) {
-    conditions.push(eq(posTransactions.barberId, barberId))
+    conditions.push(
+      or(eq(posTransactions.barberId, barberId), eq(posTransactions.barberProfileId, barberId))!
+    )
   }
   if (q) {
     conditions.push(ilike(posTransactions.customerName, `%${q}%`))
@@ -102,7 +99,7 @@ export async function GET(request: Request) {
     id: posTransactions.id,
     customerName: posTransactions.customerName,
     barberId: posTransactions.barberId,
-    barberName: sql<string | null>`coalesce(${users.fullName}, 'Staff')`,
+    barberName: sql<string | null>`coalesce(${users.fullName}, ${barbers.name}, 'Staff')`,
     items: posTransactions.items,
     subtotal: posTransactions.subtotal,
     tipAmount: posTransactions.tipAmount,
@@ -127,6 +124,7 @@ export async function GET(request: Request) {
         })
         .from(posTransactions)
         .leftJoin(users, eq(posTransactions.barberId, users.id))
+        .leftJoin(barbers, eq(posTransactions.barberProfileId, barbers.id))
         .where(whereWithManualSource)
         .orderBy(desc(posTransactions.createdAt))
         .limit(500)
@@ -140,6 +138,7 @@ export async function GET(request: Request) {
         .select(selectBase)
         .from(posTransactions)
         .leftJoin(users, eq(posTransactions.barberId, users.id))
+        .leftJoin(barbers, eq(posTransactions.barberProfileId, barbers.id))
         .where(whereBase)
         .orderBy(desc(posTransactions.createdAt))
         .limit(500)

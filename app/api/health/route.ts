@@ -3,8 +3,8 @@ import { db } from '@/lib/db'
 import { services } from '@/lib/db/schema'
 
 /**
- * GET /api/health – Backend diagnostic for Netlify.
- * Open https://your-site.netlify.app/api/health to verify DATABASE_URL and DB connection.
+ * GET /api/health – Backend diagnostic (e.g. after Vercel deploy).
+ * Open https://your-site.vercel.app/api/health to verify DATABASE_URL and DB connection.
  * No secrets are returned.
  */
 export async function GET() {

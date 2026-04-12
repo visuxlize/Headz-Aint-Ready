@@ -14,46 +14,38 @@ export type MarketingBarberCard = {
   avatarUrl: string | null
 }
 
+/** Matches `lib/marketing/homepage-team.ts` — legacy WP assets when DB is unavailable. */
 const FALLBACK_TEAM: MarketingBarberCard[] = [
   {
-    id: 'fallback-barber-louie-live',
+    id: 'fallback-homepage-louie-live',
     name: 'Louie Live',
     avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/LOUIELIVE.jpg',
   },
+  { id: 'fallback-homepage-king-rome', name: 'King Rome', avatarUrl: null },
   {
-    id: 'fallback-barber-johan',
-    name: 'Johan',
-    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2025/04/JOHAN.jpg',
-  },
-  {
-    id: 'fallback-barber-king-rome',
-    name: 'King Rome',
-    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ROME-1.jpg',
-  },
-  {
-    id: 'fallback-barber-jesus',
+    id: 'fallback-homepage-jesus',
     name: 'Jesus',
     avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/JESUS.jpg',
   },
   {
-    id: 'fallback-barber-angel',
-    name: 'Angel',
-    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg',
-  },
-  {
-    id: 'fallback-barber-victor',
-    name: 'Victor',
-    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/VICTOR.jpg',
-  },
-  {
-    id: 'fallback-barber-liseth',
+    id: 'fallback-homepage-liseth',
     name: 'Liseth',
     avatarUrl: 'https://headzaintready.com/wp-content/uploads/2025/04/Liseth.jpg',
   },
   {
-    id: 'fallback-barber-carlos',
+    id: 'fallback-homepage-carlos',
     name: 'Carlos',
     avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/CARLOS.jpg',
+  },
+  {
+    id: 'fallback-homepage-angel',
+    name: 'Angel',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg',
+  },
+  {
+    id: 'fallback-homepage-victor',
+    name: 'Victor',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/VICTOR.jpg',
   },
 ]
 

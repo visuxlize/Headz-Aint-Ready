@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { isSquireConfigured } from '@/lib/squire/config'
+import { SQUIRE } from '@/lib/squire-config'
 import { SquirePOSStatus } from '@/components/pos/SquirePOSStatus'
 
 const PLACEHOLDER_TXNS = [
@@ -55,7 +56,7 @@ export default function AdminSquirePosPage() {
               : 'Add SQUIRE_API_KEY (and related vars) in your host environment, then redeploy.'}
           </p>
           <a
-            href="https://app.getsquire.com"
+            href={SQUIRE.adminAppUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-headz-red px-5 py-3 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-headz-redDark"
@@ -63,17 +64,22 @@ export default function AdminSquirePosPage() {
             Launch Terminal
             <ExternalLink className="h-4 w-4" aria-hidden />
           </a>
-          <p className="mt-4 text-xs text-white/45">Opens app.getsquire.com in a new tab.</p>
+          <p className="mt-4 text-xs text-white/45">Opens Squire in a new tab.</p>
         </div>
 
         <div className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-widest text-headz-red">Setup</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-headz-gray">
             <li>
-              <Link href="/dashboard/settings/devices" className="font-medium text-headz-red hover:underline">
-                Squire Terminal settings
-              </Link>{' '}
-              — environment variables and dashboard links.
+              <a
+                href={SQUIRE.adminAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-headz-red hover:underline"
+              >
+                Squire admin
+              </a>{' '}
+              — terminal and shop settings in Getsquire.
             </li>
             <li>
               Webhook URL:{' '}

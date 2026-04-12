@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       .values({
         customerName: d.customerName,
         barberId: d.barberId,
+        barberProfileId: null,
         appointmentId: d.appointmentId ?? null,
         serviceId: firstServiceId ?? null,
         items: d.items,

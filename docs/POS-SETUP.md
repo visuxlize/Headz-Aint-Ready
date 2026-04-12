@@ -15,7 +15,7 @@ npm run db:push
 
 ## Environment variables
 
-Add to `.env.local` and your host (e.g. Netlify). See root **`.env.example`** for a template.
+Add to `.env.local` and your host (e.g. Vercel). See **`.env.local.example`** for a template.
 
 | Variable | Purpose |
 |----------|---------|

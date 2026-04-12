@@ -51,6 +51,9 @@ export async function POST(request: Request) {
   if (!txn) {
     return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
   }
+  if (!txn.barberId) {
+    return NextResponse.json({ error: 'Transaction has no staff barber scope' }, { status: 400 })
+  }
   const scoped = requireBarberUserId(auth, txn.barberId)
   if (scoped) return scoped
   if (txn.paymentStatus !== 'pending') {

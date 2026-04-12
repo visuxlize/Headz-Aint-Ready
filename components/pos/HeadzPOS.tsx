@@ -4,6 +4,7 @@ import { DM_Mono, DM_Sans, Playfair_Display } from 'next/font/google'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { SQUIRE } from '@/lib/squire-config'
 
 const playfair = Playfair_Display({ subsets: ['latin'], weight: ['400', '700'] })
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600'] })
@@ -142,7 +143,6 @@ function ChargeModal({
   appointmentId,
   flatItems,
   squireConnected,
-  squireHelpPath,
   onClose,
   onDone,
   onNewSale,
@@ -156,11 +156,13 @@ function ChargeModal({
   appointmentId?: string
   flatItems: PosLine[]
   squireConnected: boolean
-  squireHelpPath: string
   onClose: () => void
   onDone: () => void
   onNewSale: () => void
 }) {
+  const openSquireAdmin = useCallback(() => {
+    window.open(SQUIRE.adminAppUrl, '_blank', 'noopener,noreferrer')
+  }, [])
   const [method, setMethod] = useState<'card' | 'cash' | null>(null)
   const [cashEntered, setCashEntered] = useState('0')
   const [step, setStep] = useState<'select' | 'terminal_waiting' | 'done'>('select')
@@ -456,16 +458,14 @@ function ChargeModal({
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <button
                           type="button"
-                          onClick={() => window.open('https://app.getsquire.com', '_blank', 'noopener,noreferrer')}
+                          onClick={openSquireAdmin}
                           className={`rounded-lg bg-headz-red px-4 py-2 text-xs font-bold uppercase text-white ${dmMono.className}`}
                         >
                           Open Squire
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            window.location.href = squireHelpPath
-                          }}
+                          onClick={openSquireAdmin}
                           className={`rounded-lg border border-amber-800/60 px-4 py-2 text-xs font-bold uppercase text-amber-100 ${dmMono.className}`}
                         >
                           Devices / setup
@@ -669,9 +669,8 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
   const router = useRouter()
   const pathname = usePathname()
   const dashboardHome = pathname?.includes('/dashboard/barber') ? '/dashboard/barber' : '/dashboard'
-  const squireHelpPath = pathname?.includes('/dashboard/barber')
-    ? '/dashboard/settings/devices'
-    : '/dashboard/settings/devices'
+
+  const openSquireAdmin = () => window.open(SQUIRE.adminAppUrl, '_blank', 'noopener,noreferrer')
 
   const goDashboard = () => {
     if (onBack) onBack()
@@ -871,7 +870,7 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
             </button>
             <button
               type="button"
-              onClick={() => router.push(squireHelpPath)}
+              onClick={openSquireAdmin}
               className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${
                 squireConnected
                   ? 'border-emerald-800 bg-emerald-950/40 text-emerald-400'
@@ -1230,7 +1229,6 @@ export function HeadzPOS({ onBack }: { onBack?: () => void }) {
           appointmentId={selectedAppt?.id}
           flatItems={flatItems}
           squireConnected={squireConnected}
-          squireHelpPath={squireHelpPath}
           onClose={() => setShowCharge(false)}
           onDone={() => void finishSaleSuccess()}
           onNewSale={() => clearCart()}

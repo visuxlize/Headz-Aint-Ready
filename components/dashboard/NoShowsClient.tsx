@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 
 type Row = {
   id: string
@@ -41,10 +42,13 @@ export function NoShowsClient() {
     try {
       const res = await fetch('/api/admin/no-shows', { credentials: 'include' })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed to load')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       setRows(json.data ?? [])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load')
+      toastUnexpected(e)
       setRows([])
     } finally {
       setLoading(false)
@@ -63,7 +67,10 @@ export function NoShowsClient() {
         credentials: 'include',
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Fee waived')
       setRows((r) =>
         r.map((x) =>
@@ -73,7 +80,7 @@ export function NoShowsClient() {
         )
       )
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed')
+      toastUnexpected(e)
     } finally {
       setWaiving(null)
     }

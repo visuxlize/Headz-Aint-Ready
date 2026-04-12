@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
+import { SQUIRE } from '@/lib/squire-config'
 
 const LOGO_URL = 'https://seller-brand-assets-f.squarecdn.com/ML84BFGQFNRZQ/55115cf1910f30cc84857ca133d806e5.png?height=250'
 const HEADER_HEIGHT = 80
@@ -72,34 +72,45 @@ export function Header() {
     <header className={`sticky top-0 z-50 ${headerBg} transition-[background-color,border-color] duration-200`}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex justify-between items-center h-16">
         <Link href="/" className={`flex items-center gap-2 shrink-0 ${textClass}`} aria-label="Headz Ain't Ready home">
-          <Image
-            src={LOGO_URL}
-            alt=""
-            width={140}
-            height={48}
-            className="h-10 w-auto object-contain"
-          />
+          {/* eslint-disable-next-line @next/next/no-img-element -- avoid Image optimizer timeouts on Square CDN */}
+          <img src={LOGO_URL} alt="" className="h-10 w-auto max-w-[140px] object-contain" />
         </Link>
         <nav className="hidden md:flex items-center gap-8">
-          {nav.map(({ href, label }) => (
-            <Link key={href} href={href} className={linkClass}>
-              {label}
-            </Link>
-          ))}
-          <Link
-            href="/book"
+          {nav.map(({ href, label }) =>
+            label === 'Book' ? (
+              <a
+                key={href}
+                href={SQUIRE.bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={linkClass}
+              >
+                {label}
+              </a>
+            ) : (
+              <Link key={href} href={href} className={linkClass}>
+                {label}
+              </Link>
+            )
+          )}
+          <a
+            href={SQUIRE.bookingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="bg-headz-red hover:bg-headz-redDark font-headz-display text-sm tracking-wide text-white px-4 py-2 rounded transition"
           >
             Book Now
-          </Link>
+          </a>
         </nav>
         <div className="md:hidden flex items-center gap-4">
-          <Link
-            href="/book"
+          <a
+            href={SQUIRE.bookingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="bg-headz-red font-headz-display text-sm tracking-wide text-white px-3 py-1.5 rounded"
           >
             Book
-          </Link>
+          </a>
         </div>
       </div>
     </header>

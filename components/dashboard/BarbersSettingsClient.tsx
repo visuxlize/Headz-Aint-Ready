@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 import Link from 'next/link'
+import { Copy } from 'lucide-react'
 
 type BarberRow = {
   kind: 'linked' | 'placeholder'
@@ -65,13 +67,18 @@ export function BarbersSettingsClient() {
   const [editShowOnHomepage, setEditShowOnHomepage] = useState(true)
   const [editSortOrder, setEditSortOrder] = useState('0')
   const [visibilitySavingId, setVisibilitySavingId] = useState<string | null>(null)
+  const [inviteTempPassword, setInviteTempPassword] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/admin/barbers', { credentials: 'include' })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed to load')
+      if (!res.ok) {
+        toastApiError(res)
+        setRows([])
+        return
+      }
       const raw = (json.data ?? []) as BarberRow[]
       setRows(
         raw.map((b) => ({
@@ -81,7 +88,7 @@ export function BarbersSettingsClient() {
         }))
       )
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load barbers')
+      toastUnexpected(e)
       setRows([])
     } finally {
       setLoading(false)
@@ -98,6 +105,7 @@ export function BarbersSettingsClient() {
     setName('')
     setEmail('')
     setAvatarUrl('')
+    setInviteTempPassword(null)
   }
 
   const openEditProfile = (row: BarberRow) => {
@@ -131,12 +139,15 @@ export function BarbersSettingsClient() {
         }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Save failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Profile updated')
       resetModal()
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -152,13 +163,16 @@ export function BarbersSettingsClient() {
         body: JSON.stringify({ showOnHomepage: next }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Update failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       setRows((prev) =>
         prev.map((x) => (x.barberProfileId === row.barberProfileId ? { ...x, showOnHomepage: next } : x))
       )
       toast.success(next ? 'Shown on public site' : 'Hidden from homepage & booking picker')
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed')
+      toastUnexpected(e)
     } finally {
       setVisibilitySavingId(null)
     }
@@ -179,13 +193,26 @@ export function BarbersSettingsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: n, email: em }),
       })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed to invite')
-      toast.success(json.message ?? 'Barber invited')
-      resetModal()
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string
+        temporaryPassword?: string
+        message?: string
+      }
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
+      const pw = json.temporaryPassword
+      if (typeof pw === 'string' && pw.length > 0) {
+        setInviteTempPassword(pw)
+        toast.success(json.message ?? 'Account created')
+      } else {
+        toast.success(json.message ?? 'Account created')
+        resetModal()
+      }
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to invite')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -211,12 +238,15 @@ export function BarbersSettingsClient() {
         }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed to add')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success(json.message ?? 'Added to roster')
       resetModal()
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to add')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -242,11 +272,14 @@ export function BarbersSettingsClient() {
     try {
       const res = await fetch(url, { method: 'DELETE', credentials: 'include' })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Remove failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Barber removed')
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Remove failed')
+      toastUnexpected(e)
     }
   }
 
@@ -266,7 +299,10 @@ export function BarbersSettingsClient() {
           toast.error('Resolve future appointments first')
           return
         }
-        if (!res.ok) throw new Error(json.error || 'Could not deactivate')
+        if (!res.ok) {
+          toastApiError(res)
+          return
+        }
         toast.success('Barber deactivated')
         setRows((r) =>
           r.map((x) =>
@@ -274,7 +310,7 @@ export function BarbersSettingsClient() {
           )
         )
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Could not deactivate')
+        toastUnexpected(e)
       } finally {
         setPendingToggleId(null)
       }
@@ -291,7 +327,10 @@ export function BarbersSettingsClient() {
           body: JSON.stringify({ isActive: false }),
         })
         const json = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(json.error || 'Could not deactivate')
+        if (!res.ok) {
+          toastApiError(res)
+          return
+        }
         toast.success('Removed from active roster')
         setRows((r) =>
           r.map((x) =>
@@ -299,7 +338,7 @@ export function BarbersSettingsClient() {
           )
         )
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Could not deactivate')
+        toastUnexpected(e)
       } finally {
         setPendingToggleId(null)
       }
@@ -319,12 +358,15 @@ export function BarbersSettingsClient() {
         body: JSON.stringify({ isActive: true }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Could not reactivate')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Barber reactivated')
       if (json.data) void load()
     } catch (e) {
       setRows(prev)
-      toast.error(e instanceof Error ? e.message : 'Could not reactivate')
+      toastUnexpected(e)
     } finally {
       setPendingToggleId(null)
     }
@@ -355,10 +397,13 @@ export function BarbersSettingsClient() {
           </button>
           <button
             type="button"
-            onClick={() => setModalMode('invite')}
+            onClick={() => {
+              setInviteTempPassword(null)
+              setModalMode('invite')
+            }}
             className="inline-flex items-center rounded-lg bg-headz-red px-4 py-2.5 text-sm font-medium text-white hover:bg-headz-redDark shadow-sm"
           >
-            Email invite
+            Add barber login
           </button>
         </div>
       </div>
@@ -406,8 +451,9 @@ export function BarbersSettingsClient() {
         <div className="rounded-2xl border border-dashed border-black/15 bg-white p-12 text-center text-headz-gray text-sm space-y-2">
           <p>No barbers on the roster yet.</p>
           <p className="text-xs max-w-md mx-auto">
-            Use <strong>Add to roster</strong> for names and emails before signup, or{' '}
-            <strong>Email invite</strong> for a Supabase invite. Run <code className="bg-black/5 px-1 rounded">npm run seed:all</code> locally to load the Dream Team + demo accounts.
+            Use <strong>Add to roster</strong> for display-only profiles, or <strong>Add barber login</strong> to create
+            their account immediately (temporary password, change on first sign-in). Run{' '}
+            <code className="bg-black/5 px-1 rounded">npm run seed:all</code> locally to load the Dream Team + demo accounts.
           </p>
         </div>
       ) : (
@@ -541,61 +587,85 @@ export function BarbersSettingsClient() {
             aria-labelledby="barber-modal-title"
           >
             <h2 id="barber-modal-title" className="text-lg font-semibold text-headz-black">
-              {modalMode === 'invite' ? 'Email invite (full account)' : 'Add to roster'}
+              {modalMode === 'invite' ? 'Add barber login' : 'Add to roster'}
             </h2>
             <p className="text-sm text-headz-gray mt-1">
               {modalMode === 'invite'
-                ? 'We’ll send a Supabase invite so they can set a password. They’re added to the staff allowlist automatically.'
+                ? 'Creates Supabase auth + staff profile now. Share the temporary password; they must set a new password after signing in.'
                 : 'They’ll appear here immediately. When they sign up with this exact email, their account links to this profile.'}
             </p>
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-headz-black mb-1">Name</label>
-                <input
-                  className="w-full px-3 py-2 border border-black/15 rounded-lg"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="name"
-                />
+            {modalMode === 'invite' && inviteTempPassword ? (
+              <div className="mt-4 rounded-lg border border-headz-red/20 bg-headz-cream p-4">
+                <p className="text-xs font-medium text-headz-black">Temporary password — copy now (shown once)</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 break-all rounded border border-black/10 bg-white px-2 py-2 font-mono text-sm">
+                    {inviteTempPassword}
+                  </code>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-black/15 p-2 hover:bg-black/5"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(inviteTempPassword)
+                      toast.success('Copied')
+                    }}
+                    aria-label="Copy password"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-headz-black mb-1">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-black/15 rounded-lg"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-              </div>
-              {modalMode === 'roster' && (
+            ) : (
+              <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-headz-black mb-1">Photo URL (optional)</label>
+                  <label className="block text-sm font-medium text-headz-black mb-1">Name</label>
                   <input
-                    className="w-full px-3 py-2 border border-black/15 rounded-lg text-sm"
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    placeholder="https://…"
+                    className="w-full px-3 py-2 border border-black/15 rounded-lg"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    autoComplete="name"
                   />
                 </div>
-              )}
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-headz-black mb-1">Email</label>
+                  <input
+                    type="email"
+                    className="w-full px-3 py-2 border border-black/15 rounded-lg"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                </div>
+                {modalMode === 'roster' && (
+                  <div>
+                    <label className="block text-sm font-medium text-headz-black mb-1">Photo URL (optional)</label>
+                    <input
+                      className="w-full px-3 py-2 border border-black/15 rounded-lg text-sm"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder="https://…"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <div className="mt-6 flex gap-3 justify-end">
               <button
                 type="button"
                 onClick={resetModal}
                 className="px-4 py-2 rounded-lg border border-black/15 text-sm"
               >
-                Cancel
+                {modalMode === 'invite' && inviteTempPassword ? 'Done' : 'Cancel'}
               </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void (modalMode === 'invite' ? sendInvite() : addToRoster())}
-                className="px-4 py-2 rounded-lg bg-headz-red text-white text-sm font-medium disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : modalMode === 'invite' ? 'Send invite' : 'Add to roster'}
-              </button>
+              {!(modalMode === 'invite' && inviteTempPassword) && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void (modalMode === 'invite' ? sendInvite() : addToRoster())}
+                  className="px-4 py-2 rounded-lg bg-headz-red text-white text-sm font-medium disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : modalMode === 'invite' ? 'Create account' : 'Add to roster'}
+                </button>
+              )}
             </div>
           </div>
         </div>

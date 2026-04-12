@@ -17,6 +17,7 @@ import { NewAppointmentModal } from '@/components/dashboard/NewAppointmentModal'
 import type { ActiveBarberColumn } from '@/lib/dashboard/active-barbers'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 
 function todayStr() {
   return format(new Date(), 'yyyy-MM-dd')
@@ -114,12 +115,15 @@ export function AdminCalendarTab({
           reason: string
         }>
       }>(res)
-      if (!res.ok) throw new Error(j.error || `Failed (${res.status})`)
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       const appts = j.appointments ?? []
       setAppointments(appts)
       setBlockedRaw(j.blockedTimes ?? [])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load calendar')
+      toastUnexpected(e)
     } finally {
       setLoading(false)
     }

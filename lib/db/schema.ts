@@ -59,6 +59,12 @@ export const barbers = pgTable('barbers', {
   isActive: boolean('is_active').default(true).notNull(),
   /** When false, hidden from marketing homepage and public booking picker (staff/test accounts). */
   showOnHomepage: boolean('show_on_homepage').default(true).notNull(),
+  /**
+   * Tickets admin dropdown/list only — marketing, booking, POS, and `name` / `avatar_url` stay unchanged.
+   * When null, `name` / `avatar_url` are used in the manual ticket picker.
+   */
+  ticketDisplayName: text('ticket_display_name'),
+  ticketDisplayAvatarUrl: text('ticket_display_avatar_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
@@ -164,9 +170,10 @@ export type PosLineItem = { serviceId?: string; name: string; price: string }
 export const posTransactions = pgTable('pos_transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
   customerName: text('customer_name').notNull(),
-  barberId: uuid('barber_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+  /** Staff user — Squire/POS flows; null when ticket is tied to roster-only `barberProfileId`. */
+  barberId: uuid('barber_id').references(() => users.id, { onDelete: 'cascade' }),
+  /** Manual daily tickets — `barbers.id` without a Staff login. */
+  barberProfileId: uuid('barber_profile_id').references(() => barbers.id, { onDelete: 'set null' }),
   appointmentId: uuid('appointment_id').references(() => appointments.id, { onDelete: 'set null' }),
   serviceId: uuid('service_id').references(() => services.id, { onDelete: 'set null' }),
   items: jsonb('items').$type<PosLineItem[] | null>(),

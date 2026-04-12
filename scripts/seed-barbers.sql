@@ -1,19 +1,21 @@
--- Optional: run in Supabase SQL Editor to restore barber rows + avatar URLs (same data as scripts/seed-headz-barbers.mjs).
--- Booking still requires each barber to have user_id → users (invite via admin dashboard).
+-- Optional: run in Supabase SQL Editor — same roster as scripts/seed-headz-barbers.mjs.
+-- Booking/tickets still need barbers.user_id → public.users (invite via Admin → Staff / Barbers).
 
 insert into barbers (name, slug, avatar_url, sort_order, is_active)
 values
-  ('Louie Live', 'louie-live', 'https://headzaintready.com/wp-content/uploads/2023/02/LOUIELIVE.jpg', 0, true),
-  ('Johan', 'johan', 'https://headzaintready.com/wp-content/uploads/2025/04/JOHAN.jpg', 1, true),
-  ('King Rome', 'king-rome', 'https://headzaintready.com/wp-content/uploads/2023/02/ROME-1.jpg', 2, true),
-  ('Jesus', 'jesus', 'https://headzaintready.com/wp-content/uploads/2023/02/JESUS.jpg', 3, true),
-  ('Angel', 'angel', 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg', 4, true),
-  ('Victor', 'victor', 'https://headzaintready.com/wp-content/uploads/2023/02/VICTOR.jpg', 5, true),
-  ('Liseth', 'liseth', 'https://headzaintready.com/wp-content/uploads/2025/04/Liseth.jpg', 6, true),
-  ('Carlos', 'carlos', 'https://headzaintready.com/wp-content/uploads/2023/02/CARLOS.jpg', 7, true)
+  ('Victor Zambrano', 'victor-zambrano', 'https://headzaintready.com/wp-content/uploads/2023/02/VICTOR.jpg', 0, true),
+  ('Matthew Mirabella', 'matthew-mirabella', null, 1, true),
+  ('Luis Benites', 'luis-benites', null, 2, true),
+  ('Liseth Calderon', 'liseth-calderon', 'https://headzaintready.com/wp-content/uploads/2025/04/Liseth.jpg', 3, true),
+  ('Jesus Theodoro', 'jesus-theodoro', 'https://headzaintready.com/wp-content/uploads/2023/02/JESUS.jpg', 4, true),
+  ('Jerome Glenn', 'jerome-glenn', null, 5, true),
+  ('David Fernandez', 'david-fernandez', null, 6, true),
+  ('Carlos Principal', 'carlos-principal', 'https://headzaintready.com/wp-content/uploads/2023/02/CARLOS.jpg', 7, true),
+  ('Angle Miranda', 'angle-miranda', 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg', 8, true),
+  ('Daniel', 'daniel', null, 9, true)
 on conflict (slug) do update set
   name = excluded.name,
-  avatar_url = excluded.avatar_url,
+  avatar_url = coalesce(excluded.avatar_url, barbers.avatar_url),
   sort_order = excluded.sort_order,
   is_active = true,
   updated_at = now();

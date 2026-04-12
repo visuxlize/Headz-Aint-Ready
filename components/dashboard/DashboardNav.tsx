@@ -8,19 +8,19 @@ import {
   Contact,
   DollarSign,
   ReceiptText,
-  Settings,
   TrendingUp,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const items: { href: string; label: string; icon: typeof BarChart2 }[] = [
   { href: '/dashboard', label: 'Overview', icon: BarChart2 },
   { href: '/dashboard/tickets', label: 'Tickets', icon: ReceiptText },
+  { href: '/dashboard/tickets/barbers', label: 'Barbers', icon: Users },
   { href: '/dashboard/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/dashboard/payments', label: 'Payments', icon: DollarSign },
   { href: '/dashboard/reports', label: 'Reports', icon: TrendingUp },
   { href: '/dashboard/settings/staff', label: 'Staff Profiles', icon: Contact },
-  { href: '/dashboard/settings/squire', label: 'Squire Settings', icon: Settings },
 ]
 
 export function DashboardNav() {
@@ -32,7 +32,9 @@ export function DashboardNav() {
         const active =
           item.href === '/dashboard'
             ? pathname === '/dashboard'
-            : pathname === item.href || pathname.startsWith(item.href + '/')
+            : item.href === '/dashboard/tickets'
+              ? pathname === '/dashboard/tickets'
+              : pathname === item.href || pathname.startsWith(item.href + '/')
         const Icon = item.icon
         return (
           <li key={item.href}>

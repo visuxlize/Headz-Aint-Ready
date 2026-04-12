@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { appointments, posTransactions, services, users } from '@/lib/db/schema'
+import { appointments, barbers, posTransactions, services, users } from '@/lib/db/schema'
 import { and, eq, gte, lte, ne, sql } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 
@@ -135,13 +135,14 @@ export async function GET(request: Request) {
       ),
     db
       .select({
-        barberId: posTransactions.barberId,
-        name: users.fullName,
+        barberKey: sql<string>`coalesce(${posTransactions.barberProfileId}::text, ${posTransactions.barberId}::text)`,
+        name: sql<string>`coalesce(${users.fullName}, ${barbers.name}, 'Staff')`,
         revenue: sql<string>`coalesce(sum(${posTransactions.total}::numeric), 0)`,
         tickets: sql<number>`count(*)::int`,
       })
       .from(posTransactions)
-      .innerJoin(users, eq(posTransactions.barberId, users.id))
+      .leftJoin(users, eq(posTransactions.barberId, users.id))
+      .leftJoin(barbers, eq(posTransactions.barberProfileId, barbers.id))
       .where(
         and(
           eq(posTransactions.paymentStatus, 'paid'),
@@ -149,7 +150,10 @@ export async function GET(request: Request) {
           lte(posTransactions.createdAt, rangeEnd)
         )
       )
-      .groupBy(posTransactions.barberId, users.fullName),
+      .groupBy(
+        sql`coalesce(${posTransactions.barberProfileId}::text, ${posTransactions.barberId}::text)`,
+        sql`coalesce(${users.fullName}, ${barbers.name}, 'Staff')`
+      ),
     db
       .select({
         method: posTransactions.paymentMethod,

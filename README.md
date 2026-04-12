@@ -2,7 +2,7 @@
 
 A modern redesign and full-stack rebuild of **[Headz Ain't Ready](https://headzaintready.com/)** (Jackson Heights, Queens, NYC) — public marketing site, online booking, and staff-only dashboard.
 
-**Live demo:** [https://headz-aint-ready.netlify.app/](https://headz-aint-ready.netlify.app/)
+**Deploy:** [Vercel](https://vercel.com) — see **`DEPLOYMENT.md`**.
 
 ---
 
@@ -116,32 +116,26 @@ npm run dev
 
 This app uses **Next.js server features** (API routes, server components, auth, database). It **cannot run as a static site on GitHub Pages**.
 
-**Live demo:** [headz-aint-ready.netlify.app](https://headz-aint-ready.netlify.app/)
-
-**Recommended: Netlify.** The backend (booking, DB, API routes) is set up to run on Netlify’s Next.js runtime. Use the same GitHub repo and env vars; see **`DEPLOY_NETLIFY.md`** for step-by-step instructions.
+**Recommended: Vercel.** The backend (booking, DB, API routes, cron) runs on Vercel’s Next.js runtime. Import the GitHub repo, add env vars (including **`CRON_SECRET`** for the no-show cron), and deploy. See **`DEPLOYMENT.md`**.
 
 | Platform | Use it? | Notes |
 |----------|--------|--------|
 | **GitHub Pages** | ❌ No | Static only; no Node server, no API, no DB. |
-| **Netlify** | ✅ Yes | Use “Next.js on Netlify”; add env vars in Netlify UI. See `DEPLOY_NETLIFY.md`. |
+| **Vercel** | ✅ Yes | Next.js preset; `vercel.json` defines the hourly cron. See `DEPLOYMENT.md`. |
 
-### Deploying on Netlify
+### Deploying on Vercel
 
 1. Push this repo to GitHub (see “Pushing to GitHub” below).  
-2. In [Netlify](https://app.netlify.com): **Add new site → Import from Git** and select the repo.  
-3. **Build settings** (from `netlify.toml`): Build command `npm run build`; leave publish directory default.  
-4. **Environment variables** (Site settings → Environment variables):  
-   - `NEXT_PUBLIC_SUPABASE_URL`  
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
-   - `DATABASE_URL`  
-5. Deploy. Your site URL will be `https://your-site-name.netlify.app` (or your custom domain).
+2. In [Vercel](https://vercel.com): **Add New → Project** and import the repo.  
+3. **Environment variables:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`, and `CRON_SECRET` (generate with `openssl rand -hex 32`).  
+4. Deploy. Your site URL will be `https://<project>.vercel.app` (or your custom domain).
 
-Full walkthrough: **`DEPLOY_NETLIFY.md`**.
+Full walkthrough: **`DEPLOYMENT.md`**.
 
 ### What You Need for the Backend to Work
 
 - **Supabase project** (same as local): Auth + Database.  
-- **Env vars** set in Netlify: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`.  
+- **Env vars** set in Vercel: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL`, `CRON_SECRET` (and any others in `DEPLOYMENT.md`).  
 - **Database**: Run the schema (and allowlist) in that Supabase project so production uses the same DB, or a separate one with the same schema.  
 - **Staff allowlist**: Ensure production staff emails are in `staff_allowlist` in the DB you use in production.
 - **“Not on the staff allow list”** after signing in: your email must exist in `staff_allowlist`. For dev (`test@test.com`), run `scripts/ensure-staff-allowlist.sql` in the Supabase SQL Editor, or `npm run seed:dev-users` (creates auth user + allowlist + `users` row).

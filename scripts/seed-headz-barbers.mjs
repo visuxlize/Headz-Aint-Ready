@@ -34,15 +34,43 @@ if (!DATABASE_URL) {
 
 const sql = postgres(DATABASE_URL, { prepare: false, max: 1 })
 
+/** Shop roster — avatar URLs reuse headzaintready.com assets where names match; others null until you add photos. */
 const BARBERS = [
-  { name: 'Louie Live', slug: 'louie-live', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/LOUIELIVE.jpg', sortOrder: 0 },
-  { name: 'Johan', slug: 'johan', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2025/04/JOHAN.jpg', sortOrder: 1 },
-  { name: 'King Rome', slug: 'king-rome', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ROME-1.jpg', sortOrder: 2 },
-  { name: 'Jesus', slug: 'jesus', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/JESUS.jpg', sortOrder: 3 },
-  { name: 'Angel', slug: 'angel', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg', sortOrder: 4 },
-  { name: 'Victor', slug: 'victor', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/VICTOR.jpg', sortOrder: 5 },
-  { name: 'Liseth', slug: 'liseth', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2025/04/Liseth.jpg', sortOrder: 6 },
-  { name: 'Carlos', slug: 'carlos', avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/CARLOS.jpg', sortOrder: 7 },
+  {
+    name: 'Victor Zambrano',
+    slug: 'victor-zambrano',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/VICTOR.jpg',
+    sortOrder: 0,
+  },
+  { name: 'Matthew Mirabella', slug: 'matthew-mirabella', avatarUrl: null, sortOrder: 1 },
+  { name: 'Luis Benites', slug: 'luis-benites', avatarUrl: null, sortOrder: 2 },
+  {
+    name: 'Liseth Calderon',
+    slug: 'liseth-calderon',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2025/04/Liseth.jpg',
+    sortOrder: 3,
+  },
+  {
+    name: 'Jesus Theodoro',
+    slug: 'jesus-theodoro',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/JESUS.jpg',
+    sortOrder: 4,
+  },
+  { name: 'Jerome Glenn', slug: 'jerome-glenn', avatarUrl: null, sortOrder: 5 },
+  { name: 'David Fernandez', slug: 'david-fernandez', avatarUrl: null, sortOrder: 6 },
+  {
+    name: 'Carlos Principal',
+    slug: 'carlos-principal',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/CARLOS.jpg',
+    sortOrder: 7,
+  },
+  {
+    name: 'Angle Miranda',
+    slug: 'angle-miranda',
+    avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg',
+    sortOrder: 8,
+  },
+  { name: 'Daniel', slug: 'daniel', avatarUrl: null, sortOrder: 9 },
 ]
 
 async function main() {
@@ -59,7 +87,7 @@ async function main() {
         VALUES (${b.name}, ${b.slug}, ${b.avatarUrl}, ${b.sortOrder}, true)
         ON CONFLICT (slug) DO UPDATE SET
           name = EXCLUDED.name,
-          avatar_url = EXCLUDED.avatar_url,
+          avatar_url = COALESCE(EXCLUDED.avatar_url, barbers.avatar_url),
           sort_order = EXCLUDED.sort_order,
           is_active = true,
           updated_at = now()

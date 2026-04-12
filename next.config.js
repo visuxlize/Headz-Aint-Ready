@@ -32,7 +32,7 @@ const nextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: buildResponseHeaders() }]
   },
-  // Netlify CI can differ from local ESLint; warnings should not block deploys.
+  // ESLint warnings should not block CI deploys.
   eslint: {
     ignoreDuringBuilds: true,
   },

@@ -6,8 +6,8 @@
  * Grid tiles use `object-cover object-center`: the image fills the cell without upscaling (“zoom”);
  * edges may crop per Instagram’s square — no extra scale transform.
  *
- * If a URL 404s after tokens rotate, re-fetch:
- *   curl -sL -A 'Mozilla/5.0' "https://www.instagram.com/p/<SHORTCODE>/" | tr '"' '\n' | grep cdninstagram
+ * If a URL 404s after tokens rotate, re-fetch (embed HTML often includes fresh `scontent` URLs):
+ *   curl -sL -A 'Mozilla/5.0' "https://www.instagram.com/p/<SHORTCODE>/embed/captioned/" | tr '"' '\n' | grep cdninstagram
  *
  * @see https://www.instagram.com/headzaintready.nyc
  */
@@ -19,6 +19,7 @@ export type InstagramGalleryPhoto = {
   src: string
 }
 
+/** Homepage “The Work” grid: `grid-cols-2` (two columns), unique posts — no duplicates. */
 export const instagramGalleryPhotos: InstagramGalleryPhoto[] = [
   {
     postUrl: 'https://www.instagram.com/p/DGJNcEuPuGo/',
@@ -56,8 +57,8 @@ export const instagramGalleryPhotos: InstagramGalleryPhoto[] = [
     src: 'https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/618645945_18082034309334152_4183348624368259120_n.jpg?stp=c288.0.864.864a_dst-jpg_e35_s640x640_tt6&_nc_cat=109&ccb=7-5&_nc_sid=18de74&efg=eyJlZmdfdGFnIjoiRkVFRC5iZXN0X2ltYWdlX3VybGdlbi5DMyJ9&_nc_ohc=M9tSMNXtjSUQ7kNvwG50B7m&_nc_oc=AdoyvDAf_1HfDNMk4WdXcAYmZ8oBS9txPOu5eMvUyYbeDZM3vb1nknwlufXsGQFtq3A&_nc_zt=23&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_gid=wvaNLTvqmxDesVnhtMeI1Q&_nc_ss=7a389&oh=00_Af0-sbnQRha6YCytPlfCNVNLvRn2lvguRVNVNNHrXLpszA&oe=69DC9A64',
   },
   {
-    postUrl: 'https://www.instagram.com/p/CGLg4-ODmGz/',
-    alt: 'Headz Ain’t Ready — cut from Instagram',
-    src: 'https://scontent-lga3-2.cdninstagram.com/v/t51.82787-15/619223415_18087131410891433_7643857188630571381_n.jpg?stp=c288.0.864.864a_dst-jpg_e35_s640x640_tt6&_nc_cat=101&ccb=7-5&_nc_sid=18de74&efg=eyJlZmdfdGFnIjoiRkVFRC5iZXN0X2ltYWdlX3VybGdlbi5DMyJ9&_nc_ohc=uFDkgLtdGQoQ7kNvwFLUiH2&_nc_oc=Adr0y82P0rjAO9umYpd5Qvw4blXphOLFauSTns6uwp6cZkonG8ThYaWIS7mtDirNFqs&_nc_zt=23&_nc_ht=scontent-lga3-2.cdninstagram.com&_nc_gid=Rx-mXgcD8AL_lpbQx5WVbg&_nc_ss=7a389&oh=00_Af3G0ejXEsnXQLNudlL3D9E2nD-8j3-lJRcOYVdEI00MUA&oe=69DCB33A',
+    postUrl: 'https://www.instagram.com/p/B82IX0vloXz/',
+    alt: 'Headz Ain’t Ready — Crispy cut from Instagram',
+    src: 'https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/623775794_18151886743435191_8390294788937482304_n.jpg?stp=dst-jpg_e35_s640x640_sh0.08_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6ImltYWdlX3VybGdlbi4xNDQweDE0NDAuc2RyLmY4Mjc4Ny5kZWZhdWx0X2ltYWdlLmMyIn0&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gEAe0Lvx93gRm4tdKbP4qk9u9k7pBKUUky-0EnDviej7XHSrj7MOqJhUPRxqMWSgWY&_nc_ohc=mAzfowYI8MMQ7kNvwFeKj6u&_nc_gid=3nzsmpI9uNJdPwkiqbEzjQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af1bWILUCjJqmxFIkhOSeKhbZdo8g39MDsXzWlgm7Q90Cw&oe=69E1EAFA&_nc_sid=10d13b',
   },
 ]

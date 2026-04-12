@@ -18,6 +18,7 @@ import { useAnimatedCounter } from '@/lib/hooks/useAnimatedCounter'
 import { formatMoney } from '@/lib/utils/format-money'
 import { cn } from '@/lib/utils/cn'
 import { NY_TZ } from '@/lib/date/ny-bounds'
+import { SQUIRE } from '@/lib/squire-config'
 
 type OverviewApi = {
   activeBarbers?: number
@@ -263,7 +264,7 @@ export function AdminOverviewTab() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <a
-              href="https://app.getsquire.com"
+              href={SQUIRE.adminAppUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-xl bg-headz-red px-6 py-3 text-sm font-bold text-white hover:bg-headz-redDark"
@@ -384,7 +385,7 @@ export function AdminOverviewTab() {
             <p className="text-sm font-medium">Reports</p>
           </Link>
           <a
-            href="https://app.getsquire.com"
+            href={SQUIRE.adminAppUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="group cursor-pointer rounded-xl border border-black/[0.07] bg-white p-4 transition-all hover:border-headz-red/30 hover:shadow-sm"

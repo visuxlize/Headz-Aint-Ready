@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/no-show-checker",
+      "schedule": "59 * * * *"
+    }
+  ]
+}

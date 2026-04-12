@@ -1,6 +1,7 @@
 'use client'
 
 import { ExternalLink } from 'lucide-react'
+import { SQUIRE } from '@/lib/squire-config'
 
 export function AdminScheduleSquireClient() {
   return (
@@ -13,7 +14,7 @@ export function AdminScheduleSquireClient() {
           </p>
         </div>
         <a
-          href="https://app.getsquire.com/schedule"
+          href={SQUIRE.adminAppUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-headz-red px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:bg-headz-redDark shrink-0"
@@ -28,8 +29,8 @@ export function AdminScheduleSquireClient() {
         style={{ height: 'calc(100vh - 160px)' }}
       >
         <iframe
-          src="https://app.getsquire.com/schedule"
-          title="Squire schedule"
+          src={SQUIRE.adminAppUrl}
+          title="Squire appointments"
           className="h-full w-full border-0"
           style={{ minHeight: 'calc(100vh - 160px)' }}
         />
@@ -41,12 +42,12 @@ export function AdminScheduleSquireClient() {
           Some networks block embedding the Squire app in an iframe. Open the full schedule in Squire instead.
         </p>
         <a
-          href="https://app.getsquire.com/schedule"
+          href={SQUIRE.adminAppUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-3 inline-flex items-center gap-2 text-headz-red font-semibold hover:underline"
         >
-          Open Squire Schedule <ExternalLink className="h-4 w-4" aria-hidden />
+          Open Squire <ExternalLink className="h-4 w-4" aria-hidden />
         </a>
       </div>
     </div>

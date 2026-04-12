@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 
 type RequestRow = {
   id: string
@@ -94,7 +95,10 @@ export function AdminTimeOffClient() {
   const loadPending = useCallback(async () => {
     const res = await fetch('/api/admin/time-off/requests?status=pending', { credentials: 'include' })
     const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json.error || 'Failed')
+    if (!res.ok) {
+      toastApiError(res)
+      return
+    }
     setPending(json.data ?? [])
   }, [])
 
@@ -103,7 +107,10 @@ export function AdminTimeOffClient() {
     if (historyBarberId) url += `&barberId=${encodeURIComponent(historyBarberId)}`
     const res = await fetch(url, { credentials: 'include' })
     const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json.error || 'Failed')
+    if (!res.ok) {
+      toastApiError(res)
+      return
+    }
     setHistory(json.data ?? [])
   }, [historyMonth, historyBarberId])
 
@@ -113,7 +120,10 @@ export function AdminTimeOffClient() {
       { credentials: 'include' }
     )
     const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json.error || 'Failed')
+    if (!res.ok) {
+      toastApiError(res)
+      return
+    }
     setCalDays(json.data?.days ?? {})
   }, [calYear, calMonth])
 
@@ -124,7 +134,7 @@ export function AdminTimeOffClient() {
   useEffect(() => {
     setLoading(true)
     Promise.all([loadPending(), loadCalendar()])
-      .catch((e) => toast.error(e instanceof Error ? e.message : 'Failed to load'))
+      .catch((e) => toastUnexpected(e))
       .finally(() => setLoading(false))
   }, [loadPending, loadCalendar])
 
@@ -132,7 +142,7 @@ export function AdminTimeOffClient() {
     if (tab !== 'history') return
     setLoading(true)
     loadHistory()
-      .catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'))
+      .catch((e) => toastUnexpected(e))
       .finally(() => setLoading(false))
   }, [tab, loadHistory, historyMonth, historyBarberId])
 
@@ -161,10 +171,13 @@ export function AdminTimeOffClient() {
         credentials: 'include',
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed')
+      if (!res.ok) {
+      toastApiError(res)
+      return
+    }
       setDayRequests(json.data ?? [])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed')
+      toastUnexpected(e)
       setDayRequests([])
     }
   }
@@ -183,13 +196,16 @@ export function AdminTimeOffClient() {
         setReassignMap(Object.fromEntries(json.conflicts.map((c: ConflictRow) => [c.id, ''])))
         return
       }
-      if (!res.ok) throw new Error(json.error || 'Approve failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Time off approved')
       setConflictModal(null)
       void loadPending()
       void loadCalendar()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Approve failed')
+      toastUnexpected(e)
     }
   }
 
@@ -220,13 +236,16 @@ export function AdminTimeOffClient() {
         body: JSON.stringify(body),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Approve failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Time off approved')
       setConflictModal(null)
       void loadPending()
       void loadCalendar()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Approve failed')
+      toastUnexpected(e)
     }
   }
 
@@ -240,14 +259,17 @@ export function AdminTimeOffClient() {
         body: JSON.stringify({ denialReason: denyReason.trim() || null }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Deny failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Request denied')
       setDenyId(null)
       setDenyReason('')
       void loadPending()
       void loadCalendar()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Deny failed')
+      toastUnexpected(e)
     }
   }
 

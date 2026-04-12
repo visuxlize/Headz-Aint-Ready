@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { SQUIRE } from '@/lib/squire-config'
 import { SITE } from '@/lib/site-config'
 
 const LOGO_URL = 'https://seller-brand-assets-f.squarecdn.com/ML84BFGQFNRZQ/55115cf1910f30cc84857ca133d806e5.png?height=250'
@@ -66,9 +67,14 @@ export function Footer() {
         </div>
         <div className="mt-8 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex gap-6">
-            <Link href="/book" className="text-headz-red hover:underline font-medium text-sm">
+            <a
+              href={SQUIRE.bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-headz-red hover:underline font-medium text-sm"
+            >
               Book your cut →
-            </Link>
+            </a>
             <Link href="/auth/login" className="text-white/50 hover:text-white text-sm">
               Staff login
             </Link>

@@ -2,6 +2,115 @@
 
 ---
 
+## ACTIVE PROMPT 6: Squire Direct Booking + Tickets UI Polish
+
+Paste the entire block below into Cursor's composer.
+
+```
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM (PostgreSQL), Supabase Auth. Color palette: headz-red (#C41E3A), headz-black (#0c0c0c), headz-cream (#f5f0e8), headz-gray (#6b7280). Dashboard bg: #FAFAF8. No Framer Motion — CSS keyframes only. Lucide-react for icons.
+
+Read every existing file before editing it. Run `npx tsc --noEmit` after all changes and fix every error.
+
+---
+
+## CONTEXT
+
+**Squire is the sole booking system.** The direct booking URL is:
+  https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1
+
+This URL is already exported from `lib/squire-config.ts` as `SQUIRE.bookingUrl`.
+
+---
+
+## TASK 1 — All booking CTAs → direct Squire link (opens in new tab)
+
+Every place on the marketing site that links to `/book` must instead link directly to Squire. Make ALL these changes:
+
+**`components/marketing/MarketingHero.tsx`** — line ~302:
+Change `<Link href="/book" ...>Book appointment</Link>` to:
+```tsx
+<a
+  href="https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="... (same classes as before)"
+>
+  Book appointment
+</a>
+```
+
+**`components/site/Header.tsx`** — two `href="/book"` links (mobile + desktop nav). Change both to `<a>` tags with `href={SQUIRE.bookingUrl}` `target="_blank"` `rel="noopener noreferrer"`. Import SQUIRE from `@/lib/squire-config`.
+
+**`components/site/Footer.tsx`** — one `href="/book"` Link. Change to `<a>` with `href={SQUIRE.bookingUrl}` `target="_blank"` `rel="noopener noreferrer"`.
+
+**`app/(marketing)/page.tsx`** — one `<Link href="/book" ...>Book your cut</Link>` inside the services section. Change to `<a>` tag with `href={SQUIRE.bookingUrl}` `target="_blank"` `rel="noopener noreferrer"`.
+
+**`app/not-found.tsx`** — one `href="/book"` Link. Change to `<a>` with `href={SQUIRE.bookingUrl}` `target="_blank"` `rel="noopener noreferrer"`.
+
+---
+
+## TASK 2 — Simplify `app/(marketing)/book/page.tsx`
+
+The old approach tried to iframe Squire (which blocks iframes). Replace the entire file with a simple server-side redirect:
+
+```tsx
+import { redirect } from 'next/navigation'
+import { SQUIRE } from '@/lib/squire-config'
+
+export const metadata = {
+  title: "Book | Headz Ain't Ready",
+}
+
+export default function BookPage() {
+  redirect(SQUIRE.bookingUrl)
+}
+```
+
+Delete or stub out `components/booking/SquireEmbed.tsx` (replace with `export {}`). The file `components/booking/BookingFlow.tsx` and `components/booking/SquireBookingEmbed.tsx` can stay as-is (they are harmless empty stubs).
+
+---
+
+## TASK 3 — "Booking powered by Squire" badge in the services section
+
+In `app/(marketing)/page.tsx`, inside the services section (id="services"), find the right-side panel that contains the `<Link href="/book">Book your cut</Link>` CTA.
+
+After changing that Link to an `<a>` tag (per Task 1), add a small "Booking powered by Squire" badge directly below it:
+
+```tsx
+<p className="flex items-center justify-center gap-1.5 text-[11px] text-headz-black/35 lg:justify-start">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+  Booking powered by Squire
+</p>
+```
+
+---
+
+## TASK 4 — Fix & clean up `components/dashboard/TicketsPageClient.tsx`
+
+The current tickets page throws a render error and has a dense, dark UI that's hard to read. Rewrite the component with these goals:
+- **White/light theme** — the dashboard background is #FAFAF8, so keep all cards white with light borders (border-black/[0.07])
+- **No dark colored stat cards** — the current dark green/dark blue/dark red stat cards are hard to read. Replace with clean white cards with colored text (like the overview tab style)
+- **Simple clean form** — keep the same fields but tighten the spacing, use consistent border-radius (rounded-xl), make the form feel like a standard clean web form
+- **Fix the render error** — the most likely cause is using custom Tailwind classes that aren't defined (`animate-pulse-glow`, `animate-count-up`, `animate-fade-slide`, `animate-slide-right`, `animate-slide-up`). Replace all of these with standard Tailwind classes: use `transition-all` for smooth changes, `opacity-0 → opacity-100` for fades, or just remove the animation classes entirely. Do NOT add new keyframes to globals.css — keep it simple.
+- **Keep all functionality** — load tickets on mount, 30s auto-refresh, add ticket form (POST), void ticket (DELETE), EOD summary table, barber breakdown, search/filter
+
+The clean stat cards at top should look like `AdminOverviewTab.tsx` — white bg, `border border-black/[0.07]`, icon in a colored rounded square, number in colored font. Reference that file for the pattern.
+
+---
+
+## VERIFICATION
+
+After all changes:
+1. Run `npx tsc --noEmit` — fix all type errors
+2. Confirm no import references `NativeBookingFlow`, `BookingPageClient`, or `SquireWidgetEmbed` (they are stubs)
+3. Confirm every booking CTA in the marketing site opens `getsquire.com/booking/book/headz-aint-ready-jackson-heights-1` in a new tab
+4. Confirm the tickets page renders without a crash (no undefined custom animation class references)
+```
+
+---
+
 ## ACTIVE PROMPT 4: Ticket System + EOD Reports + Dashboard Revamp
 
 Paste the entire block below into Cursor's composer.
@@ -499,12 +608,341 @@ Read the existing full file.
 
 ---
 
+## ACTIVE PROMPT 5: Booking Page Redesign (Clean Squire Integration)
+
+Paste the entire block below into Cursor's composer.
+
+```
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM. Color palette: headz-red (#C41E3A), headz-black (#0c0c0c), headz-cream (#f5f0e8), headz-gray (#6b7280). No Framer Motion — CSS transitions only. Lucide-react installed.
+
+The entire booking flow belongs to Squire. There are two Squire booking URLs:
+  - MAIN:   https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1   (blocks iframes)
+  - ONLINE: https://online.getsquire.com/book/headz-aint-ready-jackson-heights-1    (online booking subdomain — try this for iframe)
+
+The current booking implementation (BookingPageClient, SquireWidgetEmbed, NativeBookingFlow, BookingFlow, SquireBookingEmbed) is overly complex, fragile, and unreliable. Replace all of it with a single clean system.
+
+Read every file before editing. Run npx tsc --noEmit after all changes and fix every error.
+
+---
+
+## WHAT TO DELETE
+
+Delete (or empty + leave as a re-export stub if other files import them) these components:
+- components/booking/BookingPageClient.tsx  → DELETE contents, replace with: export {}
+- components/booking/SquireWidgetEmbed.tsx  → DELETE contents, replace with: export {}
+- components/booking/NativeBookingFlow.tsx  → DELETE contents, replace with: export {}
+- components/booking/BookingFlow.tsx        → keep as-is (it re-exports SquireBookingEmbed, leave it)
+- components/booking/SquireBookingEmbed.tsx → keep as-is (used as BookingFlow fallback)
+
+Do NOT delete lib/squire-config.ts or lib/squire/public-booking.ts — they are used elsewhere.
+
+---
+
+## ARCHITECTURE: TWO-LAYER APPROACH
+
+Layer 1 — Attempt to embed online.getsquire.com in a full-height iframe.
+  The `online.getsquire.com` subdomain is Squire's dedicated online booking URL (different from the main site).
+  It is much more likely to allow iframe embedding than getsquire.com/booking.
+  Detect success/failure client-side with a 6-second timeout.
+
+Layer 2 — If iframe fails or is blocked, show a beautiful branded landing page.
+  This is NOT a fallback message. It is a full, gorgeous pre-booking page that:
+  - Shows the shop's services and prices
+  - Shows the team
+  - Has a single prominent CTA that opens Squire in a new tab
+
+No multi-step native flow. No popup system. No 4-widget-URL cascade. Clean and reliable.
+
+---
+
+## FILE 1 — lib/squire-config.ts (UPDATE)
+
+Read the file. Add one constant:
+  onlineBookingUrl: 'https://online.getsquire.com/book/headz-aint-ready-jackson-heights-1',
+
+Keep all existing fields exactly as they are.
+
+---
+
+## FILE 2 — components/booking/SquireEmbed.tsx (CREATE — replaces everything)
+
+'use client'
+
+This is the ONLY booking component. It handles both layers.
+
+```tsx
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { Clock, ExternalLink, MapPin, Phone, Scissors } from 'lucide-react'
+import { SQUIRE } from '@/lib/squire-config'
+import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
+
+export interface EmbedService {
+  id: string
+  name: string
+  price: string
+  priceDisplayOverride: string | null
+  durationMinutes: number
+}
+
+export interface EmbedBarber {
+  id: string
+  name: string
+  avatarUrl: string | null
+}
+
+interface Props {
+  services: EmbedService[]
+  barbers: EmbedBarber[]
+}
+```
+
+### State
+```ts
+type EmbedStatus = 'loading' | 'ready' | 'failed'
+```
+
+### Iframe detection logic
+- On mount, set a 6-second timeout. If iframe fires onLoad within 6 seconds → status = 'ready'.
+- After onLoad, wait 1.5 seconds then check iframe.contentDocument:
+  - If accessible and body has content (not "enable JavaScript") → confirm 'ready'
+  - If cross-origin error (SecurityError) → treat as 'ready' (Squire IS rendering, just cross-origin)
+  - If body is empty or has "enable JavaScript" text → set status = 'failed'
+- If timeout fires and still 'loading' → status = 'failed'
+- On iframe onError → status = 'failed'
+
+### Render: status === 'loading' or 'ready'
+Full-screen dark container (bg-headz-black min-h-[calc(100vh-64px)]):
+
+Loading overlay (shown while status === 'loading', absolute inset-0 z-10):
+  Dark bg, centered: scissors icon (Scissors from lucide, text-headz-red animate-pulse h-8 w-8), then "Loading booking…" text-white/60 text-sm mt-3
+
+Iframe:
+  src={SQUIRE.onlineBookingUrl}
+  className="w-full border-0"
+  style={{ height: 'calc(100vh - 64px)', minHeight: '640px' }}
+  allow="payment; camera; microphone; clipboard-write; fullscreen"
+  opacity transition: opacity-0 when loading, opacity-100 when ready (transition-opacity duration-500)
+
+### Render: status === 'failed'
+This is the branded landing page. It is beautiful, NOT an error state. Dark background, headz branding.
+
+```
+FULL PAGE LAYOUT (bg-headz-black min-h-screen):
+
+── HERO SECTION ──────────────────────────────────────────────
+Dark bg, centered text, min-h-[40vh] flex items-center justify-center
+Background: use the same trainPass animation from globals.css with bg-cover bg-center
+Overlay: absolute inset-0 bg-gradient-to-b from-black/75 via-black/65 to-headz-black
+
+Content (relative z-10 text-center px-4):
+  <p> "JACKSON HEIGHTS, QUEENS · NYC" — text-headz-red text-xs tracking-[0.3em] uppercase font-semibold mb-3
+  <h1> "Book Your Cut" — font-headz-display text-5xl sm:text-6xl text-white
+  <p> "Master barbers. Fresh cuts. Since 1995." — text-white/60 text-lg mt-2 mb-8
+  
+  CTA button (large, full-width on mobile):
+  <a href={SQUIRE.bookingUrl} target="_blank" rel="noopener noreferrer">
+    bg-headz-red hover:bg-headz-redDark text-white font-bold uppercase tracking-widest
+    text-sm px-10 py-5 rounded-2xl shadow-2xl shadow-headz-red/30
+    inline-flex items-center gap-3
+    Icon: ExternalLink h-4 w-4
+    Label: "Book Now on Squire"
+  </a>
+  
+  <p className="mt-4 text-white/30 text-xs">Opens in a new tab · Secure booking via Squire</p>
+
+── SHOP INFO STRIP ───────────────────────────────────────────
+bg-headz-black border-t border-white/5 py-5
+
+Three info items centered in a row (flex flex-wrap justify-center gap-8):
+  1. <MapPin h-4 w-4 text-headz-red> "81-13 37th Ave, Jackson Heights"
+  2. <Clock h-4 w-4 text-headz-red>  "Mon–Sat 9:30am–7pm · Sun 10am–6pm"
+  3. <Phone h-4 w-4 text-headz-red>  "(718) 429-6841" as an <a href="tel:+17184296841">
+
+Each item: flex items-center gap-2 text-white/60 text-sm
+
+── SERVICES SECTION ──────────────────────────────────────────
+bg-[#0d0d0d] py-16 px-4 sm:px-6
+
+Section header (text-center mb-10):
+  "SERVICES & PRICING" — text-headz-red text-xs uppercase tracking-[0.25em] font-semibold mb-2
+  "What We Do" — font-headz-display text-3xl text-white italic
+
+Services grid: grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-2xl mx-auto
+
+Each service card:
+  rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 hover:border-headz-red/30 hover:bg-white/[0.05] transition-all
+  Top: service name in text-white font-semibold text-sm
+  Bottom row: price in text-headz-red font-bold + duration in text-white/40 text-xs text-right
+  Use formatServicePriceDisplay(service) for the price — import from @/lib/services/format-service-price
+
+If services array is empty: show 6 skeleton placeholder cards (animate-pulse bg-white/5 rounded-xl h-20).
+
+── TEAM SECTION ──────────────────────────────────────────────
+bg-headz-black py-16 px-4 sm:px-6 border-t border-white/5
+
+Section header (text-center mb-10):
+  "THE TEAM" — text-headz-red text-xs uppercase tracking-[0.25em] font-semibold mb-2
+  "Master Barbers" — font-headz-display text-3xl text-white italic
+
+Barbers grid: flex flex-wrap justify-center gap-6
+
+Each barber:
+  w-28 text-center
+  Avatar: if avatarUrl → <Image> w-20 h-20 rounded-full object-cover mx-auto ring-2 ring-white/10 hover:ring-headz-red/50 transition
+  No avatar: initials circle w-20 h-20 rounded-full bg-headz-red/10 border border-headz-red/20 flex items-center justify-center mx-auto, initials in text-headz-red font-bold text-xl
+  Name: text-white text-sm font-semibold mt-3
+  Title: "Master Barber" text-white/40 text-xs mt-0.5
+
+If barbers array is empty: show 4 skeleton circles.
+
+── BOTTOM CTA ────────────────────────────────────────────────
+bg-headz-red py-12 px-4 text-center
+
+"Ready for a fresh cut?" — text-white font-bold text-2xl sm:text-3xl mb-2
+"Book your appointment now." — text-white/80 text-base mb-8
+
+<a href={SQUIRE.bookingUrl} target="_blank" rel="noopener noreferrer">
+  bg-white text-headz-red font-bold uppercase tracking-widest text-sm
+  px-10 py-4 rounded-2xl hover:bg-headz-cream transition-colors
+  inline-flex items-center gap-2
+  Icon: ExternalLink h-4 w-4
+  Label: "Book on Squire"
+</a>
+```
+
+---
+
+## FILE 3 — app/(marketing)/book/page.tsx (REWRITE)
+
+Read the current file first. Replace entirely:
+
+```tsx
+import { SquireEmbed } from '@/components/booking/SquireEmbed'
+import type { EmbedService, EmbedBarber } from '@/components/booking/SquireEmbed'
+import { db } from '@/lib/db'
+import { barbers, services, users } from '@/lib/db/schema'
+import { asc, eq } from 'drizzle-orm'
+import { barbersForPublicBookingCondition } from '@/lib/barbers/public-queries'
+
+export const dynamic = 'force-dynamic'
+
+export const metadata = {
+  title: "Book | Headz Ain't Ready",
+  description: "Book your haircut at Headz Ain't Ready Barbershop. Master barbers in Jackson Heights, Queens.",
+}
+
+export default async function BookPage() {
+  const [barberRows, serviceRows] = await Promise.allSettled([
+    db
+      .select({ barber: barbers })
+      .from(barbers)
+      .innerJoin(users, eq(barbers.userId, users.id))
+      .where(barbersForPublicBookingCondition)
+      .orderBy(asc(barbers.sortOrder))
+      .then((rows): EmbedBarber[] =>
+        rows.map((r) => ({
+          id: r.barber.id,
+          name: r.barber.name,
+          avatarUrl: r.barber.avatarUrl ?? null,
+        }))
+      ),
+    db
+      .select({
+        id: services.id,
+        name: services.name,
+        price: services.price,
+        priceDisplayOverride: services.priceDisplayOverride,
+        durationMinutes: services.durationMinutes,
+      })
+      .from(services)
+      .where(eq(services.isActive, true))
+      .orderBy(asc(services.displayOrder))
+      .then((rows): EmbedService[] =>
+        rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          price: String(r.price),
+          priceDisplayOverride: r.priceDisplayOverride ?? null,
+          durationMinutes: r.durationMinutes,
+        }))
+      ),
+  ])
+
+  return (
+    <SquireEmbed
+      services={serviceRows.status === 'fulfilled' ? serviceRows.value : []}
+      barbers={barberRows.status === 'fulfilled' ? barberRows.value : []}
+    />
+  )
+}
+```
+
+Note: This page has NO wrapper div, NO header — SquireEmbed owns the entire page layout including the header for the iframe case. Remove the `(marketing)` layout header override if needed by adding `export const layoutHeader = false` or handling it inside SquireEmbed.
+
+---
+
+## FILE 4 — app/(marketing)/layout.tsx (CHECK)
+
+Read this file. If it renders a site header/nav above children, that is fine — the iframe and landing page will sit below it. The header height should be accounted for in the iframe height calculation (currently using `calc(100vh - 64px)` — adjust the 64px to match the actual header height if different).
+
+---
+
+## FILE 5 — next.config.js (VERIFY)
+
+Read the file. Confirm the CSP `frame-src` includes both:
+  https://online.getsquire.com
+  https://*.getsquire.com
+
+If `https://*.getsquire.com` is already present, it covers online.getsquire.com — no change needed. If not, add `https://online.getsquire.com` explicitly.
+
+Also confirm `connect-src` includes `https://*.getsquire.com` so the embedded iframe can make API calls.
+
+---
+
+## FILE 6 — app/globals.css (VERIFY)
+
+Read globals.css. Confirm the `trainPass` keyframe animation exists (added in a previous prompt). If it does not exist, add it:
+
+@keyframes trainPass {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+And add the utility class in @layer utilities:
+  .animate-train-pass {
+    animation: trainPass 30s ease-in-out infinite alternate;
+    background-size: 200% 100%;
+  }
+
+This is used in the hero section of the landing page fallback.
+
+---
+
+## GENERAL RULES
+
+- SquireEmbed is 'use client' (uses useEffect for iframe detection).
+- book/page.tsx is a server component (DB fetches only).
+- The page must work even if DB is down — both services and barbers fall back to empty arrays, showing skeleton placeholders.
+- No new npm packages.
+- TypeScript strict. No `any`.
+- The iframe height uses `calc(100vh - 64px)` — if the marketing layout header is a different height, update this value to match so the iframe fills the screen exactly with no gap or scroll.
+- When the iframe is 'ready', the page should look and feel like Squire is running natively inside the Headz site — no visible browser chrome, no separate scroll bars, full height.
+- When the iframe fails, the landing page must stand alone as a complete, beautiful booking experience — not an error page.
+- After all changes: npx tsc --noEmit, fix every error.
+```
+
+---
+
 ## ACTIVE PROMPT 3: Native Squire Booking Flow (3-Layer System)
 
 Paste the entire block below into Cursor's composer.
 
 ```
-You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM, Supabase Auth, deployed on Netlify. Color palette: headz-red (#C41E3A), headz-black (#111), headz-cream (#FDF6EC), headz-gray (#6b7280).
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM, Supabase Auth, deployed on Vercel. Color palette: headz-red (#C41E3A), headz-black (#111), headz-cream (#FDF6EC), headz-gray (#6b7280).
 
 The Squire booking page at https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1 blocks iframe embedding. Squire has a separate widget subdomain at widget.getsquire.com/v2/ built specifically for third-party embedding. The goal is to keep the entire booking experience on the Headz site with only the final payment step going to Squire.
 
@@ -1039,7 +1477,7 @@ Also add `https://images.squarecdn.com` and `https://seller-brand-assets-f.squar
 Paste the entire block below into Cursor's composer as a second pass after Prompt 1.
 
 ```
-You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM, Supabase Auth, deployed on Netlify. Color palette: headz-red (#C41E3A), headz-black (#111), headz-cream (#FDF6EC), headz-gray (#6b7280). All design decisions must match the existing dark/red/white barbershop aesthetic.
+You are working on the Headz Ain't Ready barbershop website — Next.js 14 App Router, Tailwind CSS, Drizzle ORM, Supabase Auth, deployed on Vercel. Color palette: headz-red (#C41E3A), headz-black (#111), headz-cream (#FDF6EC), headz-gray (#6b7280). All design decisions must match the existing dark/red/white barbershop aesthetic.
 
 Squire is now the SINGLE SOURCE OF TRUTH for:
   - All customer bookings and appointments
@@ -1420,7 +1858,7 @@ Run `npx tsc --noEmit` and fix any type errors introduced by the above changes.
 Paste the entire block below into Cursor's composer to implement all 5 planned changes.
 
 ```
-You are working on the Headz Ain't Ready barbershop website — a Next.js 14 App Router project using Tailwind CSS, Drizzle ORM, and deployed on Netlify. The codebase lives at the root of this repo. The main marketing page is `app/(marketing)/page.tsx`. The site color palette uses `headz-red` (#E22222), `headz-black` (#111), `headz-cream`, and `headz-gray`. All changes must feel cohesive with the existing dark/red/white luxury barbershop aesthetic.
+You are working on the Headz Ain't Ready barbershop website — a Next.js 14 App Router project using Tailwind CSS, Drizzle ORM, and deployed on Vercel. The codebase lives at the root of this repo. The main marketing page is `app/(marketing)/page.tsx`. The site color palette uses `headz-red` (#E22222), `headz-black` (#111), `headz-cream`, and `headz-gray`. All changes must feel cohesive with the existing dark/red/white luxury barbershop aesthetic.
 
 ---
 

@@ -81,6 +81,7 @@ async function upsertFromPaymentPayload(data: Record<string, unknown>) {
   const row = {
     customerName,
     barberId,
+    barberProfileId: null as string | null,
     appointmentId: null,
     serviceId: null,
     items: null,

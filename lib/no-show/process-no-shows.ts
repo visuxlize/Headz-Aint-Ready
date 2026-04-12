@@ -6,7 +6,7 @@ import { computeNoShowFeeFromServicePrice } from '@/lib/appointments/no-show-fee
 
 /**
  * Marks past pending appointments as no_show with 20% fee.
- * Used by Netlify scheduled function (and can be invoked manually).
+ * Used by the Vercel cron route (and can be invoked manually).
  */
 export async function processNoShows(): Promise<{ flagged: number }> {
   const rows = await db

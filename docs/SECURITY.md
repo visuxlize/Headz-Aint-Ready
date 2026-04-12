@@ -29,9 +29,9 @@ This document complements code-level controls. **Supabase Auth** hashes password
 
 ## Transport
 
-- Enforce **HTTPS** at the edge (Vercel/Netlify default). `Strict-Transport-Security` is set in production via `next.config.js` and `middleware.ts`.
+- Enforce **HTTPS** at the edge (Vercel default). `Strict-Transport-Security` is set in production via `next.config.js` and `middleware.ts`.
 
 ## Abuse / bots
 
 - Add **CAPTCHA** (Turnstile/hCaptcha) on public booking if spam appears.
-- **Vercel / Netlify** bot protection and geographic rules for anomaly traffic.
+- **Vercel** bot protection and geographic rules for anomaly traffic.

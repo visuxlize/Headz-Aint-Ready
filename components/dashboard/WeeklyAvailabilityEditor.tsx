@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Copy, Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { publicMessageForFailedResponse, publicMessageFromUnknown } from '@/lib/errors/public-message'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 import { cn } from '@/lib/utils/cn'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 
@@ -98,9 +100,19 @@ export function WeeklyAvailabilityEditor(
       const json = await parseJsonResponse<{ data?: { storeHours: StoreDay[]; days: { dayOfWeek: number; mode: DayMode; intervals: { id: string; startMinutes: number; endMinutes: number }[] }[] } }>(
         res
       )
-      if (!res.ok) throw new Error((json as { error?: string }).error || 'Failed to load')
+      if (!res.ok) {
+        const msg = publicMessageForFailedResponse(res)
+        setLoadError(msg)
+        toastApiError(res)
+        return
+      }
       const data = json.data
-      if (!data) throw new Error('No data')
+      if (!data) {
+        const msg = publicMessageFromUnknown(new Error())
+        setLoadError(msg)
+        toast.error(msg)
+        return
+      }
       setStoreHours(data.storeHours ?? [])
       const byDay = new Map((data.storeHours ?? []).map((s) => [s.dayOfWeek, s]))
       const next: Record<number, DayDraft> = {}
@@ -207,12 +219,15 @@ export function WeeklyAvailabilityEditor(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ days }),
       })
-      const j = await parseJsonResponse<{ error?: string }>(res)
-      if (!res.ok) throw new Error(j.error || 'Save failed')
+      await parseJsonResponse<{ error?: string }>(res)
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Schedule saved')
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }

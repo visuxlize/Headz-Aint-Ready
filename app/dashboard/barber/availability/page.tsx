@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { SQUIRE } from '@/lib/squire-config'
 
 export default function BarberAvailabilityPage() {
   return (
@@ -13,7 +14,7 @@ export default function BarberAvailabilityPage() {
         </p>
       </div>
       <a
-        href="https://app.getsquire.com/availability"
+        href={SQUIRE.adminAppUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center justify-center rounded-xl bg-headz-red px-6 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-md hover:bg-headz-redDark"

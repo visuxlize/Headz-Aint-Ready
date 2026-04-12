@@ -118,6 +118,7 @@ export async function POST(request: Request) {
     await db.insert(posTransactions).values({
       customerName: d.customerName,
       barberId: d.barberId,
+      barberProfileId: null,
       serviceId: firstServiceId,
       items: d.items,
       subtotal: subStr,

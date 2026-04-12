@@ -3,14 +3,14 @@ import postgres from 'postgres'
 import * as schema from './schema'
 import dns from 'node:dns'
 
-// Prefer IPv4 so serverless (e.g. Netlify) can reach Supabase when IPv6 is unreachable (ENETUNREACH)
+// Prefer IPv4 so serverless (e.g. Vercel) can reach Supabase when IPv6 is unreachable (ENETUNREACH)
 dns.setDefaultResultOrder('ipv4first')
 
 /**
  * Database Connection
  * 
  * This creates a connection to your PostgreSQL database using Drizzle ORM.
- * The connection is configured for serverless environments (Netlify, etc.)
+ * The connection is configured for serverless environments (Vercel, etc.)
  * 
  * Why Drizzle?
  * - Type-safe queries (catch errors at compile time)
@@ -106,7 +106,7 @@ function getDb(): ReturnType<typeof drizzle> {
       max: 1,
       connect_timeout: 15,
       idle_timeout: 20,
-      // Netlify/serverless → Supabase often needs explicit TLS when not in the URI.
+      // Vercel/serverless → Supabase often needs explicit TLS when not in the URI.
       ...(supabaseHost ? { ssl: 'require' as const } : {}),
     })
     globalForDb.__headzDrizzle = drizzle(globalForDb.__headzPostgres, { schema })

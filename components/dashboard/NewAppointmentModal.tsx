@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 import type { Service } from '@/lib/db/schema'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 
@@ -49,7 +50,7 @@ export function NewAppointmentModal({
         setServices(active)
         if (active[0]) setServiceId(active[0].id)
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Could not load services')
+        toastUnexpected(e)
       }
     })()
   }, [open, role])
@@ -80,7 +81,12 @@ export function NewAppointmentModal({
           error?: string
           warning?: string
         }>(res)
-        if (!res.ok) throw new Error(j.error || `Could not load slots (${res.status})`)
+        if (!res.ok) {
+          toastApiError(res)
+          setSlots([])
+          setSlotIso('')
+          return
+        }
         const list = j.slots ?? []
         setSlots(list)
         if (list[0]) setSlotIso(list[0])
@@ -89,7 +95,7 @@ export function NewAppointmentModal({
       } catch (e) {
         setSlots([])
         setSlotIso('')
-        toast.error(e instanceof Error ? e.message : 'Could not load time slots')
+        toastUnexpected(e)
       } finally {
         setLoadingSlots(false)
       }
@@ -145,12 +151,15 @@ export function NewAppointmentModal({
         credentials: 'include',
         body: JSON.stringify(body),
       })
-      const j = await parseJsonResponse<{ error?: string }>(res)
-      if (!res.ok) throw new Error(j.error || `Failed (${res.status})`)
+      await parseJsonResponse<{ error?: string }>(res)
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Appointment created')
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed')
+      toastUnexpected(e)
     } finally {
       setLoading(false)
     }

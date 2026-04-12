@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 import { Copy } from 'lucide-react'
 
 type StaffRow = {
@@ -29,16 +30,21 @@ export function StaffAccountsClient() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteTempPassword, setInviteTempPassword] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/admin/staff', { credentials: 'include' })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed to load')
+      if (!res.ok) {
+        toastApiError(res)
+        setRows([])
+        return
+      }
       setRows(json.data ?? [])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load')
+      toastUnexpected(e)
       setRows([])
     } finally {
       setLoading(false)
@@ -77,12 +83,15 @@ export function StaffAccountsClient() {
         }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Save failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Account updated')
       setEditRow(null)
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -103,15 +112,28 @@ export function StaffAccountsClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: fn, email: em }),
       })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Invite failed')
-      toast.success(json.message ?? 'Invitation sent')
-      setInviteOpen(false)
-      setInviteName('')
-      setInviteEmail('')
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string
+        temporaryPassword?: string
+        message?: string
+      }
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
+      const pw = json.temporaryPassword
+      if (typeof pw === 'string' && pw.length > 0) {
+        setInviteTempPassword(pw)
+        toast.success(json.message ?? 'Account created')
+      } else {
+        toast.success(json.message ?? 'Account created')
+        setInviteOpen(false)
+        setInviteName('')
+        setInviteEmail('')
+      }
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Invite failed')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -129,11 +151,14 @@ export function StaffAccountsClient() {
         body: JSON.stringify({ isActive: next }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Update failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success(next ? 'Account reactivated' : 'Account deactivated')
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Update failed')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -148,12 +173,15 @@ export function StaffAccountsClient() {
         credentials: 'include',
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Reset failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       setTempPassword(json.temporaryPassword as string)
       toast.success('Temporary password generated')
       void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Reset failed')
+      toastUnexpected(e)
     } finally {
       setSaving(false)
     }
@@ -166,7 +194,8 @@ export function StaffAccountsClient() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-headz-gray max-w-2xl">
-        Add admins by email invite, edit login details, deactivate accounts, or reset passwords. Barber roster cards
+        Add admin accounts with an auto-generated password (they change it on first sign-in), edit login details,
+        deactivate accounts, or reset passwords. Barber roster cards
         and public photos are managed under{' '}
         <a href="/dashboard/settings/barbers" className="font-medium text-headz-red hover:underline">
           Barber management
@@ -181,10 +210,11 @@ export function StaffAccountsClient() {
             setInviteOpen(true)
             setInviteName('')
             setInviteEmail('')
+            setInviteTempPassword(null)
           }}
           className="inline-flex items-center rounded-lg bg-headz-red px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-headz-redDark"
         >
-          Invite admin
+          Add admin
         </button>
       </div>
 
@@ -315,47 +345,77 @@ export function StaffAccountsClient() {
       {inviteOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl border border-black/10 bg-white p-6 shadow-xl" role="dialog">
-            <h2 className="text-lg font-semibold text-headz-black">Invite admin</h2>
+            <h2 className="text-lg font-semibold text-headz-black">Add admin</h2>
             <p className="mt-1 text-sm text-headz-gray">
-              Sends a Supabase email so they can set a password. They receive admin access after accepting.
+              Creates their login immediately. They use the temporary password once, then set a new password (same as
+              password reset flow).
             </p>
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-headz-black">Full name</label>
-                <input
-                  className="w-full rounded-lg border border-black/15 px-3 py-2"
-                  value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
-                  autoComplete="name"
-                />
+            {inviteTempPassword ? (
+              <div className="mt-4 rounded-lg border border-headz-red/20 bg-headz-cream p-4">
+                <p className="text-xs font-medium text-headz-black">Temporary password — copy now (shown once)</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 break-all rounded border border-black/10 bg-white px-2 py-2 font-mono text-sm">
+                    {inviteTempPassword}
+                  </code>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-black/15 p-2 hover:bg-black/5"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(inviteTempPassword)
+                      toast.success('Copied')
+                    }}
+                    aria-label="Copy password"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-headz-black">Email</label>
-                <input
-                  type="email"
-                  className="w-full rounded-lg border border-black/15 px-3 py-2"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  autoComplete="email"
-                />
+            ) : (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-headz-black">Full name</label>
+                  <input
+                    className="w-full rounded-lg border border-black/15 px-3 py-2"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    autoComplete="name"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-headz-black">Email</label>
+                  <input
+                    type="email"
+                    className="w-full rounded-lg border border-black/15 px-3 py-2"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setInviteOpen(false)}
+                onClick={() => {
+                  setInviteOpen(false)
+                  setInviteTempPassword(null)
+                  setInviteName('')
+                  setInviteEmail('')
+                }}
                 className="rounded-lg border border-black/15 px-4 py-2 text-sm"
               >
-                Cancel
+                {inviteTempPassword ? 'Done' : 'Cancel'}
               </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void sendAdminInvite()}
-                className="rounded-lg bg-headz-red px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {saving ? 'Sending…' : 'Send invite'}
-              </button>
+              {!inviteTempPassword && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void sendAdminInvite()}
+                  className="rounded-lg bg-headz-red px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {saving ? 'Creating…' : 'Create account'}
+                </button>
+              )}
             </div>
           </div>
         </div>

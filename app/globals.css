@@ -36,11 +36,11 @@
 }
 
 @layer utilities {
-  /** Marketing: Playfair italic 700 — section titles & nav (body copy stays sans in `body`) */
+  /** Marketing: Playfair 700 — section titles & nav (body copy stays sans in `body`) */
   .font-headz-display {
     font-family: var(--font-headz-display), ui-serif, Georgia, 'Times New Roman', serif;
     font-weight: 700;
-    font-style: italic;
+    font-style: normal;
   }
   .text-balance {
     text-wrap: balance;

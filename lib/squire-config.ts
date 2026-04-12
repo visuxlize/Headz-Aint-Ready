@@ -1,7 +1,10 @@
 export const SQUIRE = {
+  /** Staff dashboard in Squire — appointments, schedule, POS (single entry from Headz admin). */
+  adminAppUrl: 'https://app.getsquire.com/appointments',
   shopSlug: 'headz-aint-ready-jackson-heights-1',
   shopId: '39b8356f-26e3-4c5d-972b-b33883bbb96f',
   bookingUrl: 'https://getsquire.com/booking/book/headz-aint-ready-jackson-heights-1',
+  onlineBookingUrl: 'https://online.getsquire.com/book/headz-aint-ready-jackson-heights-1',
   widgetUrls: [
     'https://widget.getsquire.com/v2/headz-aint-ready-jackson-heights-1',
     'https://widget.getsquire.com/v2/?shop=headz-aint-ready-jackson-heights-1',

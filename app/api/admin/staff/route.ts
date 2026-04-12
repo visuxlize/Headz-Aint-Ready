@@ -4,6 +4,7 @@ import { barbers, staffAllowlist, users } from '@/lib/db/schema'
 import { asc, eq, or } from 'drizzle-orm'
 import { requireAdminApi } from '@/lib/admin/require-admin'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
+import { generateTemporaryPassword } from '@/lib/staff/generate-temporary-password'
 import { z } from 'zod'
 
 const inviteAdminSchema = z.object({
@@ -11,7 +12,7 @@ const inviteAdminSchema = z.object({
   email: z.string().email(),
 })
 
-/** POST — invite a new admin (Supabase invite + users + staff_allowlist). */
+/** POST — create admin user (Supabase createUser + users + staff_allowlist; temp password, must change on first login). */
 export async function POST(request: Request) {
   const auth = await requireAdminApi()
   if ('error' in auth) return auth.error
@@ -36,20 +37,22 @@ export async function POST(request: Request) {
   }
 
   const admin = createServiceRoleClient()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const temporaryPassword = generateTemporaryPassword()
 
-  const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(emailLower, {
-    data: { full_name: fullName },
-    redirectTo: `${appUrl.replace(/\/$/, '')}/auth/callback`,
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email: emailLower,
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
   })
 
-  if (inviteErr || !invited?.user) {
-    const msg = inviteErr?.message ?? 'Invite failed'
+  if (createErr || !created?.user) {
+    const msg = createErr?.message ?? 'Could not create auth user'
     const status = msg.toLowerCase().includes('already') ? 409 : 400
     return NextResponse.json({ error: msg }, { status })
   }
 
-  const userId = invited.user.id
+  const userId = created.user.id
 
   try {
     await db.transaction(async (tx) => {
@@ -59,6 +62,7 @@ export async function POST(request: Request) {
         fullName,
         role: 'admin',
         isActive: true,
+        mustChangePassword: true,
       })
       await tx.insert(staffAllowlist).values({ email: emailLower }).onConflictDoNothing()
     })
@@ -75,7 +79,8 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       data: { id: userId, email: emailLower },
-      message: 'Invitation sent. They can set a password from the email.',
+      temporaryPassword,
+      message: 'Account created. Share the temporary password securely; they must choose a new password after signing in.',
     },
     { status: 201 }
   )

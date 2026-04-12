@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 
 const CATEGORIES = [
@@ -73,10 +74,14 @@ export function ServicesSettingsClient() {
     try {
       const res = await fetch('/api/admin/services', { credentials: 'include' })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Failed to load')
+      if (!res.ok) {
+        toastApiError(res)
+        setRows([])
+        return
+      }
       setRows(json.data ?? [])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load services')
+      toastUnexpected(e)
       setRows([])
     } finally {
       setLoading(false)
@@ -162,14 +167,17 @@ export function ServicesSettingsClient() {
           }),
         })
         const json = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(json.error || 'Save failed')
+        if (!res.ok) {
+          toastApiError(res)
+          return
+        }
         toast.success('Service updated')
         if (json.data) {
           setRows((r) => r.map((x) => (x.id === editingId ? { ...x, ...json.data } : x)))
         }
       } catch (e) {
         setRows(prev)
-        toast.error(e instanceof Error ? e.message : 'Save failed')
+        toastUnexpected(e)
         setModalOpen(true)
       }
       return
@@ -193,12 +201,15 @@ export function ServicesSettingsClient() {
         }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Create failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Service created')
       if (json.data) setRows((r) => [...r, json.data as ServiceRow])
       else void load()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Create failed')
+      toastUnexpected(e)
       setModalOpen(true)
     }
   }
@@ -215,12 +226,15 @@ export function ServicesSettingsClient() {
         body: JSON.stringify({ isActive: next }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Update failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success(next ? 'Service activated' : 'Service deactivated')
       if (json.data) setRows((r) => r.map((x) => (x.id === svc.id ? { ...x, ...json.data } : x)))
     } catch (e) {
       setRows(prev)
-      toast.error(e instanceof Error ? e.message : 'Update failed')
+      toastUnexpected(e)
     }
   }
 
@@ -238,11 +252,14 @@ export function ServicesSettingsClient() {
         credentials: 'include',
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || 'Delete failed')
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Service removed')
       setRows((r) => r.filter((x) => x.id !== svc.id))
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Delete failed')
+      toastUnexpected(e)
     }
   }
 

@@ -35,7 +35,7 @@ export function LoginForm() {
     }
     if (err === 'no_profile') {
       setError(
-        'No staff profile is linked to this login. Ask an admin to add your email to the barber roster (or send you an invite), then try again.'
+        'No staff profile is linked to this login. Ask an admin to add you under Staff accounts or Barber management, then try again.'
       )
     }
   }, [searchParams])

@@ -6,6 +6,7 @@ import { requireAdminApi } from '@/lib/admin/require-admin'
 import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { slugifyName } from '@/lib/utils/slug'
+import { generateTemporaryPassword } from '@/lib/staff/generate-temporary-password'
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
@@ -58,7 +59,7 @@ export async function GET() {
   return NextResponse.json({ data })
 }
 
-/** POST — invite barber (auth) + users + barbers + staff_allowlist */
+/** POST — create barber auth user + users + barbers + staff_allowlist (temp password, must change on first login) */
 export async function POST(request: Request) {
   const auth = await requireAdminApi()
   if ('error' in auth) return auth.error
@@ -93,20 +94,22 @@ export async function POST(request: Request) {
   }
 
   const admin = createServiceRoleClient()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const temporaryPassword = generateTemporaryPassword()
 
-  const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(emailLower, {
-    data: { full_name: name },
-    redirectTo: `${appUrl.replace(/\/$/, '')}/auth/callback`,
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email: emailLower,
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: { full_name: name },
   })
 
-  if (inviteErr || !invited?.user) {
-    const msg = inviteErr?.message ?? 'Invite failed'
+  if (createErr || !created?.user) {
+    const msg = createErr?.message ?? 'Could not create auth user'
     const status = msg.toLowerCase().includes('already') ? 409 : 400
     return NextResponse.json({ error: msg }, { status })
   }
 
-  const userId = invited.user.id
+  const userId = created.user.id
   const slug = await uniqueBarberSlug(name)
 
   try {
@@ -117,6 +120,7 @@ export async function POST(request: Request) {
         fullName: name,
         role: 'barber',
         isActive: true,
+        mustChangePassword: true,
       })
       await tx.insert(barbers).values({
         userId,
@@ -140,7 +144,8 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       data: { id: userId, email: emailLower },
-      message: 'Invitation sent. They can set a password from the email.',
+      temporaryPassword,
+      message: 'Account created. Share the temporary password securely; they must choose a new password after signing in.',
     },
     { status: 201 }
   )

@@ -1,16 +1,17 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { db } from '@/lib/db'
-import { barbersForPublicMarketingCondition } from '@/lib/barbers/public-queries'
+import { fetchMarketingBarbersForHomePage } from '@/lib/barbers/public-queries'
 import {
   getPublishedFallbackPrices,
   getPublishedFallbackTeam,
   type MarketingBarberCard,
   type MarketingPriceRow,
 } from '@/lib/marketing/home-fallbacks'
-import { barbers, services, users } from '@/lib/db/schema'
+import { services } from '@/lib/db/schema'
 import { asc, eq } from 'drizzle-orm'
 import { SITE } from '@/lib/site-config'
+import { SQUIRE } from '@/lib/squire-config'
 import { formatServicePriceDisplay } from '@/lib/services/format-service-price'
 import { GOOGLE_READ_REVIEWS_URL, GOOGLE_WRITE_REVIEW_URL } from '@/lib/marketing/google-reviews'
 import { formatServiceDurationLabel, marketingServiceDescription } from '@/lib/marketing/price-list-ui'
@@ -66,14 +67,6 @@ export default async function HomePage() {
   let barbersList: MarketingBarberCard[] = []
   let priceRows: MarketingPriceRow[] = []
 
-  const barbersQuery = db
-    .select({ barber: barbers })
-    .from(barbers)
-    .leftJoin(users, eq(barbers.userId, users.id))
-    .where(barbersForPublicMarketingCondition)
-    .orderBy(asc(barbers.sortOrder))
-    .then((rows) => rows.map((r) => r.barber))
-
   const pricesQuery = db
     .select({
       id: services.id,
@@ -87,26 +80,29 @@ export default async function HomePage() {
     .where(eq(services.isActive, true))
     .orderBy(asc(services.displayOrder))
 
-  const [barbersSettled, pricesSettled] = await Promise.allSettled([barbersQuery, pricesQuery])
+  const [barbersOutcome, pricesOutcome] = await Promise.all([
+    fetchMarketingBarbersForHomePage()
+      .then((list) => ({ ok: true as const, list }))
+      .catch((error: unknown) => ({ ok: false as const, error })),
+    pricesQuery
+      .then((rows) => ({ ok: true as const, rows }))
+      .catch((error: unknown) => ({ ok: false as const, error })),
+  ])
 
-  if (barbersSettled.status === 'fulfilled' && barbersSettled.value.length > 0) {
-    barbersList = barbersSettled.value.map((b) => ({
-      id: b.id,
-      name: b.name,
-      avatarUrl: b.avatarUrl,
-    }))
+  if (barbersOutcome.ok && barbersOutcome.list.length > 0) {
+    barbersList = barbersOutcome.list
   } else {
-    if (barbersSettled.status === 'rejected') {
-      console.error('HomePage: barbers query failed', barbersSettled.reason)
+    if (!barbersOutcome.ok) {
+      console.error('HomePage: barbers query failed', barbersOutcome.error)
     }
     barbersList = getPublishedFallbackTeam()
   }
 
-  if (pricesSettled.status === 'fulfilled' && pricesSettled.value.length > 0) {
-    priceRows = pricesSettled.value
+  if (pricesOutcome.ok && pricesOutcome.rows.length > 0) {
+    priceRows = pricesOutcome.rows
   } else {
-    if (pricesSettled.status === 'rejected') {
-      console.error('HomePage: services query failed', pricesSettled.reason)
+    if (!pricesOutcome.ok) {
+      console.error('HomePage: services query failed', pricesOutcome.error)
     }
     priceRows = getPublishedFallbackPrices()
   }
@@ -287,12 +283,26 @@ export default async function HomePage() {
               <p className="text-center text-sm font-medium text-headz-black/90 lg:text-left">
                 Ready when you are — pick your cut on the next screen.
               </p>
-              <Link
-                href="/book"
+              <a
+                href={SQUIRE.bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex min-h-[3.25rem] items-center justify-center bg-headz-red px-8 py-3.5 text-center text-sm font-semibold uppercase tracking-widest text-white shadow-lg transition hover:bg-[var(--headz-red-dark)] hover:shadow-headz-red/25"
               >
                 Book your cut
-              </Link>
+              </a>
+              <p className="flex items-center justify-center gap-1.5 text-[11px] text-headz-black/35 lg:justify-start">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Booking powered by Squire
+              </p>
               <Link
                 href="#prices"
                 className="text-center text-sm font-medium text-headz-red underline-offset-4 hover:underline lg:text-left"
@@ -304,27 +314,30 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Team */}
-      <section id="team" className="py-20 px-4 sm:px-6 max-w-6xl mx-auto">
-        <h2 className="font-headz-display text-center text-3xl mb-4">The Dream Team</h2>
-        <p className="text-headz-gray text-center max-w-xl mx-auto mb-12">
+      {/* Team — single row; columns shrink on small screens, roomier on tablet/desktop */}
+      <section id="team" className="mx-auto max-w-7xl px-3 py-16 sm:px-5 sm:py-20 md:px-6">
+        <h2 className="font-headz-display mb-3 text-center text-3xl sm:mb-4">The Dream Team</h2>
+        <p className="mx-auto mb-8 max-w-xl text-center text-sm text-headz-gray sm:mb-10 sm:text-base">
           Headz Ain&apos;t Ready Master Barbers. Pick your favorite when you book.
         </p>
-        <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-10">
+        <div className="mx-auto grid w-full grid-cols-7 gap-x-1.5 gap-y-0 sm:gap-x-2 md:gap-x-4 lg:gap-x-6 xl:gap-x-8">
           {barbersList.map((barber) => (
-            <div key={barber.id} className="w-40 shrink-0 text-center sm:w-44 md:w-48">
-              <div className="aspect-square rounded-full overflow-hidden mx-auto mb-4 max-w-[200px] bg-headz-black/10">
+            <div
+              key={barber.id}
+              className="min-w-0 flex flex-col items-center text-center"
+            >
+              <div className="relative mb-1.5 aspect-square w-full overflow-hidden rounded-full bg-headz-black/10 sm:mb-2 md:mb-3">
                 {barber.avatarUrl ? (
                   <Image
                     src={barber.avatarUrl}
                     alt={barber.name}
-                    width={200}
-                    height={200}
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 480px) 13vw, (max-width: 768px) 12vw, (max-width: 1024px) 11vw, 120px"
+                    className="object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-headz-cream border-2 border-headz-red/15 flex items-center justify-center">
-                    <span className="text-headz-red font-semibold text-3xl sm:text-4xl tracking-tight">
+                  <div className="flex h-full w-full items-center justify-center border-2 border-headz-red/15 bg-headz-cream">
+                    <span className="text-headz-red font-semibold leading-none tracking-tight [font-size:clamp(0.65rem,3.2vw,2.25rem)]">
                       {barber.name
                         .split(/\s+/)
                         .filter(Boolean)
@@ -336,8 +349,12 @@ export default async function HomePage() {
                   </div>
                 )}
               </div>
-              <h3 className="font-semibold">{barber.name}</h3>
-              <p className="text-headz-gray text-sm">Master Barber</p>
+              <h3 className="w-full truncate px-0.5 text-[0.62rem] font-semibold leading-tight text-headz-black sm:px-0 sm:text-xs md:text-sm">
+                {barber.name}
+              </h3>
+              <p className="mt-0.5 text-[0.5rem] leading-tight text-headz-gray sm:text-[0.65rem] md:text-xs">
+                Master Barber
+              </p>
             </div>
           ))}
         </div>
@@ -388,24 +405,24 @@ export default async function HomePage() {
               </a>
               . Tap a photo to open the original post — follow for lineups, reels, and shop drops.
             </p>
-            <div className="grid w-full grid-cols-1 gap-4">
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-2.5 md:gap-3">
               {instagramGalleryPhotos.map((item, index) => (
                 <a
                   key={`${item.postUrl}-${index}`}
                   href={item.postUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative h-[clamp(20rem,40vw,28rem)] w-full overflow-hidden rounded-xl bg-neutral-200 shadow-md ring-1 ring-black/[0.06] transition duration-300 hover:ring-headz-red/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
+                  className="group relative aspect-[4/5] w-full min-w-0 overflow-hidden rounded-sm bg-neutral-200 ring-1 ring-black/[0.08] transition duration-300 hover:ring-headz-red/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-headz-red"
                 >
                   <Image
                     src={item.src}
                     alt={item.alt}
                     fill
-                    className="object-cover object-center transition duration-500 group-hover:scale-[1.03]"
-                    sizes="(max-width: 1024px) min(100vw, 42rem), (max-width: 1536px) 58vw, 720px"
+                    className="object-cover object-center transition duration-300 group-hover:scale-[1.02]"
+                    sizes="(max-width: 1024px) 45vw, 360px"
                     unoptimized
                   />
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-white opacity-0 transition group-hover:opacity-100">
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent px-1 py-2 text-center text-[8px] font-semibold uppercase tracking-wider text-white opacity-0 transition group-hover:opacity-100 sm:text-[9px] sm:py-2.5">
                     Open in Instagram
                   </span>
                 </a>

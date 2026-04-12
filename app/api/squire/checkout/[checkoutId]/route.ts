@@ -72,8 +72,12 @@ export async function GET(_request: Request, context: { params: Promise<{ checko
     .where(eq(posTransactions.squareTerminalCheckoutId, checkoutId))
     .limit(1)
   if (scopeTxn) {
-    const forbidden = requireBarberUserId(auth, scopeTxn.barberId)
-    if (forbidden) return forbidden
+    if (scopeTxn.barberId) {
+      const forbidden = requireBarberUserId(auth, scopeTxn.barberId)
+      if (forbidden) return forbidden
+    } else if (auth.dbUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
   } else if (auth.dbUser.role !== 'admin') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

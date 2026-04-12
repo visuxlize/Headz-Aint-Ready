@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
+import { toastApiError, toastUnexpected } from '@/lib/errors/toast-safe'
 import { parseJsonResponse } from '@/lib/utils/parse-json-response'
 
 export function BlockTimeModal({
@@ -67,11 +68,14 @@ export function BlockTimeModal({
         body: JSON.stringify(body),
       })
       const j = await parseJsonResponse<{ error?: string }>(res)
-      if (!res.ok) throw new Error(j.error || `Failed (${res.status})`)
+      if (!res.ok) {
+        toastApiError(res)
+        return
+      }
       toast.success('Blocked')
       onClose()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed')
+      toastUnexpected(e)
     } finally {
       setLoading(false)
     }

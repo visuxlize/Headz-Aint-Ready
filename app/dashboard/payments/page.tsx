@@ -7,6 +7,7 @@ import { ChevronLeft, Download, ExternalLink, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatMoney } from '@/lib/utils/format-money'
 import { cn } from '@/lib/utils/cn'
+import { SQUIRE } from '@/lib/squire-config'
 
 type Txn = {
   id: string
@@ -456,7 +457,7 @@ export default function PaymentsPage() {
                             </button>
                           )}
                           <a
-                            href="https://app.getsquire.com/payments"
+                            href={SQUIRE.adminAppUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-0.5 text-xs text-headz-gray hover:text-headz-black"

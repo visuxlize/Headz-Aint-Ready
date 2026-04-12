@@ -1,9 +1,10 @@
-import { SquireIntegrationSettingsClient } from '@/components/dashboard/SquireIntegrationSettingsClient'
+import { redirect } from 'next/navigation'
+import { SQUIRE } from '@/lib/squire-config'
 
 export const metadata = {
-  title: 'Squire Settings | Headz Staff',
+  title: 'Squire | Headz Staff',
 }
 
-export default function SquireSettingsPage() {
-  return <SquireIntegrationSettingsClient />
+export default function SquireSettingsRedirectPage() {
+  redirect(SQUIRE.adminAppUrl)
 }

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, ChevronLeft, Loader2, XCircle } from 'lucide-react'
 import { SquirePOSStatus } from '@/components/pos/SquirePOSStatus'
+import { SQUIRE } from '@/lib/squire-config'
 
 type ServiceRow = { id: string; name: string; price: string }
 type BootstrapPayload = {
@@ -225,7 +226,7 @@ export default function BarberSquirePosPage() {
       </div>
 
       <a
-        href="https://app.getsquire.com/pos"
+        href={SQUIRE.adminAppUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-6 flex w-full items-center justify-center rounded-2xl bg-headz-red py-4 text-center text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-headz-red/30 transition hover:bg-headz-redDark"
