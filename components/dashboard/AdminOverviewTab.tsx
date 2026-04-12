@@ -183,67 +183,67 @@ export function AdminOverviewTab() {
       {/* Hero */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div
-          className="animate-slide-up rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+          className="animate-slide-up rounded-2xl border border-teal-200/60 bg-gradient-to-br from-white to-teal-50/30 p-5 shadow-sm transition-shadow hover:shadow-md"
           style={{ animationDelay: '0ms' }}
         >
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">Cash today</p>
-              <p className="mt-2 font-mono text-2xl font-black tabular-nums text-emerald-600">{formatMoney(cash)}</p>
+              <p className="mt-2 font-mono text-2xl font-black tabular-nums text-teal-800">{formatMoney(cash)}</p>
             </div>
-            <span className="rounded-xl bg-emerald-500/15 p-2.5 text-emerald-600">
+            <span className="rounded-xl bg-teal-100/90 p-2.5 text-teal-800">
               <Banknote className="h-5 w-5" />
             </span>
           </div>
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-black/5">
-            <div className="h-full bg-emerald-500/80 transition-all" style={{ width: `${cashShare}%` }} />
+          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-teal-900/10">
+            <div className="h-full bg-teal-400/85 transition-all" style={{ width: `${cashShare}%` }} />
           </div>
         </div>
         <div
-          className="animate-slide-up rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+          className="animate-slide-up rounded-2xl border border-sky-200/60 bg-gradient-to-br from-white to-sky-50/35 p-5 shadow-sm transition-shadow hover:shadow-md"
           style={{ animationDelay: '60ms' }}
         >
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">Card today</p>
-              <p className="mt-2 font-mono text-2xl font-black tabular-nums text-blue-600">{formatMoney(card)}</p>
+              <p className="mt-2 font-mono text-2xl font-black tabular-nums text-sky-800">{formatMoney(card)}</p>
             </div>
-            <span className="rounded-xl bg-blue-500/15 p-2.5 text-blue-600">
+            <span className="rounded-xl bg-sky-100/90 p-2.5 text-sky-800">
               <CreditCard className="h-5 w-5" />
             </span>
           </div>
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-black/5">
-            <div className="h-full bg-blue-500/80 transition-all" style={{ width: `${100 - cashShare}%` }} />
+          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-sky-900/10">
+            <div className="h-full bg-sky-400/85 transition-all" style={{ width: `${100 - cashShare}%` }} />
           </div>
         </div>
         <div
-          className="animate-slide-up rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+          className="animate-slide-up rounded-2xl border border-rose-200/60 bg-gradient-to-br from-white to-rose-50/30 p-5 shadow-sm transition-shadow hover:shadow-md"
           style={{ animationDelay: '120ms' }}
         >
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">Tickets today</p>
-              <p className="mt-2 font-mono text-2xl font-black tabular-nums text-headz-red">{Math.round(tickCount)}</p>
+              <p className="mt-2 font-mono text-2xl font-black tabular-nums text-rose-900">{Math.round(tickCount)}</p>
               <p className="mt-1 text-xs text-headz-gray">
                 {cashTickets} cash · {cardTickets} card
               </p>
             </div>
-            <span className="rounded-xl bg-headz-red/15 p-2.5 text-headz-red">
+            <span className="rounded-xl bg-rose-100/90 p-2.5 text-rose-900">
               <ReceiptText className="h-5 w-5" />
             </span>
           </div>
         </div>
         <div
-          className="animate-slide-up rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+          className="animate-slide-up rounded-2xl border border-violet-200/60 bg-gradient-to-br from-white to-violet-50/30 p-5 shadow-sm transition-shadow hover:shadow-md"
           style={{ animationDelay: '180ms' }}
         >
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">Active barbers</p>
-              <p className="mt-2 text-2xl font-black text-headz-black">{overview.activeBarbers ?? 0}</p>
+              <p className="mt-2 text-2xl font-black text-violet-950">{overview.activeBarbers ?? 0}</p>
               <p className="mt-1 text-xs text-headz-gray">{format(new Date(), 'EEE MMM d')}</p>
             </div>
-            <span className="rounded-xl bg-purple-500/15 p-2.5 text-purple-700">
+            <span className="rounded-xl bg-violet-100/90 p-2.5 text-violet-800">
               <Users className="h-5 w-5" />
             </span>
           </div>
@@ -305,7 +305,7 @@ export function AdminOverviewTab() {
                   <span
                     className={cn(
                       'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                      t.paymentMethod === 'cash' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                      t.paymentMethod === 'cash' ? 'bg-teal-100 text-teal-800' : 'bg-sky-100 text-sky-800'
                     )}
                   >
                     {t.paymentMethod === 'cash' ? 'CASH' : 'CARD'}
@@ -343,8 +343,8 @@ export function AdminOverviewTab() {
                       <span className="text-sm font-bold tabular-nums">{formatMoney(b.total)}</span>
                     </div>
                     <div className="mt-1 flex h-1 overflow-hidden rounded-full bg-black/5">
-                      <div className="h-full bg-emerald-500" style={{ width: `${cw}%` }} />
-                      <div className="h-full bg-blue-500" style={{ width: `${100 - cw}%` }} />
+                      <div className="h-full bg-teal-400/90" style={{ width: `${cw}%` }} />
+                      <div className="h-full bg-sky-400/90" style={{ width: `${100 - cw}%` }} />
                     </div>
                   </li>
                 )

@@ -406,9 +406,9 @@ export default async function HomePage() {
               . Tap a photo to open the original post — follow for lineups, reels, and shop drops.
             </p>
             <div className="grid w-full grid-cols-2 gap-2 sm:gap-2.5 md:gap-3">
-              {instagramGalleryPhotos.map((item, index) => (
+              {instagramGalleryPhotos.map((item) => (
                 <a
-                  key={`${item.postUrl}-${index}`}
+                  key={item.postUrl}
                   href={item.postUrl}
                   target="_blank"
                   rel="noopener noreferrer"

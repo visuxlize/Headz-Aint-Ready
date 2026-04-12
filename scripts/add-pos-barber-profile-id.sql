@@ -9,3 +9,6 @@ ALTER TABLE pos_transactions ADD COLUMN IF NOT EXISTS barber_profile_id uuid REF
 ALTER TABLE pos_transactions ALTER COLUMN barber_id DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS pos_transactions_barber_profile_id_idx ON pos_transactions (barber_profile_id);
+
+-- Required for Drizzle `pos_transactions.source` on inserts (manual tickets, POS, Squire).
+ALTER TABLE pos_transactions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'manual';

@@ -380,90 +380,74 @@ export async function POST(request: Request) {
 
     const insertWithSource = () =>
       db.insert(posTransactions).values({ ...baseInsert, source: 'manual' as const }).returning()
-    const insertNoSource = () => db.insert(posTransactions).values(baseInsert).returning()
 
-    try {
-      ;[inserted] = await insertWithSource()
-    } catch (e) {
-      lastInsertError = e
-      if (needsPosManualTicketDdls(e)) {
-        const migrated = await runPosTransactionsManualTicketDdls()
-        if (migrated) {
-          try {
-            ;[inserted] = await insertWithSource()
-          } catch (e2) {
-            lastInsertError = e2
-            if (isMissingPosSourceColumnError(e2)) {
-              ;[inserted] = await insertNoSource()
-            } else {
-              lastInsertError = e2
-            }
-          }
-        }
-      } else if (isMissingPosSourceColumnError(e)) {
-        try {
-          ;[inserted] = await insertNoSource()
-        } catch (e2) {
-          lastInsertError = e2
-          if (needsPosManualTicketDdls(e2)) {
-            const migrated = await runPosTransactionsManualTicketDdls()
-            if (migrated) {
-              ;[inserted] = await insertNoSource()
-            } else {
-              lastInsertError = e2
-            }
-          } else {
-            lastInsertError = e2
-          }
-        }
-      } else {
+    /** Omitting `source` in `.values()` still makes Drizzle emit `source` (schema default) — useless when the column is missing; fix schema via DDL instead. */
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        ;[inserted] = await insertWithSource()
+        lastInsertError = undefined
+        break
+      } catch (e) {
         lastInsertError = e
+        const canAutoMigrate =
+          needsPosManualTicketDdls(e) || isMissingPosSourceColumnError(e)
+        if (!canAutoMigrate || attempt >= 2) break
+        const migrated = await runPosTransactionsManualTicketDdls()
+        if (!migrated) break
       }
+    }
 
-      if (!inserted && needsPosManualTicketDdls(lastInsertError)) {
-        const [link] = await db
-          .select({ userId: barbers.userId })
-          .from(barbers)
-          .where(eq(barbers.id, barberProfileId))
-          .limit(1)
-        const staffUserId = link?.userId
+    if (!inserted && lastInsertError != null && needsPosManualTicketDdls(lastInsertError)) {
+      const [link] = await db
+        .select({ userId: barbers.userId })
+        .from(barbers)
+        .where(eq(barbers.id, barberProfileId))
+        .limit(1)
+      const staffUserId = link?.userId
 
-        if (staffUserId) {
-          const legacyInsert = {
-            customerName,
-            barberId: staffUserId,
-            appointmentId: null as string | null,
-            serviceId: svcRow.id,
-            items,
-            subtotal: amount.toFixed(2),
-            tipAmount: tip.toFixed(2),
-            total: total.toFixed(2),
-            paymentMethod,
-            paymentStatus: 'paid' as const,
-          }
-          try {
+      if (staffUserId) {
+        const legacyInsert = {
+          customerName,
+          barberId: staffUserId,
+          appointmentId: null as string | null,
+          serviceId: svcRow.id,
+          items,
+          subtotal: amount.toFixed(2),
+          tipAmount: tip.toFixed(2),
+          total: total.toFixed(2),
+          paymentMethod,
+          paymentStatus: 'paid' as const,
+        }
+        try {
+          ;[inserted] = await db
+            .insert(posTransactions)
+            .values({ ...legacyInsert, source: 'manual' as const })
+            .returning()
+        } catch (e2) {
+          if (!isMissingPosSourceColumnError(e2)) throw e2
+          const migrated = await runPosTransactionsManualTicketDdls()
+          if (migrated) {
             ;[inserted] = await db
               .insert(posTransactions)
               .values({ ...legacyInsert, source: 'manual' as const })
               .returning()
-          } catch (e2) {
-            if (!isMissingPosSourceColumnError(e2)) throw e2
-            ;[inserted] = await db.insert(posTransactions).values(legacyInsert).returning()
+          } else {
+            lastInsertError = e2
           }
         }
-
-        if (!inserted) {
-          return NextResponse.json(
-            {
-              error:
-                'Manual tickets need `barber_profile_id` on `pos_transactions` (and nullable `barber_id`), or a staff login linked to this barber. Automatic migration failed — use a direct Postgres URL for DDL: set `DATABASE_URL_NON_POOLING` to Supabase Connect → **Direct**, or run `scripts/add-pos-barber-profile-id.sql` in the SQL Editor.',
-            },
-            { status: 503 }
-          )
-        }
-      } else if (!inserted) {
-        throw lastInsertError
       }
+
+      if (!inserted) {
+        return NextResponse.json(
+          {
+            error:
+              'Manual tickets need `barber_profile_id` on `pos_transactions` (and nullable `barber_id`), or a staff login linked to this barber. Automatic migration failed — use a direct Postgres URL for DDL: set `DATABASE_URL_NON_POOLING` to Supabase Connect → **Direct**, or run `scripts/add-pos-barber-profile-id.sql` in the SQL Editor.',
+          },
+          { status: 503 }
+        )
+      }
+    } else if (!inserted && lastInsertError != null) {
+      throw lastInsertError
     }
 
     if (!inserted) {

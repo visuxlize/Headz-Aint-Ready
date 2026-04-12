@@ -21,8 +21,11 @@ export function postgresErrorText(e: unknown): string {
 /** Older DBs without `pos_transactions.source`. */
 export function isMissingPosSourceColumnError(e: unknown): boolean {
   const msg = postgresErrorText(e)
-  return /pos_transactions\.["']?source["']? does not exist|column .*source.*does not exist|\b42703\b.*source/i.test(
-    msg
+  return (
+    /column "source" of relation "pos_transactions"/i.test(msg) ||
+    /pos_transactions\.["']?source["']? does not exist/i.test(msg) ||
+    /column .*source.*does not exist/i.test(msg) ||
+    /\b42703\b.*source/i.test(msg)
   )
 }
 

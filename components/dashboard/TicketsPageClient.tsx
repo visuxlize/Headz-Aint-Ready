@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, formatDistanceToNow } from 'date-fns'
 import {
   Banknote,
+  CalendarDays,
   CreditCard,
   Loader2,
   Pencil,
@@ -21,6 +22,7 @@ import { useAnimatedCounter } from '@/lib/hooks/useAnimatedCounter'
 import { formatMoney } from '@/lib/utils/format-money'
 import { cn } from '@/lib/utils/cn'
 import { HeadzFormSelect } from '@/components/dashboard/HeadzFormSelect'
+import { ConfirmModal } from '@/components/barber/ConfirmModal'
 
 function TicketsPageSkeleton() {
   return (
@@ -116,6 +118,8 @@ export function TicketsPageClient({
   const [newTicketId, setNewTicketId] = useState<string | null>(null)
   const [pulseStat, setPulseStat] = useState<'cash' | 'card' | 'count' | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [voidTicketId, setVoidTicketId] = useState<string | null>(null)
+  const [voidLoading, setVoidLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editBarberId, setEditBarberId] = useState('')
@@ -257,8 +261,10 @@ export function TicketsPageClient({
     }
   }
 
-  const voidTicket = async (id: string) => {
-    if (!window.confirm('Void this ticket? It will be removed from today’s cash/card totals.')) return
+  const executeVoidTicket = async () => {
+    const id = voidTicketId
+    if (!id) return
+    setVoidLoading(true)
     setRemovingId(id)
     try {
       const res = await fetch(`/api/dashboard/tickets/${id}`, { method: 'DELETE', credentials: 'include' })
@@ -269,11 +275,13 @@ export function TicketsPageClient({
       await res.json().catch(() => null)
       setEditingId((eid) => (eid === id ? null : eid))
       setTickets((prev) => prev.filter((t) => t.id !== id))
+      setVoidTicketId(null)
       void load()
     } catch (e) {
       setErr(publicMessageFromUnknown(e))
     } finally {
       setRemovingId(null)
+      setVoidLoading(false)
     }
   }
 
@@ -348,69 +356,98 @@ export function TicketsPageClient({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div
             className={cn(
-              'rounded-2xl border border-emerald-800/10 bg-gradient-to-br from-white to-emerald-50/40 p-5 shadow-sm transition-all',
-              pulseStat === 'cash' && 'ring-2 ring-emerald-500/40 ring-offset-2 ring-offset-headz-cream'
+              'rounded-2xl border border-teal-200/70 bg-gradient-to-br from-white to-teal-50/35 p-5 shadow-sm transition-all',
+              pulseStat === 'cash' && 'ring-2 ring-teal-300/60 ring-offset-2 ring-offset-headz-cream'
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-800/70">Cash today</p>
-                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-emerald-700">{formatMoney(cashAnim)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700/75">Cash today</p>
+                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-teal-800">{formatMoney(cashAnim)}</p>
               </div>
-              <span className="rounded-xl bg-emerald-600/12 p-2.5 text-emerald-700">
+              <span className="rounded-xl bg-teal-100/90 p-2.5 text-teal-800">
                 <Banknote className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-emerald-900/10">
-              <div className="h-full w-[72%] rounded-full bg-emerald-500 transition-all" />
+            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-teal-900/10">
+              <div className="h-full w-[72%] rounded-full bg-teal-400/90 transition-all" />
             </div>
           </div>
           <div
             className={cn(
-              'rounded-2xl border border-blue-800/10 bg-gradient-to-br from-white to-blue-50/50 p-5 shadow-sm transition-all',
-              pulseStat === 'card' && 'ring-2 ring-blue-500/40 ring-offset-2 ring-offset-headz-cream'
+              'rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white to-sky-50/40 p-5 shadow-sm transition-all',
+              pulseStat === 'card' && 'ring-2 ring-sky-300/60 ring-offset-2 ring-offset-headz-cream'
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-900/60">Card today</p>
-                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-blue-700">{formatMoney(cardAnim)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-700/75">Card today</p>
+                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-sky-800">{formatMoney(cardAnim)}</p>
               </div>
-              <span className="rounded-xl bg-blue-600/12 p-2.5 text-blue-700">
+              <span className="rounded-xl bg-sky-100/90 p-2.5 text-sky-800">
                 <CreditCard className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-blue-900/10">
-              <div className="h-full w-[72%] rounded-full bg-blue-500 transition-all" />
+            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-sky-900/10">
+              <div className="h-full w-[72%] rounded-full bg-sky-400/90 transition-all" />
             </div>
           </div>
           <div
             className={cn(
-              'rounded-2xl border border-headz-red/20 bg-gradient-to-br from-white to-headz-red/[0.06] p-5 shadow-sm transition-all',
-              pulseStat === 'count' && 'ring-2 ring-headz-red/45 ring-offset-2 ring-offset-headz-cream'
+              'rounded-2xl border border-rose-200/80 bg-gradient-to-br from-white to-rose-50/35 p-5 shadow-sm transition-all',
+              pulseStat === 'count' && 'ring-2 ring-rose-300/55 ring-offset-2 ring-offset-headz-cream'
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-red/80">Tickets today</p>
-                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-headz-red">{Math.round(countAnim)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-700/80">Tickets today</p>
+                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-rose-800">{Math.round(countAnim)}</p>
               </div>
-              <span className="rounded-xl bg-headz-red/12 p-2.5 text-headz-red">
+              <span className="rounded-xl bg-rose-100/90 p-2.5 text-rose-800">
                 <ReceiptText className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-headz-red/10">
-              <div className="h-full w-[72%] rounded-full bg-headz-red/80 transition-all" />
+            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-rose-900/10">
+              <div className="h-full w-[72%] rounded-full bg-rose-400/85 transition-all" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ZONE B */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,440px)_1fr]">
-        <div>
+      {/* Shop day + search — directly under KPIs */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-headz-red/15 bg-gradient-to-r from-white to-headz-cream/40 px-4 py-3 shadow-sm shadow-black/[0.03]">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-headz-red/10 text-headz-red">
+            <CalendarDays className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">Shop day</p>
+            <p className="truncate font-serif text-base font-bold text-headz-black sm:text-lg">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-rose-200/90 px-3 py-1.5 font-mono text-sm font-black tabular-nums text-rose-950 shadow-sm">
+            {tickets.length}
+          </span>
+        </div>
+        <div className="relative w-full sm:max-w-md lg:max-w-lg">
+          <span className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center">
+            <Search className="h-4 w-4 shrink-0 text-headz-gray" aria-hidden />
+          </span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search barber or customer…"
+            className="w-full rounded-2xl border-2 border-black/[0.08] bg-white py-3 pl-11 pr-4 text-sm shadow-inner shadow-black/[0.02] transition-colors focus:border-headz-red/40 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
+          />
+        </div>
+      </div>
+
+      {/* Left: add ticket · Right: list + end of day */}
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,400px)_1fr] lg:gap-10">
+        <div className="lg:sticky lg:top-24">
           <h2 className="mb-3 font-serif text-xl font-bold text-headz-black">Add ticket</h2>
-          <div className="space-y-5 rounded-2xl border border-headz-red/15 bg-gradient-to-b from-white to-headz-cream/30 p-6 shadow-md shadow-headz-black/5">
+          <div className="space-y-5 rounded-2xl border-2 border-headz-red/20 bg-gradient-to-b from-white via-white to-headz-cream/35 p-6 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] ring-1 ring-headz-red/10">
             {formDisabled ? (
               <p className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
                 No active services in the catalog. Add services in the database or admin tools, then refresh this page.
@@ -477,7 +514,9 @@ export function TicketsPageClient({
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-headz-black">Tip amount</p>
                   <div className="relative max-w-[160px]">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-headz-gray">$</span>
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex w-8 items-center justify-center text-headz-gray">
+                      $
+                    </span>
                     <input
                       value={tipStr}
                       onChange={(e) => setTipStr(e.target.value)}
@@ -503,8 +542,8 @@ export function TicketsPageClient({
                   className={cn(
                     'flex items-center justify-center gap-2 rounded-xl py-4 text-sm font-bold uppercase tracking-wide transition-all',
                     paymentMethod === 'cash'
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 ring-2 ring-emerald-400/80 ring-offset-2'
-                      : 'border-2 border-black/10 bg-white text-headz-gray hover:border-emerald-600/35 hover:bg-emerald-50/50'
+                      ? 'bg-teal-600/90 text-white shadow-lg shadow-teal-900/15 ring-2 ring-teal-300/70 ring-offset-2'
+                      : 'border-2 border-black/10 bg-white text-headz-gray hover:border-teal-400/40 hover:bg-teal-50/60'
                   )}
                 >
                   <Banknote className="h-5 w-5 shrink-0" />
@@ -516,8 +555,8 @@ export function TicketsPageClient({
                   className={cn(
                     'flex items-center justify-center gap-2 rounded-xl py-4 text-sm font-bold uppercase tracking-wide transition-all',
                     paymentMethod === 'card'
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20 ring-2 ring-blue-400/80 ring-offset-2'
-                      : 'border-2 border-black/10 bg-white text-headz-gray hover:border-blue-600/35 hover:bg-blue-50/50'
+                      ? 'bg-sky-600/90 text-white shadow-lg shadow-sky-900/15 ring-2 ring-sky-300/70 ring-offset-2'
+                      : 'border-2 border-black/10 bg-white text-headz-gray hover:border-sky-400/40 hover:bg-sky-50/60'
                   )}
                 >
                   <CreditCard className="h-5 w-5 shrink-0" />
@@ -561,29 +600,16 @@ export function TicketsPageClient({
           </div>
         </div>
 
-        <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold text-headz-black">
-              Today — {format(new Date(), 'EEEE MMMM d')}
-              <span className="ml-2 inline-flex items-center rounded-full bg-headz-red/10 px-2 py-0.5 text-xs font-semibold text-headz-red">
-                {tickets.length}
-              </span>
-            </h2>
-            {lastUpdated ? (
-              <span className="text-xs text-headz-gray/80">
-                Updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
-              </span>
-            ) : null}
-          </div>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-headz-gray" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search barber or customer…"
-              className="w-full rounded-xl border-2 border-black/[0.08] bg-white py-2.5 pl-9 pr-3 text-sm transition-colors focus:border-headz-red/40 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
-            />
-          </div>
+        <div className="space-y-8">
+          <div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
+              <h2 className="font-serif text-xl font-bold text-headz-black">Today&apos;s tickets</h2>
+              {lastUpdated ? (
+                <span className="text-xs text-headz-gray/80">
+                  Updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
+                </span>
+              ) : null}
+            </div>
 
           {loading && !tickets.length ? (
             <div className="py-12 text-center text-headz-gray">Loading…</div>
@@ -619,8 +645,8 @@ export function TicketsPageClient({
                             className={cn(
                               'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
                               t.paymentMethod === 'cash'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-blue-100 text-blue-700'
+                                ? 'bg-teal-100 text-teal-800'
+                                : 'bg-sky-100 text-sky-800'
                             )}
                           >
                             {t.paymentMethod === 'cash' ? 'CASH' : 'CARD'}
@@ -658,7 +684,7 @@ export function TicketsPageClient({
                               type="button"
                               aria-label="Void ticket"
                               disabled={removingId === t.id}
-                              onClick={() => void voidTicket(t.id)}
+                              onClick={() => setVoidTicketId(t.id)}
                               className="rounded p-1 text-headz-gray/40 transition hover:bg-red-50 hover:text-headz-red disabled:opacity-50"
                             >
                               <X className="h-4 w-4" />
@@ -723,7 +749,7 @@ export function TicketsPageClient({
                                   className={cn(
                                     'rounded-lg py-2 text-xs font-bold uppercase',
                                     editPayment === 'cash'
-                                      ? 'bg-emerald-600 text-white'
+                                      ? 'bg-teal-600/90 text-white'
                                       : 'border border-black/10 bg-white text-headz-gray'
                                   )}
                                 >
@@ -735,7 +761,7 @@ export function TicketsPageClient({
                                   className={cn(
                                     'rounded-lg py-2 text-xs font-bold uppercase',
                                     editPayment === 'card'
-                                      ? 'bg-blue-600 text-white'
+                                      ? 'bg-sky-600/90 text-white'
                                       : 'border border-black/10 bg-white text-headz-gray'
                                   )}
                                 >
@@ -770,114 +796,124 @@ export function TicketsPageClient({
               })}
             </ul>
           )}
-        </div>
-      </div>
-
-      {/* ZONE C */}
-      <div>
-        <h2 className="mb-2 text-xl font-bold text-headz-black">
-          End of Day Summary{' '}
-          <span className="text-base font-normal text-headz-gray">· {format(new Date(), 'MMM d, yyyy')}</span>
-        </h2>
-        <div className="overflow-hidden rounded-xl border border-black/[0.07] bg-white shadow-sm">
-          <div className="grid grid-cols-1 divide-y divide-black/5 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-            <div className="px-5 py-6">
-              <p className="text-xs uppercase tracking-wider text-headz-gray">Total cash</p>
-              <p className="mt-1 font-mono text-4xl font-black tabular-nums text-emerald-600">{formatMoney(eodCash)}</p>
-            </div>
-            <div className="px-5 py-6">
-              <p className="text-xs uppercase tracking-wider text-headz-gray">Total card</p>
-              <p className="mt-1 font-mono text-4xl font-black tabular-nums text-blue-600">{formatMoney(eodCard)}</p>
-            </div>
-            <div className="px-5 py-6">
-              <p className="text-xs uppercase tracking-wider text-headz-gray">Grand total</p>
-              <p className="mt-1 font-mono text-4xl font-black tabular-nums text-headz-red">{formatMoney(eodGrand)}</p>
-            </div>
-          </div>
-          <div className="border-t border-black/5 px-5 py-4">
-            <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/5">
-              <div
-                className="h-full bg-emerald-500 transition-all duration-700"
-                style={{ width: `${cashPct}%` }}
-              />
-              <div
-                className="h-full bg-blue-500 transition-all duration-700"
-                style={{ width: `${cardPct}%` }}
-              />
-            </div>
-            <p className="mt-2 text-center text-xs text-headz-gray">
-              Cash: {formatMoney(totals?.cash ?? 0)} · Card: {formatMoney(totals?.card ?? 0)} · {cashPct.toFixed(0)}% /{' '}
-              {cardPct.toFixed(0)}%
-            </p>
           </div>
 
-          <div className="border-t border-black/5 p-5">
-            <h3 className="mb-3 text-sm font-semibold text-headz-black">Breakdown by Barber</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs uppercase tracking-wider text-headz-gray">
-                    <th className="pb-2 pr-4">Barber</th>
-                    <th className="pb-2 pr-4">Tickets</th>
-                    <th className="pb-2 pr-4">Cash</th>
-                    <th className="pb-2 pr-4">Card</th>
-                    <th className="pb-2 pr-4">Tips</th>
-                    <th className="pb-2">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byBarberSorted.map((r) => {
-                    const tipRow = tickets
-                      .filter((t) => t.barberId === r.barberId)
-                      .reduce((s, t) => s + t.tipAmount, 0)
-                    return (
-                      <tr key={r.barberId} className="border-b border-black/5">
-                        <td className="py-3 pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-headz-red/10 text-xs font-bold text-headz-red">
-                              {initials(r.barberName)}
-                            </span>
-                            <span className="font-medium">{r.barberName}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span className="rounded-full bg-headz-black/5 px-2 text-xs">{r.tickets}</span>
-                        </td>
-                        <td className="py-3 pr-4 font-semibold text-emerald-600">{formatMoney(r.cash)}</td>
-                        <td className="py-3 pr-4 font-semibold text-blue-600">{formatMoney(r.card)}</td>
-                        <td className="py-3 pr-4 text-headz-gray">{formatMoney(tipRow)}</td>
-                        <td className="py-3 font-bold text-headz-black">{formatMoney(r.total)}</td>
+          {/* End of day — right column under list */}
+          <div className="rounded-2xl border-2 border-black/[0.06] bg-gradient-to-br from-white to-headz-cream/30 p-1 shadow-lg shadow-black/[0.06]">
+            <div className="rounded-[14px] border border-white/80 bg-white/90 p-5 backdrop-blur-sm">
+              <h2 className="font-serif text-lg font-bold text-headz-black">
+                End of day summary
+                <span className="ml-2 text-sm font-normal text-headz-gray">· {format(new Date(), 'MMM d, yyyy')}</span>
+              </h2>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-teal-200/70 bg-gradient-to-br from-teal-50/70 to-white p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">Total cash</p>
+                  <p className="mt-1 font-mono text-2xl font-black tabular-nums text-teal-800 sm:text-3xl">{formatMoney(eodCash)}</p>
+                </div>
+                <div className="rounded-xl border border-sky-200/70 bg-gradient-to-br from-sky-50/70 to-white p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80">Total card</p>
+                  <p className="mt-1 font-mono text-2xl font-black tabular-nums text-sky-800 sm:text-3xl">{formatMoney(eodCard)}</p>
+                </div>
+                <div className="rounded-xl border border-rose-200/70 bg-gradient-to-br from-rose-50/60 to-white p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800/80">Grand total</p>
+                  <p className="mt-1 font-mono text-2xl font-black tabular-nums text-rose-900 sm:text-3xl">{formatMoney(eodGrand)}</p>
+                </div>
+              </div>
+              <div className="mt-4 rounded-xl bg-black/[0.03] px-4 py-3">
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/5">
+                  <div className="h-full bg-teal-400/90 transition-all duration-700" style={{ width: `${cashPct}%` }} />
+                  <div className="h-full bg-sky-400/90 transition-all duration-700" style={{ width: `${cardPct}%` }} />
+                </div>
+                <p className="mt-2 text-center text-[11px] text-headz-gray">
+                  Cash {formatMoney(totals?.cash ?? 0)} · Card {formatMoney(totals?.card ?? 0)} · {cashPct.toFixed(0)}% /{' '}
+                  {cardPct.toFixed(0)}%
+                </p>
+              </div>
+
+              <div className="mt-5">
+                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-headz-gray">By barber</h3>
+                <div className="overflow-x-auto rounded-xl border border-black/5">
+                  <table className="w-full min-w-[520px] text-sm">
+                    <thead>
+                      <tr className="border-b border-black/5 bg-headz-cream/40 text-left text-[10px] font-bold uppercase tracking-wider text-headz-gray">
+                        <th className="px-3 py-2">Barber</th>
+                        <th className="px-3 py-2">#</th>
+                        <th className="px-3 py-2">Cash</th>
+                        <th className="px-3 py-2">Card</th>
+                        <th className="px-3 py-2">Tips</th>
+                        <th className="px-3 py-2">Total</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t bg-headz-black/[0.02] font-bold">
-                    <td className="py-3 pr-4">Totals</td>
-                    <td className="py-3 pr-4">
-                      <span className="rounded-full bg-headz-black/5 px-2 text-xs">{totals?.count ?? 0}</span>
-                    </td>
-                    <td className="py-3 pr-4 text-emerald-600">{formatMoney(totals?.cash ?? 0)}</td>
-                    <td className="py-3 pr-4 text-blue-600">{formatMoney(totals?.card ?? 0)}</td>
-                    <td className="py-3 pr-4 text-headz-gray">
-                      {formatMoney(tickets.reduce((s, t) => s + t.tipAmount, 0))}
-                    </td>
-                    <td className="py-3">{formatMoney((totals?.cash ?? 0) + (totals?.card ?? 0))}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                className="rounded-lg border border-black/10 px-4 py-2 text-sm text-headz-gray transition hover:bg-black/[0.03]"
-              >
-                Print Summary
-              </button>
+                    </thead>
+                    <tbody>
+                      {byBarberSorted.map((r) => {
+                        const tipRow = tickets
+                          .filter((t) => t.barberId === r.barberId)
+                          .reduce((s, t) => s + t.tipAmount, 0)
+                        return (
+                          <tr key={r.barberId} className="border-b border-black/[0.04] last:border-0">
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-headz-red/10 text-[10px] font-bold text-headz-red">
+                                  {initials(r.barberName)}
+                                </span>
+                                <span className="font-medium">{r.barberName}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className="rounded-md bg-headz-black/[0.06] px-1.5 font-mono text-xs font-bold">{r.tickets}</span>
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold text-teal-800">{formatMoney(r.cash)}</td>
+                            <td className="px-3 py-2.5 font-semibold text-sky-800">{formatMoney(r.card)}</td>
+                            <td className="px-3 py-2.5 text-headz-gray">{formatMoney(tipRow)}</td>
+                            <td className="px-3 py-2.5 font-bold text-headz-black">{formatMoney(r.total)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-headz-black/[0.03] font-bold">
+                        <td className="px-3 py-2.5">Totals</td>
+                        <td className="px-3 py-2.5">
+                          <span className="rounded-md bg-headz-black/10 px-1.5 font-mono text-xs">{totals?.count ?? 0}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-teal-800">{formatMoney(totals?.cash ?? 0)}</td>
+                        <td className="px-3 py-2.5 text-sky-800">{formatMoney(totals?.card ?? 0)}</td>
+                        <td className="px-3 py-2.5 text-headz-gray">
+                          {formatMoney(tickets.reduce((s, t) => s + t.tipAmount, 0))}
+                        </td>
+                        <td className="px-3 py-2.5">{formatMoney((totals?.cash ?? 0) + (totals?.card ?? 0))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-black/10 px-4 py-2 text-xs font-semibold text-headz-gray transition hover:bg-black/[0.04]"
+                  >
+                    Print summary
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={voidTicketId !== null}
+        title="Void this ticket?"
+        message="This removes the sale from today’s cash and card totals. You can’t undo this from the dashboard."
+        confirmLabel="Void ticket"
+        danger
+        loading={voidLoading}
+        onClose={() => {
+          if (!voidLoading) setVoidTicketId(null)
+        }}
+        onConfirm={executeVoidTicket}
+        overlayClassName="backdrop-blur-[2px]"
+        panelClassName="w-full max-w-md rounded-2xl border border-headz-red/20 bg-gradient-to-b from-white to-headz-cream/50 p-6 shadow-2xl shadow-black/20"
+      />
     </div>
   )
 }

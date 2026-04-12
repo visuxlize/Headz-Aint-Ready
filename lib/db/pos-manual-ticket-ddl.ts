@@ -24,9 +24,8 @@ function isSupabaseHost(url: string): boolean {
 }
 
 /**
- * Applies the same intent as `scripts/add-pos-barber-profile-id.sql` so manual Tickets can store
- * `barbers.id` without a staff `users` row. Idempotent. Uses a short-lived connection so DDL does not
- * depend on the pooled Drizzle client.
+ * Applies `scripts/add-pos-barber-profile-id.sql` plus `source` for Drizzle inserts. Idempotent.
+ * Uses a short-lived connection so DDL does not depend on the pooled Drizzle client.
  */
 export async function runPosTransactionsManualTicketDdls(): Promise<boolean> {
   const url = resolveDdlConnectionString()
@@ -68,6 +67,11 @@ export async function runPosTransactionsManualTicketDdls(): Promise<boolean> {
     `)
     await sql`
       CREATE INDEX IF NOT EXISTS pos_transactions_barber_profile_id_idx ON pos_transactions (barber_profile_id);
+    `
+    // Drizzle always references `source` on insert (default); DBs that only ran older scripts need this.
+    await sql`
+      ALTER TABLE pos_transactions
+      ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'manual';
     `
     return true
   } catch (e) {

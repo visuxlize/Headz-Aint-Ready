@@ -1,12 +1,6 @@
 /**
- * Gallery images from Instagram post previews (@headzaintready.nyc and related permalinks).
- * Use each `src` as-is (signed URL with `stp` crop). Do **not** strip `stp` — Instagram returns 403
- * for many stripped URLs in the browser.
- *
- * Grid tiles use `object-cover object-center`: the image fills the cell without upscaling (“zoom”);
- * edges may crop per Instagram’s square — no extra scale transform.
- *
- * If a URL 404s after tokens rotate, re-fetch (embed HTML often includes fresh `scontent` URLs):
+ * Gallery images from Instagram post embeds (@headzaintready.nyc).
+ * Use each `src` as-is (signed URL). **Tokens expire** — refresh via:
  *   curl -sL -A 'Mozilla/5.0' "https://www.instagram.com/p/<SHORTCODE>/embed/captioned/" | tr '"' '\n' | grep cdninstagram
  *
  * @see https://www.instagram.com/headzaintready.nyc
@@ -19,8 +13,33 @@ export type InstagramGalleryPhoto = {
   src: string
 }
 
-/** Homepage “The Work” grid: `grid-cols-2` (two columns), unique posts — no duplicates. */
-export const instagramGalleryPhotos: InstagramGalleryPhoto[] = [
+/** Instagram media id from path like `…/432602196_18490638913040453_n.jpg` — used to avoid duplicate tiles. */
+function mediaIdFromSrc(src: string): string {
+  const m = src.match(/\/(\d+_\d+)_n\.(jpg|jpegr|webp)/i)
+  return m ? m[1] : src
+}
+
+function dedupeGallery(rows: InstagramGalleryPhoto[]): InstagramGalleryPhoto[] {
+  const seen = new Set<string>()
+  const out: InstagramGalleryPhoto[] = []
+  for (const row of rows) {
+    const id = mediaIdFromSrc(row.src)
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(row)
+  }
+  return out
+}
+
+/**
+ * Homepage “The Work” grid: **2 columns** (`grid-cols-2`), as many unique post images as we list — no duplicate media.
+ */
+const instagramGalleryPhotosRaw: InstagramGalleryPhoto[] = [
+  {
+    postUrl: 'https://www.instagram.com/p/C4jR-uqxqZd/',
+    alt: 'Headz Ain’t Ready — from Instagram',
+    src: 'https://scontent-lga3-2.cdninstagram.com/v/t39.30808-6/432602196_18490638913040453_5906142504504214331_n.jpg?se=-1&stp=dst-jpegr_e35_s640x640_sh0.08_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6ImltYWdlX3VybGdlbi4xNjIweDE2MjAuaGRyLmYzMDgwOC5kZWZhdWx0X2ltYWdlLmMyIn0&_nc_ht=scontent-lga3-2.cdninstagram.com&_nc_cat=105&_nc_oc=Q6cZ2gFb67Z0cK6mGY3Aaep4tNAwJvfkCCIGxu10AA6CX3SIvGLtAb3eWkDows0fd0iqZPg&_nc_ohc=kZWCOXaFbSQQ7kNvwGSlQ7E&_nc_gid=p6Pn7vdE7HABc8SqVR12gQ&edm=APs17CUAAAAA&ccb=7-5&oh=00_Af1ujtkWBQlVDJKStTk2H8ga4ZTw0WLgK5dm2qg5Kj_HzQ&oe=69E1FA1B&_nc_sid=10d13b',
+  },
   {
     postUrl: 'https://www.instagram.com/p/DGJNcEuPuGo/',
     alt: 'Headz Ain’t Ready — work from Instagram',
@@ -56,9 +75,6 @@ export const instagramGalleryPhotos: InstagramGalleryPhoto[] = [
     alt: 'Headz Ain’t Ready — classic cut from Instagram',
     src: 'https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/618645945_18082034309334152_4183348624368259120_n.jpg?stp=c288.0.864.864a_dst-jpg_e35_s640x640_tt6&_nc_cat=109&ccb=7-5&_nc_sid=18de74&efg=eyJlZmdfdGFnIjoiRkVFRC5iZXN0X2ltYWdlX3VybGdlbi5DMyJ9&_nc_ohc=M9tSMNXtjSUQ7kNvwG50B7m&_nc_oc=AdoyvDAf_1HfDNMk4WdXcAYmZ8oBS9txPOu5eMvUyYbeDZM3vb1nknwlufXsGQFtq3A&_nc_zt=23&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_gid=wvaNLTvqmxDesVnhtMeI1Q&_nc_ss=7a389&oh=00_Af0-sbnQRha6YCytPlfCNVNLvRn2lvguRVNVNNHrXLpszA&oe=69DC9A64',
   },
-  {
-    postUrl: 'https://www.instagram.com/p/B82IX0vloXz/',
-    alt: 'Headz Ain’t Ready — Crispy cut from Instagram',
-    src: 'https://scontent-lga3-1.cdninstagram.com/v/t51.82787-15/623775794_18151886743435191_8390294788937482304_n.jpg?stp=dst-jpg_e35_s640x640_sh0.08_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6ImltYWdlX3VybGdlbi4xNDQweDE0NDAuc2RyLmY4Mjc4Ny5kZWZhdWx0X2ltYWdlLmMyIn0&_nc_ht=scontent-lga3-1.cdninstagram.com&_nc_cat=103&_nc_oc=Q6cZ2gEAe0Lvx93gRm4tdKbP4qk9u9k7pBKUUky-0EnDviej7XHSrj7MOqJhUPRxqMWSgWY&_nc_ohc=mAzfowYI8MMQ7kNvwFeKj6u&_nc_gid=3nzsmpI9uNJdPwkiqbEzjQ&edm=APs17CUBAAAA&ccb=7-5&oh=00_Af1bWILUCjJqmxFIkhOSeKhbZdo8g39MDsXzWlgm7Q90Cw&oe=69E1EAFA&_nc_sid=10d13b',
-  },
 ]
+
+export const instagramGalleryPhotos = dedupeGallery(instagramGalleryPhotosRaw)

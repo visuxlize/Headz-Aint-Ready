@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { ChevronLeft, Download, ExternalLink, RefreshCw } from 'lucide-react'
+import { Banknote, ChevronLeft, CreditCard, Download, ExternalLink, ReceiptText, RefreshCw, Search } from 'lucide-react'
+import { ConfirmModal } from '@/components/barber/ConfirmModal'
 import { format } from 'date-fns'
 import { formatMoney } from '@/lib/utils/format-money'
 import { cn } from '@/lib/utils/cn'
@@ -52,6 +53,8 @@ export default function PaymentsPage() {
   const [refundTxn, setRefundTxn] = useState<Txn | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
+  const [voidTxn, setVoidTxn] = useState<Txn | null>(null)
+  const [voidLoading, setVoidLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -136,16 +139,23 @@ export default function PaymentsPage() {
     void load()
   }
 
-  const voidManual = async (t: Txn) => {
-    if (!window.confirm('Void this transaction?')) return
-    const res = await fetch(`/api/dashboard/tickets/${t.id}`, { method: 'DELETE', credentials: 'include' })
-    const j = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      toast.error((j as { error?: string }).error || 'Void failed')
-      return
+  const executeVoidManual = async () => {
+    const t = voidTxn
+    if (!t) return
+    setVoidLoading(true)
+    try {
+      const res = await fetch(`/api/dashboard/tickets/${t.id}`, { method: 'DELETE', credentials: 'include' })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error((j as { error?: string }).error || 'Void failed')
+        return
+      }
+      toast.success('Transaction voided')
+      setVoidTxn(null)
+      void load()
+    } finally {
+      setVoidLoading(false)
     }
-    toast.success('Transaction voided')
-    void load()
   }
 
   const exportCsv = () => {
@@ -182,7 +192,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 pb-12 pt-2 sm:pt-4">
+    <div className="mx-auto max-w-6xl space-y-8 pb-12 pt-2 text-headz-black sm:pt-4">
       <Link
         href="/dashboard"
         className="inline-flex items-center gap-1 text-sm font-medium text-headz-gray transition hover:text-headz-black"
@@ -190,29 +200,42 @@ export default function PaymentsPage() {
         <ChevronLeft className="h-4 w-4" aria-hidden />
         Back to dashboard
       </Link>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+
+      <div className="flex flex-col gap-4 border-b border-headz-red/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-serif text-2xl font-bold text-headz-black md:text-3xl">Payment History</h1>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-headz-red/12 text-headz-red">
+              <ReceiptText className="h-6 w-6" aria-hidden />
+            </span>
+            <div>
+              <h1 className="font-serif text-2xl font-bold md:text-3xl">Payments</h1>
+              <p className="mt-0.5 text-sm text-headz-gray">Card, cash, and manual tickets — filter, export, void, refund.</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setTab('all')}
               className={cn(
-                'rounded-full px-4 py-1.5 text-sm font-semibold transition',
-                tab === 'all' ? 'bg-headz-red text-white' : 'text-headz-gray hover:text-headz-black'
+                'rounded-full px-4 py-2 text-sm font-semibold transition',
+                tab === 'all'
+                  ? 'bg-rose-300/90 text-rose-950 shadow-md shadow-rose-900/10'
+                  : 'border border-black/10 bg-white text-headz-gray hover:border-rose-200 hover:text-headz-black'
               )}
             >
-              All Transactions
+              All transactions
             </button>
             <button
               type="button"
               onClick={() => setTab('manual')}
               className={cn(
-                'rounded-full px-4 py-1.5 text-sm font-semibold transition',
-                tab === 'manual' ? 'bg-headz-red text-white' : 'text-headz-gray hover:text-headz-black'
+                'rounded-full px-4 py-2 text-sm font-semibold transition',
+                tab === 'manual'
+                  ? 'bg-rose-300/90 text-rose-950 shadow-md shadow-rose-900/10'
+                  : 'border border-black/10 bg-white text-headz-gray hover:border-rose-200 hover:text-headz-black'
               )}
             >
-              Manual Tickets
+              Manual tickets
             </button>
           </div>
         </div>
@@ -221,7 +244,7 @@ export default function PaymentsPage() {
             type="button"
             onClick={() => exportCsv()}
             disabled={!data?.transactions.length}
-            className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-medium text-headz-black shadow-sm hover:bg-black/[0.02] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-headz-cream/80 disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
             Export CSV
@@ -230,7 +253,7 @@ export default function PaymentsPage() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-medium text-headz-black shadow-sm hover:bg-black/[0.02] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-headz-red/25 bg-gradient-to-r from-headz-red/10 to-transparent px-4 py-2.5 text-sm font-semibold text-headz-red transition hover:bg-headz-red/15 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -286,108 +309,121 @@ export default function PaymentsPage() {
             />
           </div>
 
-          <div className="rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-headz-gray">
-              This month — card vs cash
-            </p>
-            <div className="flex h-2.5 w-full max-w-full overflow-hidden rounded-full bg-black/5 transition-all duration-700">
+          <div className="rounded-2xl border border-headz-red/12 bg-gradient-to-r from-white to-headz-cream/30 p-6 shadow-sm">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">This month — mix</p>
+            <div className="flex h-3 w-full max-w-full overflow-hidden rounded-full bg-black/5 transition-all duration-700">
               <div
-                className="h-full bg-blue-500 transition-all duration-700"
+                className="h-full bg-sky-400/90 transition-all duration-700"
                 style={{ width: `${monthBar.cardPct}%` }}
               />
               <div
-                className="h-full bg-emerald-500 transition-all duration-700"
+                className="h-full bg-teal-400/90 transition-all duration-700"
                 style={{ width: `${monthBar.cashPct}%` }}
               />
             </div>
-            <p className="mt-2 text-sm text-headz-gray">
-              Card {formatMoney(monthBar.card)} · Cash {formatMoney(monthBar.cash)}
+            <p className="mt-3 text-sm text-headz-gray">
+              <span className="font-semibold text-sky-800">Card {formatMoney(monthBar.card)}</span>
+              <span className="mx-2 text-headz-gray/50">·</span>
+              <span className="font-semibold text-teal-800">Cash {formatMoney(monthBar.cash)}</span>
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="text-xs text-headz-gray">From</label>
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="mt-1 block rounded-lg border border-black/10 px-3 py-2 text-sm"
-              />
+          <div className="rounded-2xl border border-black/8 bg-white p-5 shadow-md shadow-black/[0.03]">
+            <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Filters</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <div>
+                <label className="text-xs font-medium text-headz-gray">From</label>
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border-2 border-black/[0.08] bg-headz-cream/20 px-3 py-2.5 text-sm transition focus:border-headz-red/35 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-headz-gray">To</label>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border-2 border-black/[0.08] bg-headz-cream/20 px-3 py-2.5 text-sm transition focus:border-headz-red/35 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-headz-gray">Method</label>
+                <select
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as typeof method)}
+                  className="mt-1.5 w-full rounded-xl border-2 border-black/[0.08] bg-white px-3 py-2.5 text-sm focus:border-headz-red/35 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
+                >
+                  <option value="all">All</option>
+                  <option value="card">Card</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-headz-gray">Barber</label>
+                <select
+                  value={barberId}
+                  onChange={(e) => setBarberId(e.target.value)}
+                  className="mt-1.5 w-full min-w-0 rounded-xl border-2 border-black/[0.08] bg-white px-3 py-2.5 text-sm focus:border-headz-red/35 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
+                >
+                  <option value="">All barbers</option>
+                  {data.barbers.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name ?? 'Barber'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2 xl:col-span-2">
+                <label className="text-xs font-medium text-headz-gray" htmlFor="payments-search-customer">
+                  Search customer
+                </label>
+                <div className="relative mt-1.5">
+                  <span className="pointer-events-none absolute inset-y-0 left-0 flex w-10 items-center justify-center">
+                    <Search className="h-4 w-4 shrink-0 text-headz-gray" aria-hidden />
+                  </span>
+                  <input
+                    id="payments-search-customer"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void load()}
+                    placeholder="Name…"
+                    className="w-full rounded-xl border-2 border-black/[0.08] bg-white py-2.5 pl-10 pr-3 text-sm placeholder:text-headz-gray/50 focus:border-rose-300/80 focus:outline-none focus:ring-4 focus:ring-rose-200/40"
+                  />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className="w-full rounded-xl bg-rose-900/90 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-rose-900/15 transition hover:bg-rose-950"
+                >
+                  Apply filters
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-headz-gray">To</label>
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="mt-1 block rounded-lg border border-black/10 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-headz-gray">Method</label>
-              <select
-                value={method}
-                onChange={(e) => setMethod(e.target.value as typeof method)}
-                className="mt-1 block rounded-lg border border-black/10 px-3 py-2 text-sm"
-              >
-                <option value="all">All</option>
-                <option value="card">Card</option>
-                <option value="cash">Cash</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-headz-gray">Barber</label>
-              <select
-                value={barberId}
-                onChange={(e) => setBarberId(e.target.value)}
-                className="mt-1 block min-w-[160px] rounded-lg border border-black/10 px-3 py-2 text-sm"
-              >
-                <option value="">All</option>
-                {data.barbers.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name ?? 'Barber'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-[200px] flex-1">
-              <label className="text-xs text-headz-gray">Search customer</label>
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void load()}
-                placeholder="Name…"
-                className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="rounded-lg bg-headz-black px-4 py-2 text-sm font-medium text-white"
-            >
-              Apply
-            </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-black/8 bg-white shadow-lg shadow-black/[0.04]">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-black/10 bg-black/[0.02] text-xs uppercase text-headz-gray">
+              <thead className="border-b border-black/10 bg-gradient-to-r from-headz-cream/50 to-white text-[11px] font-bold uppercase tracking-wider text-headz-gray">
                 <tr>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Barber</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Service</th>
-                  <th className="px-4 py-3">Method</th>
-                  <th className="px-4 py-3">Total</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Actions</th>
+                  <th className="px-4 py-3.5">Time</th>
+                  <th className="px-4 py-3.5">Barber</th>
+                  <th className="px-4 py-3.5">Customer</th>
+                  <th className="px-4 py-3.5">Service</th>
+                  <th className="px-4 py-3.5">Method</th>
+                  <th className="px-4 py-3.5">Total</th>
+                  <th className="px-4 py-3.5">Status</th>
+                  <th className="px-4 py-3.5">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {data.transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-headz-gray">
+                    <td colSpan={8} className="px-4 py-16 text-center text-headz-gray">
                       No transactions match your filters yet.
                     </td>
                   </tr>
@@ -396,7 +432,7 @@ export default function PaymentsPage() {
                     const service = t.items?.[0]?.name ?? '—'
                     const tipN = Number(t.tipAmount)
                     return (
-                      <tr key={t.id} className="border-b border-black/5">
+                      <tr key={t.id} className="border-b border-black/[0.06] transition-colors hover:bg-headz-red/[0.02]">
                         <td className="whitespace-nowrap px-4 py-2 text-xs text-headz-gray">
                           {new Date(t.createdAt).toLocaleString()}
                         </td>
@@ -406,11 +442,11 @@ export default function PaymentsPage() {
                         <td className="px-4 py-2">
                           <div className="flex flex-col gap-0.5">
                             {t.paymentMethod === 'card' ? (
-                              <span className="w-fit rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                              <span className="w-fit rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">
                                 CARD
                               </span>
                             ) : (
-                              <span className="w-fit rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              <span className="w-fit rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-800">
                                 CASH
                               </span>
                             )}
@@ -437,8 +473,8 @@ export default function PaymentsPage() {
                           {t.source === 'manual' && t.paymentStatus !== 'voided' && (
                             <button
                               type="button"
-                              onClick={() => void voidManual(t)}
-                              className="text-xs text-headz-red hover:underline"
+                              onClick={() => setVoidTxn(t)}
+                              className="rounded-lg px-2 py-1 text-xs font-semibold text-headz-red transition hover:bg-red-50"
                             >
                               Void
                             </button>
@@ -476,32 +512,36 @@ export default function PaymentsPage() {
       )}
 
       {refundTxn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="font-serif text-lg font-bold">Refund payment</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-2xl border border-headz-red/15 bg-gradient-to-b from-white to-headz-cream/40 p-6 shadow-2xl">
+            <h2 className="font-serif text-lg font-bold text-headz-black">Refund payment</h2>
             <p className="mt-2 text-sm text-headz-gray">
-              Refund for {refundTxn.customerName} — max {formatMoney(Number(refundTxn.total))}
+              {refundTxn.customerName} — max {formatMoney(Number(refundTxn.total))}
             </p>
-            <label className="mt-4 block text-xs text-headz-gray">Amount (USD)</label>
+            <label className="mt-4 block text-xs font-semibold text-headz-gray">Amount (USD)</label>
             <input
               value={refundAmount}
               onChange={(e) => setRefundAmount(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
+              className="mt-1.5 w-full rounded-xl border-2 border-black/[0.08] bg-white px-3 py-2.5 text-sm focus:border-headz-red/35 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
             />
-            <label className="mt-3 block text-xs text-headz-gray">Reason (required)</label>
+            <label className="mt-3 block text-xs font-semibold text-headz-gray">Reason (required)</label>
             <input
               value={refundReason}
               onChange={(e) => setRefundReason(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm"
+              className="mt-1.5 w-full rounded-xl border-2 border-black/[0.08] bg-white px-3 py-2.5 text-sm focus:border-headz-red/35 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
             />
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" className="rounded-lg px-4 py-2 text-sm" onClick={() => setRefundTxn(null)}>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-xl border border-black/12 px-5 py-2.5 text-sm font-semibold hover:bg-headz-cream/80"
+                onClick={() => setRefundTxn(null)}
+              >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => void submitRefund()}
-                className="rounded-lg bg-headz-red px-4 py-2 text-sm font-medium text-white"
+                className="rounded-xl bg-headz-red px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-headz-red/25 hover:bg-headz-redDark"
               >
                 Process refund
               </button>
@@ -509,6 +549,25 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={voidTxn !== null}
+        title="Void this transaction?"
+        message={
+          voidTxn
+            ? `Remove ${formatMoney(Number(voidTxn.total))} for ${voidTxn.customerName} from reporting. This matches voiding a ticket on the Tickets page.`
+            : ''
+        }
+        confirmLabel="Void transaction"
+        danger
+        loading={voidLoading}
+        onClose={() => {
+          if (!voidLoading) setVoidTxn(null)
+        }}
+        onConfirm={executeVoidManual}
+        overlayClassName="backdrop-blur-[2px]"
+        panelClassName="w-full max-w-md rounded-2xl border border-headz-red/20 bg-gradient-to-b from-white to-headz-cream/50 p-6 shadow-2xl shadow-black/20"
+      />
     </div>
   )
 }
@@ -525,12 +584,19 @@ function SummaryCard({
   cash: number
 }) {
   return (
-    <div className="rounded-2xl border border-black/[0.07] bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wider text-headz-gray">{title}</p>
-      <p className="mt-2 text-2xl font-black tabular-nums text-headz-black">{formatMoney(total)}</p>
-      <p className="mt-1 text-xs text-headz-gray">
-        {formatMoney(cash)} cash · {formatMoney(card)} card
-      </p>
+    <div className="rounded-2xl border border-black/8 bg-gradient-to-br from-white to-headz-cream/25 p-5 shadow-md shadow-black/[0.04]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">{title}</p>
+      <p className="mt-2 font-mono text-2xl font-black tabular-nums text-headz-black">{formatMoney(total)}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 font-semibold text-teal-800">
+          <Banknote className="h-3 w-3" aria-hidden />
+          {formatMoney(cash)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-800">
+          <CreditCard className="h-3 w-3" aria-hidden />
+          {formatMoney(card)}
+        </span>
+      </div>
     </div>
   )
 }

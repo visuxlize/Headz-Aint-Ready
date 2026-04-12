@@ -188,7 +188,9 @@ export async function GET(request: Request) {
       tickets: r.tickets ?? 0,
       revenue: Number(r.revenue ?? 0),
     }))
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a, b) => b.tickets - a.tickets || b.revenue - a.revenue)
+
+  const totalTicketsInRange = ticketsByBarber.reduce((s, r) => s + r.tickets, 0)
 
   const totalAppointments = apptCount[0]?.count ?? 0
   const avgPer = totalAppointments > 0 ? totalRevenue / totalAppointments : 0
@@ -201,6 +203,7 @@ export async function GET(request: Request) {
     combinedRevenue,
     cashTotal,
     cardTotal,
+    totalTicketsInRange,
     ticketsByBarber,
     summary: {
       totalRevenue,
