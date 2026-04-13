@@ -2,19 +2,47 @@ import type { MarketingBarberCard } from '@/lib/marketing/home-fallbacks'
 
 /**
  * Public homepage “The Dream Team” grid only — fixed roster and display names.
- * Separate from manual tickets allowlist, /book barbers, and admin seed lists.
+ * Avatar art is served from `/public/marketing-team/` (see `image` paths).
  *
  * `slugAliases` are tried in order; first matching `barbers.slug` wins (case-insensitive).
  */
 /** Display order for the homepage row (Louie → … → Victor). */
 export const HOMEPAGE_TEAM = [
-  { displayName: 'Louie Live', slugAliases: ['louie-live'] },
-  { displayName: 'King Rome', slugAliases: ['king-rome'] },
-  { displayName: 'Jesus', slugAliases: ['jesus-theodoro', 'jesus'] },
-  { displayName: 'Liseth', slugAliases: ['liseth-calderon', 'liseth'] },
-  { displayName: 'Carlos', slugAliases: ['carlos-principal', 'carlos'] },
-  { displayName: 'Angel', slugAliases: ['angle-miranda', 'angel'] },
-  { displayName: 'Victor', slugAliases: ['victor-zambrano', 'victor'] },
+  {
+    displayName: 'Louie Live',
+    slugAliases: ['louie-live'],
+    image: '/marketing-team/Luis.png',
+  },
+  {
+    displayName: 'King Rome',
+    slugAliases: ['king-rome'],
+    image: '/marketing-team/Rome.png',
+  },
+  {
+    displayName: 'Jesus',
+    slugAliases: ['jesus-theodoro', 'jesus'],
+    image: '/marketing-team/Jesus.png',
+  },
+  {
+    displayName: 'Liseth',
+    slugAliases: ['liseth-calderon', 'liseth'],
+    image: '/marketing-team/Liseth.png',
+  },
+  {
+    displayName: 'Carlos',
+    slugAliases: ['carlos-principal', 'carlos'],
+    image: '/marketing-team/Carlos.png',
+  },
+  {
+    displayName: 'Angel',
+    slugAliases: ['angle-miranda', 'angel'],
+    image: '/marketing-team/Angel.png',
+  },
+  {
+    displayName: 'Victor',
+    slugAliases: ['victor-zambrano', 'victor'],
+    image: '/marketing-team/Victor.png',
+  },
 ] as const
 
 export const HOMEPAGE_TEAM_ALL_SLUGS: string[] = [
@@ -31,11 +59,11 @@ export function buildHomepageTeamCards(
   }
 
   const out: MarketingBarberCard[] = []
-  for (const { displayName, slugAliases } of HOMEPAGE_TEAM) {
+  for (const { displayName, slugAliases, image } of HOMEPAGE_TEAM) {
     for (const alias of slugAliases) {
       const row = slugToRow.get(alias.toLowerCase())
       if (row) {
-        out.push({ id: row.id, name: displayName, avatarUrl: row.avatarUrl })
+        out.push({ id: row.id, name: displayName, avatarUrl: image })
         break
       }
     }
