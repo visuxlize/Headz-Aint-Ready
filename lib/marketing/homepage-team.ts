@@ -31,7 +31,7 @@ export const HOMEPAGE_TEAM = [
   {
     displayName: 'Carlos',
     slugAliases: ['carlos-principal', 'carlos'],
-    image: '/marketing-team/Carlos.png',
+    image: '/marketing-team/Carlos-2026.png',
   },
   {
     displayName: 'Angel',

@@ -160,13 +160,14 @@ export default async function HomePage() {
           <FadeInOnScroll>
             <div className="mx-auto w-full max-w-md text-left lg:mx-0">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-headz-red">
-                OVER 25 YEARS IN...
+                OVER 30 YEARS IN...
               </p>
               <h2 className="font-headz-display mb-5 text-5xl text-headz-black sm:text-6xl">The Industry</h2>
               <p className="mb-10 text-base leading-relaxed text-headz-black/85">
-                Headz Ain&apos;t Ready Was Established In 1995 In Jackson Heights, Queens. Since Then We Have
-                Been Serving Thousands Of Clients In New York &amp; The Entire Tri-State Area. We&apos;re proud of
-                the craft and we let the cuts speak for themselves.
+                <strong>30 years</strong> plus of experience. Since <strong>1995</strong>, we have been the only
+                barbershop in Queens still standing strong. We have set trends over the years. From classic to
+                modern precision haircuts.
+                <span className="mt-2 block text-xl font-bold text-headz-black">It&apos;s what we do!!!</span>
               </p>
               <div className="flex w-full flex-col gap-4">
                 <div className="flex w-full min-w-0 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm">
@@ -175,7 +176,7 @@ export default async function HomePage() {
                   </span>
                   <div className="min-w-0 pt-0.5">
                     <p className="font-semibold text-headz-black">Open 7 Days</p>
-                    <p className="mt-1 text-sm leading-snug text-headz-gray">Monday – Sun: 9am – 8pm</p>
+                    <p className="mt-1 text-sm leading-snug text-headz-gray">Mon – Sat: 9:30am – 7:00pm · Sun: 10:00am – 6:00pm</p>
                   </div>
                 </div>
                 <div className="flex w-full min-w-0 items-start gap-4 rounded-2xl border border-black/[0.07] bg-white/80 px-5 py-5 shadow-[0_8px_32px_-20px_rgba(196,30,58,0.25)] ring-1 ring-headz-red/[0.08] backdrop-blur-sm">

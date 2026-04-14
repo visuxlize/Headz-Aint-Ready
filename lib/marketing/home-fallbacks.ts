@@ -20,7 +20,7 @@ const FALLBACK_TEAM: MarketingBarberCard[] = [
   { id: 'fallback-homepage-1', name: 'King Rome', avatarUrl: '/marketing-team/Rome.png' },
   { id: 'fallback-homepage-2', name: 'Jesus', avatarUrl: '/marketing-team/Jesus.png' },
   { id: 'fallback-homepage-3', name: 'Liseth', avatarUrl: '/marketing-team/Liseth.png' },
-  { id: 'fallback-homepage-4', name: 'Carlos', avatarUrl: '/marketing-team/Carlos.png' },
+  { id: 'fallback-homepage-4', name: 'Carlos', avatarUrl: '/marketing-team/Carlos-2026.png' },
   { id: 'fallback-homepage-5', name: 'Angel', avatarUrl: '/marketing-team/Angel.png' },
   { id: 'fallback-homepage-6', name: 'Victor', avatarUrl: '/marketing-team/Victor.png' },
 ]

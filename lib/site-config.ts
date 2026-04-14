@@ -11,8 +11,8 @@ export const SITE = {
   phone: '(718) 429-6841',
   phoneTel: '+17184296841',
   email: 'info@headzaintready.com',
-  hours: 'Monday – Sunday 9am – 8pm',
-  hoursShort: 'Mon – Sun 9am – 8pm',
+  hours: 'Mon – Sat 9:30am – 7:00pm · Sun 10:00am – 6:00pm',
+  hoursShort: 'Mon – Sat 9:30am – 7:00pm · Sun 10:00am – 6:00pm',
   /** Store operation hours for booking (EST). 9 = 9am, 20 = 8pm close. */
   bookingOpenHour: 9,
   bookingCloseHour: 20,
