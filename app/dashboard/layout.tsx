@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { staffAllowlist, users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { linkPlaceholderBarberIfNeeded } from '@/lib/staff/link-placeholder-barber'
+import { resolveDbUserForAuth } from '@/lib/auth/resolve-db-user'
 
 async function withDbRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   let last: unknown
@@ -52,11 +53,11 @@ export default async function DashboardRootLayout({
       redirect('/auth/login?error=unauthorized')
     }
 
-    let [dbUser] = await withDbRetry(() => db.select().from(users).where(eq(users.id, user.id)).limit(1))
+    let dbUser = await withDbRetry(() => resolveDbUserForAuth({ authUserId: user.id, authEmail: user.email }))
     if (!dbUser) {
       const linked = await withDbRetry(() => linkPlaceholderBarberIfNeeded(user.id, email))
       if (linked) {
-        ;[dbUser] = await withDbRetry(() => db.select().from(users).where(eq(users.id, user.id)).limit(1))
+        dbUser = await withDbRetry(() => resolveDbUserForAuth({ authUserId: user.id, authEmail: user.email }))
       }
     }
     if (!dbUser) {

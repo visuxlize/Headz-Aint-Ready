@@ -1,9 +1,7 @@
 import { DashboardShell } from '@/components/dashboard/DashboardShell'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { resolveDbUserForAuth } from '@/lib/auth/resolve-db-user'
 
 /** Admin-only shell: barbers use /dashboard/barber. */
 export default async function AdminDashboardLayout({
@@ -17,7 +15,7 @@ export default async function AdminDashboardLayout({
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const [dbUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1)
+  const dbUser = await resolveDbUserForAuth({ authUserId: user.id, authEmail: user.email })
   if (!dbUser) redirect('/auth/login')
   if (dbUser.mustChangePassword) {
     redirect('/dashboard/force-password-change')
