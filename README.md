@@ -1,47 +1,53 @@
-# Headz Ain't Ready
+# Headz Ain't Ready - Official Digital Platform
 
-Modern website and booking experience for **[Headz Ain't Ready](https://headzaintready.com/)** in Jackson Heights, Queens, NYC.
+The official web experience for **[headzaintready.com](https://headzaintready.com/)**.
 
-## Live Product
+Built to represent the Headz Ain't Ready brand with a premium, modern customer journey and a high-trust operational workflow for staff.
 
-- Public website with updated branding and marketing sections
-- Real booking flow from barber selection through appointment time
-- Staff dashboard for daily operations and scheduling
-- Deployed on **Vercel**
+## Brand Standard
 
-## What’s Included
+This codebase powers a luxury-forward digital presence designed specifically for Headz Ain't Ready:
 
-- **Marketing homepage**
-  - Hero, welcome section, Dream Team, services, reviews, and contact
-  - Updated industry copy and refreshed team imagery
-- **Booking flow**
-  - Barber, service, date, and time selection
-  - Store-hour-aware availability windows
-- **Staff experience**
-  - Protected staff area for operations
-  - Appointment visibility and schedule management
+- Elevated visual storytelling and premium brand presentation
+- Frictionless booking from barber selection to confirmed appointment
+- Reliable staff operations for day-to-day schedule management
+- Production deployment architecture for a stable customer experience
 
-## Recent Updates
+## Core Experience
 
-- Industry section updated to reflect 30+ years since 1995
-- Homepage hours updated to:
-  - Mon-Sat: 9:30am-7:00pm
-  - Sun: 10:00am-6:00pm
-- Carlos team photo replaced with the latest image asset
-- Staff auth/profile access flow hardened for new admin onboarding
+- **Public Website**
+  - Signature homepage with hero, story, team, services, reviews, and contact
+  - Brand messaging aligned with Headz Ain't Ready identity
+  - Refined layout and content structure for conversion
 
-## Stack
+- **Booking Journey**
+  - Guided flow: barber -> service -> date -> time
+  - Real-time availability within business-hour constraints
+  - Seamless appointment path designed for clarity and speed
+
+- **Staff Operations**
+  - Protected staff access
+  - Appointment visibility and schedule control
+  - Administrative workflows tailored to the shop's daily rhythm
+
+## Technology Foundation
 
 - Next.js
 - TypeScript
 - Tailwind CSS
 - Supabase
 - Drizzle ORM
+- Vercel
 
-## Repository
+## Ownership, License, and Usage Restrictions
 
-[github.com/visuxlize/Headz-Aint-Ready](https://github.com/visuxlize/Headz-Aint-Ready)
+This software, design system, content structure, and brand presentation are **proprietary intellectual property** of Headz Ain't Ready and its authorized owners/licensors.
 
-## License
+**Strictly prohibited without express written authorization:**
 
-Private project for Headz Ain't Ready.
+- Reuse, redistribution, resale, or sublicensing
+- Cloning, republishing, or adapting this project for any third-party brand
+- Using this repository, in whole or in part, for external or local commercial deployment
+- Representing derivative works as official Headz Ain't Ready properties
+
+This project is licensed exclusively for the official Headz Ain't Ready web property at **headzaintready.com** and owner-authorized operations only.
