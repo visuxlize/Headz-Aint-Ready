@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { barbers, posTransactions, services } from '@/lib/db/schema'
 import type { PosLineItem } from '@/lib/db/schema'
 import { requireAdminApi } from '@/lib/admin/require-admin'
+import { buildManualTicketLines } from '@/lib/dashboard/manual-ticket-amounts'
 import { startOfNyDayUtc } from '@/lib/date/ny-bounds'
 import {
   isMissingPosSourceColumnError,
@@ -17,13 +18,28 @@ function isMissingBarberProfileColumnError(e: unknown): boolean {
   return /barber_profile_id|column.*barber_profile|42703.*barber_profile/i.test(msg)
 }
 
-const patchSchema = z.object({
-  barberProfileId: z.string().uuid(),
-  serviceId: z.string().uuid(),
-  paymentMethod: z.enum(['cash', 'card']),
-  tipAmount: z.number().min(0),
-  customerName: z.string().optional(),
-})
+const patchSchema = z
+  .object({
+    barberProfileId: z.string().uuid(),
+    serviceId: z.string().uuid(),
+    paymentMethod: z.enum(['cash', 'card']),
+    tipAmount: z.number().min(0),
+    customerName: z.string().optional(),
+    addCustomAmount: z.boolean().optional(),
+    customAmount: z.number().min(0).max(50_000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.addCustomAmount === true) {
+      const c = data.customAmount
+      if (c == null || !Number.isFinite(c) || c <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Enter a custom amount greater than $0.',
+          path: ['customAmount'],
+        })
+      }
+    }
+  })
 
 /** DELETE — void a ticket (soft-delete for reporting). */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -73,7 +89,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { barberProfileId, serviceId, paymentMethod, tipAmount } = parsed.data
+  const { barberProfileId, serviceId, paymentMethod, tipAmount, addCustomAmount, customAmount } = parsed.data
   const customerName = (parsed.data.customerName?.trim() || 'Walk-in').trim() || 'Walk-in'
 
   try {
@@ -162,13 +178,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Invalid or inactive service' }, { status: 400 })
     }
 
-    const amount = Number.parseFloat(String(svcRow.price))
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const { items, serviceAmount, subtotal, total } = buildManualTicketLines(svcRow, tipAmount, {
+      addCustomAmount,
+      customAmount,
+    })
+    if (!Number.isFinite(serviceAmount) || serviceAmount <= 0) {
       return NextResponse.json({ error: 'Invalid service price' }, { status: 400 })
     }
-
-    const total = amount + tipAmount
-    const items: PosLineItem[] = [{ serviceId: svcRow.id, name: svcRow.name, price: amount.toFixed(2) }]
 
     const updatePayload = {
       customerName,
@@ -176,7 +192,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       barberProfileId: prof.id,
       serviceId: svcRow.id,
       items,
-      subtotal: amount.toFixed(2),
+      subtotal: subtotal.toFixed(2),
       tipAmount: tipAmount.toFixed(2),
       total: total.toFixed(2),
       paymentMethod,
@@ -208,7 +224,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           barberId: staffUserId,
           serviceId: svcRow.id,
           items,
-          subtotal: amount.toFixed(2),
+          subtotal: subtotal.toFixed(2),
           tipAmount: tipAmount.toFixed(2),
           total: total.toFixed(2),
           paymentMethod,

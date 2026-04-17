@@ -10,7 +10,6 @@ import {
   Pencil,
   ReceiptText,
   Scissors,
-  Search,
   Check,
   X,
 } from 'lucide-react'
@@ -48,6 +47,9 @@ type Ticket = {
   barberId: string
   serviceId: string | null
   serviceName: string | null
+  customExtraAmount?: number
+  deductionReason?: string | null
+  isDeduction?: boolean
   total: number
   tipAmount: number
   paymentMethod: string
@@ -67,6 +69,7 @@ type BarberTotal = {
 type Totals = {
   cash: number
   card: number
+  deductions: number
   count: number
   byBarber: BarberTotal[]
 }
@@ -108,6 +111,9 @@ export function TicketsPageClient({
 
   const [barberProfileId, setBarberProfileId] = useState<string>('')
   const [serviceId, setServiceId] = useState<string>('')
+  const [extraAmountMode, setExtraAmountMode] = useState<'none' | 'custom' | 'deduction'>('none')
+  const [customAmountStr, setCustomAmountStr] = useState('')
+  const [deductionReason, setDeductionReason] = useState('')
   const [tipStr, setTipStr] = useState('')
   const [tipOpen, setTipOpen] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | null>(null)
@@ -125,9 +131,10 @@ export function TicketsPageClient({
   const [editBarberId, setEditBarberId] = useState('')
   const [editServiceId, setEditServiceId] = useState('')
   const [editTipStr, setEditTipStr] = useState('')
+  const [editExtraMode, setEditExtraMode] = useState<'none' | 'custom'>('none')
+  const [editCustomAmountStr, setEditCustomAmountStr] = useState('')
   const [editPayment, setEditPayment] = useState<'cash' | 'card'>('cash')
   const [editCustomer, setEditCustomer] = useState('')
-  const [q, setQ] = useState('')
   /** Defer interactive markup until after mount so browser extensions don’t mutate SSR DOM before hydrate. */
   const [uiReady, setUiReady] = useState(false)
 
@@ -183,36 +190,56 @@ export function TicketsPageClient({
     () => services.map((s) => ({ value: s.id, label: serviceDropdownLabel(s) })),
     [services]
   )
-  const amount = selectedService ? parsePrice(selectedService.price) : 0
+  const extraAmountSelectOptions = useMemo(
+    () => [
+      { value: 'none', label: 'No custom amount' },
+      { value: 'custom', label: 'Custom amount' },
+      { value: 'deduction', label: 'Cash deduction' },
+    ],
+    []
+  )
+  const isDeductionMode = extraAmountMode === 'deduction'
+  const serviceCatalogAmount = selectedService ? parsePrice(selectedService.price) : 0
+  const customExtraParsed =
+    extraAmountMode === 'custom'
+      ? Math.min(50_000, Math.max(0, Number.parseFloat(customAmountStr) || 0))
+      : 0
+  const subtotalBeforeTip = serviceCatalogAmount + (extraAmountMode === 'custom' ? customExtraParsed : 0)
   const tip = Number.parseFloat(tipStr) || 0
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    if (!s) return tickets
-    return tickets.filter(
-      (t) =>
-        t.customerName.toLowerCase().includes(s) ||
-        t.barberName.toLowerCase().includes(s) ||
-        (t.serviceName?.toLowerCase().includes(s) ?? false)
-    )
-  }, [tickets, q])
+  const filtered = useMemo(() => tickets, [tickets])
+
+  const groupedByHour = useMemo(() => {
+    const groups = new Map<string, Ticket[]>()
+    for (const t of filtered) {
+      const key = format(new Date(t.createdAt), 'h a')
+      const prev = groups.get(key) ?? []
+      prev.push(t)
+      groups.set(key, prev)
+    }
+    return [...groups.entries()].map(([hour, rows]) => ({ hour, rows }))
+  }, [filtered])
+
+  const editCustomExtraParsed = useMemo(
+    () =>
+      editExtraMode === 'custom'
+        ? Math.min(50_000, Math.max(0, Number.parseFloat(editCustomAmountStr) || 0))
+        : 0,
+    [editExtraMode, editCustomAmountStr]
+  )
 
   const cashAnim = useAnimatedCounter(totals?.cash ?? 0, 600)
   const cardAnim = useAnimatedCounter(totals?.card ?? 0, 600)
   const countAnim = useAnimatedCounter(totals?.count ?? 0, 600)
 
-  const eodCash = useAnimatedCounter(totals?.cash ?? 0, 600)
-  const eodCard = useAnimatedCounter(totals?.card ?? 0, 600)
-  const eodGrand = useAnimatedCounter((totals?.cash ?? 0) + (totals?.card ?? 0), 600)
-
-  const cashPct =
-    totals && totals.cash + totals.card > 0
-      ? (100 * totals.cash) / (totals.cash + totals.card)
-      : 50
-  const cardPct = 100 - cashPct
-
   const submit = async () => {
-    if (!barberProfileId || !serviceId || amount <= 0 || !paymentMethod) return
+    if (isDeductionMode) {
+      if (customExtraParsed <= 0) return
+      if (deductionReason.trim().length < 3) return
+    } else {
+      if (!barberProfileId || !serviceId || serviceCatalogAmount <= 0 || !paymentMethod) return
+      if (extraAmountMode === 'custom' && customExtraParsed <= 0) return
+    }
     setSubmitting(true)
     setErr(null)
     try {
@@ -221,11 +248,23 @@ export function TicketsPageClient({
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          barberProfileId,
-          serviceId,
-          customerName: customerName.trim() || undefined,
-          paymentMethod,
-          tipAmount: tip > 0 ? tip : undefined,
+          ...(isDeductionMode
+            ? {
+                entryType: 'deduction' as const,
+                deductionAmount: customExtraParsed,
+                deductionReason: deductionReason.trim(),
+              }
+            : {
+                entryType: 'ticket' as const,
+                barberProfileId,
+                serviceId,
+                customerName: customerName.trim() || undefined,
+                paymentMethod,
+                tipAmount: tip > 0 ? tip : undefined,
+                ...(extraAmountMode === 'custom'
+                  ? { addCustomAmount: true, customAmount: customExtraParsed }
+                  : {}),
+              }),
         }),
       })
       const j = (await res.json()) as {
@@ -251,6 +290,9 @@ export function TicketsPageClient({
       window.setTimeout(() => setSuccessFlash(false), 1500)
       setBarberProfileId('')
       setServiceId('')
+      setExtraAmountMode('none')
+      setCustomAmountStr('')
+      setDeductionReason('')
       setTipStr('')
       setTipOpen(false)
       setCustomerName('')
@@ -290,6 +332,14 @@ export function TicketsPageClient({
     setEditingId(t.id)
     setEditBarberId(t.barberId)
     setEditServiceId(t.serviceId ?? '')
+    const extra = t.customExtraAmount && t.customExtraAmount > 0 ? t.customExtraAmount : 0
+    if (extra > 0) {
+      setEditExtraMode('custom')
+      setEditCustomAmountStr(String(extra))
+    } else {
+      setEditExtraMode('none')
+      setEditCustomAmountStr('')
+    }
     setEditTipStr(t.tipAmount > 0 ? String(t.tipAmount) : '')
     setEditPayment(t.paymentMethod === 'card' ? 'card' : 'cash')
     setEditCustomer(t.customerName)
@@ -302,6 +352,7 @@ export function TicketsPageClient({
     if (amt <= 0) return
     const tip = Number.parseFloat(editTipStr) || 0
     if (tip < 0) return
+    if (editExtraMode === 'custom' && editCustomExtraParsed <= 0) return
     setEditSaving(true)
     setErr(null)
     try {
@@ -315,6 +366,9 @@ export function TicketsPageClient({
           paymentMethod: editPayment,
           tipAmount: tip,
           customerName: editCustomer.trim() || undefined,
+          ...(editExtraMode === 'custom'
+            ? { addCustomAmount: true, customAmount: editCustomExtraParsed }
+            : {}),
         }),
       })
       if (!res.ok) {
@@ -331,11 +385,6 @@ export function TicketsPageClient({
     }
   }
 
-  const byBarberSorted = useMemo(
-    () => [...(totals?.byBarber ?? [])].sort((a, b) => b.total - a.total),
-    [totals]
-  )
-
   const formDisabled = services.length === 0
 
   if (!uiReady) {
@@ -351,72 +400,85 @@ export function TicketsPageClient({
 
       {err ? <InlineErrorAlert message={err} onDismiss={() => setErr(null)} /> : null}
 
-      {/* ZONE A — stats aligned with Headz cream / brand */}
-      <div className="sticky top-0 z-10 -mx-4 border-b border-headz-red/10 bg-gradient-to-b from-headz-cream/80 to-[#FAFAF8]/95 px-4 py-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* KPI strip */}
+      <div className="rounded-2xl border border-black/10 bg-gradient-to-r from-white via-white to-headz-cream/30 p-3 shadow-sm sm:p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div
             className={cn(
-              'rounded-2xl border border-teal-200/70 bg-gradient-to-br from-white to-teal-50/35 p-5 shadow-sm transition-all',
-              pulseStat === 'cash' && 'ring-2 ring-teal-300/60 ring-offset-2 ring-offset-headz-cream'
+              'rounded-xl border border-black/10 bg-white/95 p-4 shadow-[0_2px_12px_-8px_rgba(0,0,0,0.35)] transition-all',
+              pulseStat === 'cash' && 'ring-2 ring-teal-300/60 ring-offset-2'
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700/75">Cash today</p>
-                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-teal-800">{formatMoney(cashAnim)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">Cash today</p>
+                <p className="mt-1 font-mono text-[1.75rem] font-black tabular-nums leading-none text-teal-800">
+                  {formatMoney(cashAnim)}
+                </p>
+                <p className="mt-2 text-xs text-headz-gray/80">Walk-in cash recorded today</p>
               </div>
-              <span className="rounded-xl bg-teal-100/90 p-2.5 text-teal-800">
+              <span className="rounded-lg bg-teal-50 p-2 text-teal-700 ring-1 ring-teal-100">
                 <Banknote className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-teal-900/10">
-              <div className="h-full w-[72%] rounded-full bg-teal-400/90 transition-all" />
-            </div>
           </div>
           <div
             className={cn(
-              'rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white to-sky-50/40 p-5 shadow-sm transition-all',
-              pulseStat === 'card' && 'ring-2 ring-sky-300/60 ring-offset-2 ring-offset-headz-cream'
+              'rounded-xl border border-black/10 bg-white/95 p-4 shadow-[0_2px_12px_-8px_rgba(0,0,0,0.35)] transition-all',
+              pulseStat === 'card' && 'ring-2 ring-sky-300/60 ring-offset-2'
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-700/75">Card today</p>
-                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-sky-800">{formatMoney(cardAnim)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">Card today</p>
+                <p className="mt-1 font-mono text-[1.75rem] font-black tabular-nums leading-none text-sky-800">
+                  {formatMoney(cardAnim)}
+                </p>
+                <p className="mt-2 text-xs text-headz-gray/80">Card payments captured today</p>
               </div>
-              <span className="rounded-xl bg-sky-100/90 p-2.5 text-sky-800">
+              <span className="rounded-lg bg-sky-50 p-2 text-sky-700 ring-1 ring-sky-100">
                 <CreditCard className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-sky-900/10">
-              <div className="h-full w-[72%] rounded-full bg-sky-400/90 transition-all" />
-            </div>
           </div>
           <div
             className={cn(
-              'rounded-2xl border border-rose-200/80 bg-gradient-to-br from-white to-rose-50/35 p-5 shadow-sm transition-all',
-              pulseStat === 'count' && 'ring-2 ring-rose-300/55 ring-offset-2 ring-offset-headz-cream'
+              'rounded-xl border border-black/10 bg-white/95 p-4 shadow-[0_2px_12px_-8px_rgba(0,0,0,0.35)] transition-all',
+              pulseStat === 'count' && 'ring-2 ring-rose-300/55 ring-offset-2'
             )}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-700/80">Tickets today</p>
-                <p className="mt-2 font-mono text-2xl font-black tabular-nums text-rose-800">{Math.round(countAnim)}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">Tickets today</p>
+                <p className="mt-1 font-mono text-[1.75rem] font-black tabular-nums leading-none text-rose-800">
+                  {Math.round(countAnim)}
+                </p>
+                <p className="mt-2 text-xs text-headz-gray/80">Total entries so far today</p>
               </div>
-              <span className="rounded-xl bg-rose-100/90 p-2.5 text-rose-800">
+              <span className="rounded-lg bg-rose-50 p-2 text-rose-700 ring-1 ring-rose-100">
                 <ReceiptText className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-rose-900/10">
-              <div className="h-full w-[72%] rounded-full bg-rose-400/85 transition-all" />
+          </div>
+          <div className="rounded-xl border border-black/10 bg-white/95 p-4 shadow-[0_2px_12px_-8px_rgba(0,0,0,0.35)]">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-headz-gray">Deductions</p>
+                <p className="mt-1 font-mono text-[1.75rem] font-black tabular-nums leading-none text-amber-800">
+                  {formatMoney(totals?.deductions ?? 0)}
+                </p>
+                <p className="mt-2 text-xs text-headz-gray/80">Cash removed from till</p>
+              </div>
+              <span className="rounded-lg bg-amber-50 p-2 text-amber-700 ring-1 ring-amber-100">
+                <Banknote className="h-5 w-5" />
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Shop day + search — directly under KPIs */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6">
-        <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-headz-red/15 bg-gradient-to-r from-white to-headz-cream/40 px-4 py-3 shadow-sm shadow-black/[0.03]">
+      {/* Shop day bar */}
+      <div className="flex w-full min-w-0 items-center gap-3 rounded-2xl border border-headz-red/15 bg-gradient-to-r from-white to-headz-cream/40 px-4 py-3 shadow-sm shadow-black/[0.03]">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-headz-red/10 text-headz-red">
             <CalendarDays className="h-5 w-5" aria-hidden />
           </span>
@@ -426,28 +488,13 @@ export function TicketsPageClient({
               {format(new Date(), 'EEEE, MMMM d, yyyy')}
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-rose-200/90 px-3 py-1.5 font-mono text-sm font-black tabular-nums text-rose-950 shadow-sm">
-            {tickets.length}
-          </span>
-        </div>
-        <div className="relative w-full sm:max-w-md lg:max-w-lg">
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center">
-            <Search className="h-4 w-4 shrink-0 text-headz-gray" aria-hidden />
-          </span>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search barber or customer…"
-            className="w-full rounded-2xl border-2 border-black/[0.08] bg-white py-3 pl-11 pr-4 text-sm shadow-inner shadow-black/[0.02] transition-colors focus:border-headz-red/40 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
-          />
-        </div>
       </div>
 
-      {/* Left: add ticket · Right: list + end of day */}
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,400px)_1fr] lg:gap-10">
-        <div className="lg:sticky lg:top-24">
-          <h2 className="mb-3 font-serif text-xl font-bold text-headz-black">Add ticket</h2>
-          <div className="space-y-5 rounded-2xl border-2 border-headz-red/20 bg-gradient-to-b from-white via-white to-headz-cream/35 p-6 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] ring-1 ring-headz-red/10">
+      {/* Workspace: add ticket on left, hourly ticket feed on right */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
+        <section className="lg:sticky lg:top-24">
+            <h2 className="mb-3 font-serif text-xl font-bold text-headz-black">Add ticket</h2>
+            <div className="space-y-5 rounded-2xl border-2 border-headz-red/20 bg-gradient-to-b from-white via-white to-headz-cream/35 p-6 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)] ring-1 ring-headz-red/10">
             {formDisabled ? (
               <p className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
                 No active services in the catalog. Add services in the database or admin tools, then refresh this page.
@@ -482,25 +529,103 @@ export function TicketsPageClient({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Service total</label>
-              <div
-                className={cn(
-                  'mt-2 flex items-baseline justify-between rounded-xl border-2 border-dashed border-headz-red/25 bg-headz-black/[0.03] px-4 py-3',
-                  selectedService && 'border-headz-red/35 bg-headz-red/[0.04]'
-                )}
-              >
-                <span className="text-xs text-headz-gray">Subtotal (from catalog)</span>
-                <span className="font-mono text-xl font-bold tabular-nums text-headz-black">
-                  {selectedService ? formatMoney(amount) : '—'}
-                </span>
+              <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Extra on ticket</label>
+              <div className="mt-2">
+                <HeadzFormSelect
+                  value={extraAmountMode}
+                  onChange={(v) => {
+                    const mode = v === 'custom' || v === 'deduction' ? v : 'none'
+                    setExtraAmountMode(mode)
+                    if (mode === 'none') {
+                      setCustomAmountStr('')
+                      setDeductionReason('')
+                    }
+                  }}
+                  options={extraAmountSelectOptions}
+                  placeholder="Select…"
+                  disabled={formDisabled}
+                />
               </div>
-              {tip > 0 ? (
-                <p className="mt-2 text-xs text-headz-gray">
-                  With tip: <span className="font-semibold text-headz-black">{formatMoney(amount + tip)}</span>
-                </p>
+              {extraAmountMode !== 'none' ? (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-medium text-headz-black">
+                    {isDeductionMode ? 'Deduction amount ($)' : 'Custom amount ($)'}
+                  </p>
+                  <div className="relative max-w-[180px]">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex w-8 items-center justify-center text-headz-gray">
+                      $
+                    </span>
+                    <input
+                      value={customAmountStr}
+                      onChange={(e) => setCustomAmountStr(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      disabled={formDisabled}
+                      className="w-full rounded-xl border-2 border-black/[0.08] bg-white py-2.5 pl-8 pr-3 font-mono text-sm tabular-nums transition-colors focus:border-headz-red/40 focus:outline-none focus:ring-4 focus:ring-headz-red/10 disabled:opacity-50"
+                    />
+                  </div>
+                  {isDeductionMode ? (
+                    <div>
+                      <p className="mb-1 text-xs font-medium text-headz-black">Reason (required)</p>
+                      <input
+                        value={deductionReason}
+                        onChange={(e) => setDeductionReason(e.target.value)}
+                        placeholder="Cash removed from till for..."
+                        className="w-full rounded-xl border-2 border-black/[0.08] bg-white px-3 py-2.5 text-sm transition-colors focus:border-headz-red/40 focus:outline-none focus:ring-4 focus:ring-headz-red/10"
+                      />
+                    </div>
+                  ) : null}
+                  {customExtraParsed > 0 ? (
+                    <span className="inline-block rounded-full bg-headz-red/10 px-2.5 py-1 text-xs font-medium text-headz-red">
+                      {isDeductionMode
+                        ? `Subtracts ${formatMoney(customExtraParsed)} from cash totals`
+                        : `Adds ${formatMoney(customExtraParsed)} to this ticket`}
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 
+            {!isDeductionMode ? (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Ticket subtotal</label>
+              <div className="mt-2 space-y-2 rounded-xl border-2 border-dashed border-headz-red/25 bg-headz-black/[0.03] px-4 py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs text-headz-gray">Catalog service</span>
+                  <span className="font-mono text-base font-bold tabular-nums text-headz-black">
+                    {selectedService ? formatMoney(serviceCatalogAmount) : '—'}
+                  </span>
+                </div>
+                {extraAmountMode === 'custom' && customExtraParsed > 0 ? (
+                  <div className="flex items-baseline justify-between gap-2 border-t border-black/[0.06] pt-2">
+                    <span className="text-xs text-headz-gray">Custom amount</span>
+                    <span className="font-mono text-base font-bold tabular-nums text-headz-red">
+                      +{formatMoney(customExtraParsed)}
+                    </span>
+                  </div>
+                ) : null}
+                <div
+                  className={cn(
+                    'flex items-baseline justify-between gap-2 border-t border-black/[0.06] pt-2',
+                    selectedService && 'border-headz-red/20'
+                  )}
+                >
+                  <span className="text-xs font-semibold text-headz-black">Before tip</span>
+                  <span className="font-mono text-xl font-black tabular-nums text-headz-black">
+                    {selectedService ? formatMoney(subtotalBeforeTip) : '—'}
+                  </span>
+                </div>
+              </div>
+              {tip > 0 ? (
+                <p className="mt-2 text-xs text-headz-gray">
+                  With tip:{' '}
+                  <span className="font-semibold text-headz-black">{formatMoney(subtotalBeforeTip + tip)}</span>
+                </p>
+              ) : null}
+            </div>
+            ) : null}
+
+            {!isDeductionMode ? (
             <div>
               {!tipOpen ? (
                 <button
@@ -532,7 +657,9 @@ export function TicketsPageClient({
                 </div>
               )}
             </div>
+            ) : null}
 
+            {!isDeductionMode ? (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Payment</p>
               <div className="mt-2 grid grid-cols-2 gap-3">
@@ -564,7 +691,9 @@ export function TicketsPageClient({
                 </button>
               </div>
             </div>
+            ) : null}
 
+            {!isDeductionMode ? (
             <div>
               <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Customer (optional)</label>
               <input
@@ -575,10 +704,23 @@ export function TicketsPageClient({
                 className="mt-2 w-full rounded-xl border-2 border-black/[0.08] bg-white px-4 py-3 text-sm transition-colors focus:border-headz-red/40 focus:outline-none focus:ring-4 focus:ring-headz-red/10 disabled:opacity-50"
               />
             </div>
+            ) : null}
 
             <button
               type="button"
-              disabled={submitting || formDisabled || !barberProfileId || !serviceId || amount <= 0 || !paymentMethod}
+              disabled={
+                submitting ||
+                formDisabled ||
+                (
+                  isDeductionMode
+                    ? customExtraParsed <= 0 || deductionReason.trim().length < 3
+                    : !barberProfileId ||
+                      !serviceId ||
+                      serviceCatalogAmount <= 0 ||
+                      !paymentMethod ||
+                      (extraAmountMode === 'custom' && customExtraParsed <= 0)
+                )
+              }
               onClick={() => void submit()}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-headz-red py-4 text-sm font-bold uppercase tracking-[0.2em] text-white shadow-lg shadow-headz-red/25 transition-all hover:bg-headz-redDark disabled:opacity-45"
             >
@@ -593,106 +735,126 @@ export function TicketsPageClient({
                   Saved
                 </>
               ) : (
-                'Add ticket'
+                isDeductionMode ? 'Record deduction' : 'Add ticket'
               )}
             </button>
-            <p className="text-center text-xs text-headz-gray/90">Tickets are recorded to the daily report.</p>
-          </div>
-        </div>
+              <p className="text-center text-xs text-headz-gray/90">
+                {isDeductionMode
+                  ? 'Deductions are subtracted from cash reporting.'
+                  : 'Tickets are recorded to the daily report.'}
+              </p>
+            </div>
+          </section>
 
-        <div className="space-y-8">
-          <div>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-3">
+          <section className="rounded-2xl border border-black/[0.06] bg-white/90 p-4 shadow-sm sm:p-5">
+            <div className="mb-4 border-b border-black/5 pb-3">
               <h2 className="font-serif text-xl font-bold text-headz-black">Today&apos;s tickets</h2>
               {lastUpdated ? (
-                <span className="text-xs text-headz-gray/80">
+                <p className="mt-1 text-xs text-headz-gray/80">
                   Updated {formatDistanceToNow(lastUpdated, { addSuffix: true })}
-                </span>
+                </p>
               ) : null}
             </div>
 
-          {loading && !tickets.length ? (
-            <div className="py-12 text-center text-headz-gray">Loading…</div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-headz-red/10 bg-gradient-to-b from-white to-headz-cream/20 py-16 text-center shadow-sm">
-              <Scissors className="mb-3 text-4xl text-headz-red/25" aria-hidden />
-              <p className="text-sm text-headz-gray">No tickets yet today. Add the first one.</p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {filtered.map((t) => {
-                const isNew = t.id === newTicketId
-                return (
-                  <li
-                    key={t.id}
-                    className={cn(
-                      'rounded-xl border border-black/[0.07] bg-white p-3 shadow-sm transition-all',
-                      removingId === t.id && 'opacity-40',
-                      isNew && 'border-headz-red/30 shadow-md'
-                    )}
-                  >
-                    <div className="flex gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-headz-red/10 text-xs font-bold text-headz-red">
-                        {initials(t.customerName)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-headz-black">{t.customerName}</p>
-                            <p className="text-xs text-headz-gray">{t.barberName}</p>
+            {loading && !tickets.length ? (
+              <div className="py-12 text-center text-headz-gray">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-headz-red/10 bg-gradient-to-b from-white to-headz-cream/20 py-16 text-center shadow-sm">
+                <Scissors className="mb-3 text-4xl text-headz-red/25" aria-hidden />
+                <p className="text-sm text-headz-gray">No tickets yet today. Add the first one.</p>
+              </div>
+            ) : (
+              <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 sm:pr-2">
+                {groupedByHour.map((group) => (
+                  <div key={group.hour}>
+                    <div className="sticky top-0 z-[1] mb-2 rounded-lg border border-black/5 bg-headz-cream/80 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-headz-gray backdrop-blur-sm">
+                      {group.hour} · {group.rows.length} {group.rows.length === 1 ? 'entry' : 'entries'}
+                    </div>
+                    <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {group.rows.map((t) => {
+                    const isNew = t.id === newTicketId
+                    return (
+                      <li
+                        key={t.id}
+                        className={cn(
+                          'rounded-xl border border-black/[0.07] bg-white p-3 shadow-sm transition-all',
+                          removingId === t.id && 'opacity-40',
+                          isNew && 'border-headz-red/30 shadow-md'
+                        )}
+                      >
+                        <div className="flex gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-headz-red/10 text-xs font-bold text-headz-red">
+                            {initials(t.customerName)}
                           </div>
-                          <span
-                            className={cn(
-                              'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
-                              t.paymentMethod === 'cash'
-                                ? 'bg-teal-100 text-teal-800'
-                                : 'bg-sky-100 text-sky-800'
-                            )}
-                          >
-                            {t.paymentMethod === 'cash' ? 'CASH' : 'CARD'}
-                          </span>
-                        </div>
-                        {t.serviceName ? (
-                          <p className="mt-1 text-xs text-headz-gray">{t.serviceName}</p>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <span className="font-bold tabular-nums text-headz-black">{formatMoney(t.total)}</span>
-                            {t.tipAmount > 0 ? (
-                              <span className="ml-2 text-xs text-headz-gray">+ {formatMoney(t.tipAmount)} tip</span>
-                            ) : null}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-headz-gray">
-                              {formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })}
-                            </span>
-                            {t.source === 'manual' ? (
-                              <button
-                                type="button"
-                                aria-label="Edit ticket"
-                                disabled={removingId === t.id || editSaving}
-                                onClick={() => (editingId === t.id ? setEditingId(null) : openEdit(t))}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-headz-black">{t.customerName}</p>
+                                <p className="text-xs text-headz-gray">{t.barberName}</p>
+                              </div>
+                              <span
                                 className={cn(
-                                  'rounded p-1 text-headz-gray/50 transition hover:bg-headz-red/10 hover:text-headz-red disabled:opacity-50',
-                                  editingId === t.id && 'bg-headz-red/10 text-headz-red'
+                                  'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
+                                  t.paymentMethod === 'cash'
+                                    ? 'bg-teal-100 text-teal-800'
+                                    : 'bg-sky-100 text-sky-800'
                                 )}
                               >
-                                <Pencil className="h-4 w-4" />
-                              </button>
+                                {t.paymentMethod === 'cash' ? 'CASH' : 'CARD'}
+                              </span>
+                            </div>
+                            {t.serviceName ? (
+                              <p className="mt-1 text-xs text-headz-gray">{t.serviceName}</p>
                             ) : null}
-                            <button
-                              type="button"
-                              aria-label="Void ticket"
-                              disabled={removingId === t.id}
-                              onClick={() => setVoidTicketId(t.id)}
-                              className="rounded p-1 text-headz-gray/40 transition hover:bg-red-50 hover:text-headz-red disabled:opacity-50"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                        {editingId === t.id ? (
-                          <div className="mt-4 space-y-3 rounded-xl border border-headz-red/20 bg-headz-cream/40 p-4">
+                            {t.isDeduction ? (
+                              <p className="mt-0.5 text-xs font-semibold text-amber-700">
+                                Deduction{t.deductionReason ? ` - ${t.deductionReason}` : ''}
+                              </p>
+                            ) : null}
+                            {(t.customExtraAmount ?? 0) > 0 ? (
+                              <p className="mt-0.5 text-xs font-medium text-headz-red/90">
+                                + {formatMoney(t.customExtraAmount!)} custom
+                              </p>
+                            ) : null}
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <span className="font-bold tabular-nums text-headz-black">{formatMoney(t.total)}</span>
+                                {t.tipAmount > 0 ? (
+                                  <span className="ml-2 text-xs text-headz-gray">+ {formatMoney(t.tipAmount)} tip</span>
+                                ) : null}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-headz-gray">
+                                  {formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })}
+                                </span>
+                                {t.source === 'manual' ? (
+                                  <button
+                                    type="button"
+                                    aria-label="Edit ticket"
+                                    disabled={removingId === t.id || editSaving}
+                                    title={t.isDeduction ? 'Deductions cannot be edited.' : undefined}
+                                    onClick={() => (editingId === t.id ? setEditingId(null) : openEdit(t))}
+                                    className={cn(
+                                      'rounded p-1 text-headz-gray/50 transition hover:bg-headz-red/10 hover:text-headz-red disabled:opacity-50',
+                                      editingId === t.id && 'bg-headz-red/10 text-headz-red'
+                                    )}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  aria-label="Void ticket"
+                                  disabled={removingId === t.id}
+                                  onClick={() => setVoidTicketId(t.id)}
+                                  className="rounded p-1 text-headz-gray/40 transition hover:bg-red-50 hover:text-headz-red disabled:opacity-50"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                            {editingId === t.id ? (
+                              <div className="mt-4 space-y-3 rounded-xl border border-headz-red/20 bg-headz-cream/40 p-4">
                             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Edit ticket</p>
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div>
@@ -720,6 +882,37 @@ export function TicketsPageClient({
                                   />
                                 </div>
                               </div>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold uppercase tracking-wider text-headz-gray">
+                                Extra on ticket
+                              </label>
+                              <div className="mt-1">
+                                <HeadzFormSelect
+                                  size="sm"
+                                  value={editExtraMode}
+                                  onChange={(v) => {
+                                    setEditExtraMode(v === 'custom' ? 'custom' : 'none')
+                                    if (v !== 'custom') setEditCustomAmountStr('')
+                                  }}
+                                  options={extraAmountSelectOptions}
+                                  placeholder="Select…"
+                                />
+                              </div>
+                              {editExtraMode === 'custom' ? (
+                                <div className="relative mt-2 max-w-[180px]">
+                                  <span className="pointer-events-none absolute inset-y-0 left-0 flex w-8 items-center justify-center text-headz-gray">
+                                    $
+                                  </span>
+                                  <input
+                                    value={editCustomAmountStr}
+                                    onChange={(e) => setEditCustomAmountStr(e.target.value)}
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    className="w-full rounded-lg border-2 border-black/[0.08] bg-white py-2 pl-8 pr-3 font-mono text-sm tabular-nums"
+                                  />
+                                </div>
+                              ) : null}
                             </div>
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div>
@@ -769,135 +962,42 @@ export function TicketsPageClient({
                                 </button>
                               </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                disabled={editSaving || !editBarberId || !editServiceId}
-                                onClick={() => void saveEdit()}
-                                className="rounded-lg bg-headz-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-45"
-                              >
-                                {editSaving ? 'Saving…' : 'Save changes'}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={editSaving}
-                                onClick={() => setEditingId(null)}
-                                className="rounded-lg border border-black/15 px-4 py-2 text-sm text-headz-gray"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          </div>
-
-          {/* End of day — right column under list */}
-          <div className="rounded-2xl border-2 border-black/[0.06] bg-gradient-to-br from-white to-headz-cream/30 p-1 shadow-lg shadow-black/[0.06]">
-            <div className="rounded-[14px] border border-white/80 bg-white/90 p-5 backdrop-blur-sm">
-              <h2 className="font-serif text-lg font-bold text-headz-black">
-                End of day summary
-                <span className="ml-2 text-sm font-normal text-headz-gray">· {format(new Date(), 'MMM d, yyyy')}</span>
-              </h2>
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-teal-200/70 bg-gradient-to-br from-teal-50/70 to-white p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">Total cash</p>
-                  <p className="mt-1 font-mono text-2xl font-black tabular-nums text-teal-800 sm:text-3xl">{formatMoney(eodCash)}</p>
-                </div>
-                <div className="rounded-xl border border-sky-200/70 bg-gradient-to-br from-sky-50/70 to-white p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80">Total card</p>
-                  <p className="mt-1 font-mono text-2xl font-black tabular-nums text-sky-800 sm:text-3xl">{formatMoney(eodCard)}</p>
-                </div>
-                <div className="rounded-xl border border-rose-200/70 bg-gradient-to-br from-rose-50/60 to-white p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800/80">Grand total</p>
-                  <p className="mt-1 font-mono text-2xl font-black tabular-nums text-rose-900 sm:text-3xl">{formatMoney(eodGrand)}</p>
-                </div>
-              </div>
-              <div className="mt-4 rounded-xl bg-black/[0.03] px-4 py-3">
-                <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/5">
-                  <div className="h-full bg-teal-400/90 transition-all duration-700" style={{ width: `${cashPct}%` }} />
-                  <div className="h-full bg-sky-400/90 transition-all duration-700" style={{ width: `${cardPct}%` }} />
-                </div>
-                <p className="mt-2 text-center text-[11px] text-headz-gray">
-                  Cash {formatMoney(totals?.cash ?? 0)} · Card {formatMoney(totals?.card ?? 0)} · {cashPct.toFixed(0)}% /{' '}
-                  {cardPct.toFixed(0)}%
-                </p>
-              </div>
-
-              <div className="mt-5">
-                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-headz-gray">By barber</h3>
-                <div className="overflow-x-auto rounded-xl border border-black/5">
-                  <table className="w-full min-w-[520px] text-sm">
-                    <thead>
-                      <tr className="border-b border-black/5 bg-headz-cream/40 text-left text-[10px] font-bold uppercase tracking-wider text-headz-gray">
-                        <th className="px-3 py-2">Barber</th>
-                        <th className="px-3 py-2">#</th>
-                        <th className="px-3 py-2">Cash</th>
-                        <th className="px-3 py-2">Card</th>
-                        <th className="px-3 py-2">Tips</th>
-                        <th className="px-3 py-2">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {byBarberSorted.map((r) => {
-                        const tipRow = tickets
-                          .filter((t) => t.barberId === r.barberId)
-                          .reduce((s, t) => s + t.tipAmount, 0)
-                        return (
-                          <tr key={r.barberId} className="border-b border-black/[0.04] last:border-0">
-                            <td className="px-3 py-2.5">
-                              <div className="flex items-center gap-2">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-headz-red/10 text-[10px] font-bold text-headz-red">
-                                  {initials(r.barberName)}
-                                </span>
-                                <span className="font-medium">{r.barberName}</span>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      editSaving ||
+                                      !editBarberId ||
+                                      !editServiceId ||
+                                      (editExtraMode === 'custom' && editCustomExtraParsed <= 0)
+                                    }
+                                    onClick={() => void saveEdit()}
+                                    className="rounded-lg bg-headz-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-45"
+                                  >
+                                    {editSaving ? 'Saving…' : 'Save changes'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={editSaving}
+                                    onClick={() => setEditingId(null)}
+                                    className="rounded-lg border border-black/15 px-4 py-2 text-sm text-headz-gray"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <span className="rounded-md bg-headz-black/[0.06] px-1.5 font-mono text-xs font-bold">{r.tickets}</span>
-                            </td>
-                            <td className="px-3 py-2.5 font-semibold text-teal-800">{formatMoney(r.cash)}</td>
-                            <td className="px-3 py-2.5 font-semibold text-sky-800">{formatMoney(r.card)}</td>
-                            <td className="px-3 py-2.5 text-headz-gray">{formatMoney(tipRow)}</td>
-                            <td className="px-3 py-2.5 font-bold text-headz-black">{formatMoney(r.total)}</td>
-                          </tr>
-                        )
+                            ) : null}
+                          </div>
+                        </div>
+                      </li>
+                    )
                       })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-headz-black/[0.03] font-bold">
-                        <td className="px-3 py-2.5">Totals</td>
-                        <td className="px-3 py-2.5">
-                          <span className="rounded-md bg-headz-black/10 px-1.5 font-mono text-xs">{totals?.count ?? 0}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-teal-800">{formatMoney(totals?.cash ?? 0)}</td>
-                        <td className="px-3 py-2.5 text-sky-800">{formatMoney(totals?.card ?? 0)}</td>
-                        <td className="px-3 py-2.5 text-headz-gray">
-                          {formatMoney(tickets.reduce((s, t) => s + t.tipAmount, 0))}
-                        </td>
-                        <td className="px-3 py-2.5">{formatMoney((totals?.cash ?? 0) + (totals?.card ?? 0))}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    className="rounded-xl border border-black/10 px-4 py-2 text-xs font-semibold text-headz-gray transition hover:bg-black/[0.04]"
-                  >
-                    Print summary
-                  </button>
-                </div>
+                    </ul>
+                  </div>
+                ))}
               </div>
-            </div>
-          </div>
-        </div>
+            )}
+          </section>
       </div>
 
       <ConfirmModal

@@ -17,6 +17,17 @@ type ReportsPayload = {
   ticketsByBarber?: { barber: string; tickets: number; revenue: number }[]
 }
 
+type TicketsSnapshotPayload = {
+  totals?: {
+    cash?: number
+    card?: number
+    deductions?: number
+    count?: number
+    byBarber?: Array<{ barberId: string; barberName: string; tickets: number; cash: number; card: number; total: number }>
+  }
+  tickets?: Array<{ barberId: string; tipAmount: number }>
+}
+
 function RankBadge({ rank }: { rank: number }) {
   const style =
     rank === 1
@@ -42,6 +53,7 @@ export default function ReportsPage() {
   const end = format(new Date(), 'yyyy-MM-dd')
   const start = format(subDays(new Date(), 30), 'yyyy-MM-dd')
   const [data, setData] = useState<ReportsPayload | null>(null)
+  const [todaySnapshot, setTodaySnapshot] = useState<TicketsSnapshotPayload | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -49,7 +61,34 @@ export default function ReportsPage() {
       .then((r) => r.json())
       .then((j) => setData(j as ReportsPayload))
       .finally(() => setLoading(false))
+    void fetch('/api/dashboard/tickets', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => setTodaySnapshot(j as TicketsSnapshotPayload))
+      .catch(() => setTodaySnapshot(null))
   }, [start, end])
+
+  const snapshotTipsByBarber = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of todaySnapshot?.tickets ?? []) {
+      const key = t.barberId ?? ''
+      if (!key) continue
+      m.set(key, (m.get(key) ?? 0) + Number(t.tipAmount ?? 0))
+    }
+    return m
+  }, [todaySnapshot])
+
+  const snapshotByBarber = useMemo(
+    () => [...(todaySnapshot?.totals?.byBarber ?? [])].sort((a, b) => b.total - a.total),
+    [todaySnapshot?.totals?.byBarber]
+  )
+
+  const snapshotCash = todaySnapshot?.totals?.cash ?? 0
+  const snapshotCard = todaySnapshot?.totals?.card ?? 0
+  const snapshotDeductions = todaySnapshot?.totals?.deductions ?? 0
+  const snapshotGrand = snapshotCash + snapshotCard
+  const snapshotSplitDenom = snapshotCash + snapshotCard
+  const snapshotCashPct = snapshotSplitDenom > 0 ? (100 * snapshotCash) / snapshotSplitDenom : 50
+  const snapshotCardPct = 100 - snapshotCashPct
 
   const ticketsRanked = useMemo(() => {
     const rows = [...(data?.ticketsByBarber ?? [])]
@@ -100,6 +139,71 @@ export default function ReportsPage() {
           <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </div>
+
+      <section className="rounded-2xl border-2 border-black/[0.06] bg-gradient-to-br from-white to-headz-cream/30 p-1 shadow-lg shadow-black/[0.06]">
+        <div className="rounded-[14px] border border-white/80 bg-white/90 p-5 backdrop-blur-sm">
+          <h2 className="font-serif text-lg font-bold text-headz-black">
+            End of day summary
+            <span className="ml-2 text-sm font-normal text-headz-gray">· {format(new Date(), 'MMM d, yyyy')}</span>
+          </h2>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-teal-200/70 bg-gradient-to-br from-teal-50/70 to-white p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700/80">Total cash</p>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums text-teal-800">{formatMoney(snapshotCash)}</p>
+            </div>
+            <div className="rounded-xl border border-sky-200/70 bg-gradient-to-br from-sky-50/70 to-white p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80">Total card</p>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums text-sky-800">{formatMoney(snapshotCard)}</p>
+            </div>
+            <div className="rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50/70 to-white p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700/80">Deductions</p>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums text-amber-800">{formatMoney(snapshotDeductions)}</p>
+            </div>
+            <div className="rounded-xl border border-rose-200/70 bg-gradient-to-br from-rose-50/60 to-white p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800/80">Grand total</p>
+              <p className="mt-1 font-mono text-2xl font-black tabular-nums text-rose-900">{formatMoney(snapshotGrand)}</p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl bg-black/[0.03] px-4 py-3">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-black/5">
+              <div className="h-full bg-teal-400/90 transition-all duration-700" style={{ width: `${snapshotCashPct}%` }} />
+              <div className="h-full bg-sky-400/90 transition-all duration-700" style={{ width: `${snapshotCardPct}%` }} />
+            </div>
+            <p className="mt-2 text-center text-[11px] text-headz-gray">
+              Cash {formatMoney(snapshotCash)} · Card {formatMoney(snapshotCard)} · Deductions {formatMoney(snapshotDeductions)}
+            </p>
+          </div>
+          <div className="mt-5">
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-headz-gray">By barber</h3>
+            <div className="overflow-x-auto rounded-xl border border-black/5">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="border-b border-black/5 bg-headz-cream/40 text-left text-[10px] font-bold uppercase tracking-wider text-headz-gray">
+                    <th className="px-3 py-2">Barber</th>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Cash</th>
+                    <th className="px-3 py-2">Card</th>
+                    <th className="px-3 py-2">Tips</th>
+                    <th className="px-3 py-2">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {snapshotByBarber.map((r) => (
+                    <tr key={r.barberId} className="border-b border-black/[0.04] last:border-0">
+                      <td className="px-3 py-2.5 font-medium">{r.barberName}</td>
+                      <td className="px-3 py-2.5">{r.tickets}</td>
+                      <td className="px-3 py-2.5 text-teal-800">{formatMoney(r.cash)}</td>
+                      <td className="px-3 py-2.5 text-sky-800">{formatMoney(r.card)}</td>
+                      <td className="px-3 py-2.5 text-headz-gray">{formatMoney(snapshotTipsByBarber.get(r.barberId) ?? 0)}</td>
+                      <td className="px-3 py-2.5 font-semibold">{formatMoney(r.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-3 font-serif text-lg font-bold text-headz-black">Ticket &amp; POS</h2>

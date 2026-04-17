@@ -90,9 +90,9 @@ export async function GET(request: Request) {
   const whereBase = conditions.length > 0 ? and(...conditions) : undefined
   const whereWithManualSource =
     sourceFilter === 'manual' && whereBase
-      ? and(whereBase, eq(posTransactions.source, 'manual'))
+      ? and(whereBase, or(eq(posTransactions.source, 'manual'), eq(posTransactions.source, 'deduction')))
       : sourceFilter === 'manual'
-        ? eq(posTransactions.source, 'manual')
+        ? or(eq(posTransactions.source, 'manual'), eq(posTransactions.source, 'deduction'))
         : whereBase
 
   const selectBase = {

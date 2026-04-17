@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq, gte, isNotNull, lte, ne, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, isNotNull, lte, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { barbers, posTransactions, services, users } from '@/lib/db/schema'
@@ -13,6 +13,7 @@ import {
   postgresErrorText,
 } from '@/lib/db/postgres-error'
 import { runPosTransactionsManualTicketDdls } from '@/lib/db/pos-manual-ticket-ddl'
+import { buildManualTicketLines, customExtraFromItems } from '@/lib/dashboard/manual-ticket-amounts'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,7 @@ type TicketRow = {
   paymentMethod: string
   createdAt: Date
   source: string
+  deductionReason: string | null
 }
 
 type BarberTotal = {
@@ -49,12 +51,17 @@ type BarberTotal = {
 function computeTotals(rows: TicketRow[]) {
   let cash = 0
   let card = 0
+  let deductions = 0
+  let ticketCount = 0
   const byBarber = new Map<string, BarberTotal>()
 
   for (const r of rows) {
     const t = parseNum(r.total)
+    const isDeduction = r.source === 'deduction'
     if (r.paymentMethod === 'cash') cash += t
     else if (r.paymentMethod === 'card') card += t
+    if (isDeduction && t < 0) deductions += Math.abs(t)
+    if (!isDeduction) ticketCount += 1
 
     const key = r.barberProfileId ?? r.barberId
     if (!key) continue
@@ -79,7 +86,8 @@ function computeTotals(rows: TicketRow[]) {
   return {
     cash,
     card,
-    count: rows.length,
+    deductions,
+    count: ticketCount,
     byBarber: byBarberList,
   }
 }
@@ -98,21 +106,83 @@ function toTicketPayload(r: TicketRow) {
     barberId: barberKey,
     serviceId,
     serviceName,
+    customExtraAmount: customExtraFromItems(items),
     total: parseNum(r.total),
     tipAmount: parseNum(r.tipAmount),
+    deductionReason: r.deductionReason,
+    isDeduction: r.source === 'deduction',
     paymentMethod: r.paymentMethod,
     createdAt: r.createdAt.toISOString(),
     source: r.source,
   }
 }
 
-const postSchema = z.object({
-  barberProfileId: z.string().uuid(),
-  customerName: z.string().optional(),
-  paymentMethod: z.enum(['cash', 'card']),
-  serviceId: z.string().uuid(),
-  tipAmount: z.number().min(0).optional(),
-})
+const postSchema = z
+  .object({
+    entryType: z.enum(['ticket', 'deduction']).optional(),
+    barberProfileId: z.string().uuid().optional(),
+    customerName: z.string().optional(),
+    paymentMethod: z.enum(['cash', 'card']).optional(),
+    serviceId: z.string().uuid().optional(),
+    tipAmount: z.number().min(0).optional(),
+    addCustomAmount: z.boolean().optional(),
+    customAmount: z.number().min(0).max(50_000).optional(),
+    deductionAmount: z.number().min(0).max(50_000).optional(),
+    deductionReason: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const entryType = data.entryType ?? 'ticket'
+    if (entryType === 'deduction') {
+      const amt = data.deductionAmount
+      if (amt == null || !Number.isFinite(amt) || amt <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Enter a deduction amount greater than $0.',
+          path: ['deductionAmount'],
+        })
+      }
+      const reason = data.deductionReason?.trim() ?? ''
+      if (reason.length < 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A deduction reason is required.',
+          path: ['deductionReason'],
+        })
+      }
+      return
+    }
+    if (!data.barberProfileId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Barber is required.',
+        path: ['barberProfileId'],
+      })
+    }
+    if (!data.serviceId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Service is required.',
+        path: ['serviceId'],
+      })
+    }
+    if (!data.paymentMethod) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Payment method is required.',
+        path: ['paymentMethod'],
+      })
+    }
+    if (data.addCustomAmount === true) {
+      const c = data.customAmount
+      if (c == null || !Number.isFinite(c) || c <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Enter a custom amount greater than $0.',
+          path: ['customAmount'],
+        })
+      }
+    }
+  })
 
 /** Run `scripts/add-pos-barber-profile-id.sql` in Supabase if this fires. */
 function isMissingBarberProfileColumnError(e: unknown): boolean {
@@ -132,6 +202,7 @@ const ticketSelectBase = {
   tipAmount: posTransactions.tipAmount,
   paymentMethod: posTransactions.paymentMethod,
   createdAt: posTransactions.createdAt,
+  deductionReason: posTransactions.refundReason,
 } as const
 
 /** Same as {@link ticketSelectBase} when `ticket_display_*` columns are not migrated yet. */
@@ -147,6 +218,7 @@ const ticketSelectBaseSansTicketUi = {
   tipAmount: posTransactions.tipAmount,
   paymentMethod: posTransactions.paymentMethod,
   createdAt: posTransactions.createdAt,
+  deductionReason: posTransactions.refundReason,
 } as const
 
 /** No `barber_profile_id` column — only rows with `barber_id` (staff) appear. */
@@ -161,6 +233,7 @@ const ticketSelectLegacyNoProfile = {
   tipAmount: posTransactions.tipAmount,
   paymentMethod: posTransactions.paymentMethod,
   createdAt: posTransactions.createdAt,
+  deductionReason: posTransactions.refundReason,
 } as const
 
 function mapLegacyRow(
@@ -176,6 +249,7 @@ function mapLegacyRow(
     paymentMethod: string
     createdAt: Date
     source?: string | null
+    deductionReason?: string | null
   },
   defaultSource: string
 ): TicketRow {
@@ -192,6 +266,7 @@ function mapLegacyRow(
     paymentMethod: r.paymentMethod,
     createdAt: r.createdAt,
     source: (r.source != null && r.source !== '') ? String(r.source) : defaultSource,
+    deductionReason: r.deductionReason ?? null,
   }
 }
 
@@ -234,8 +309,7 @@ async function fetchTodayTicketRows(): Promise<TicketRow[]> {
     ne(posTransactions.paymentStatus, 'voided'),
     eq(posTransactions.paymentStatus, 'paid')
   )
-  const scopeBarber = or(isNotNull(posTransactions.barberId), isNotNull(posTransactions.barberProfileId))
-  const where = and(dayWhere, scopeBarber)
+  const where = dayWhere
 
   const run = async (
     base: typeof ticketSelectBase | typeof ticketSelectBaseSansTicketUi
@@ -310,7 +384,69 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { barberProfileId, paymentMethod, serviceId, tipAmount } = parsed.data
+  const entryType = parsed.data.entryType ?? 'ticket'
+  if (entryType === 'deduction') {
+    const deductionAmount = Math.min(50_000, Math.max(0, parsed.data.deductionAmount ?? 0))
+    const deductionReason = (parsed.data.deductionReason?.trim() ?? '').slice(0, 500)
+    try {
+      const deductionInsert = {
+        customerName: 'Cash deduction',
+        barberId: null as string | null,
+        barberProfileId: null as string | null,
+        appointmentId: null as string | null,
+        serviceId: null as string | null,
+        items: [{ name: `Cash deduction: ${deductionReason}`, price: (-deductionAmount).toFixed(2) }] as PosLineItem[],
+        subtotal: (-deductionAmount).toFixed(2),
+        tipAmount: '0.00',
+        total: (-deductionAmount).toFixed(2),
+        paymentMethod: 'cash' as const,
+        paymentStatus: 'paid' as const,
+        refundReason: deductionReason,
+      }
+      let inserted: typeof posTransactions.$inferSelect | undefined
+      try {
+        ;[inserted] = await db
+          .insert(posTransactions)
+          .values({ ...deductionInsert, source: 'deduction' as const })
+          .returning()
+      } catch (e) {
+        if (!isMissingPosSourceColumnError(e)) throw e
+        ;[inserted] = await db.insert(posTransactions).values(deductionInsert).returning()
+      }
+      if (!inserted) {
+        return NextResponse.json({ error: 'Insert failed' }, { status: 500 })
+      }
+      const ticketRow: TicketRow = {
+        id: inserted.id,
+        customerName: inserted.customerName,
+        barberId: inserted.barberId,
+        barberProfileId: (inserted as { barberProfileId?: string | null }).barberProfileId ?? null,
+        barberName: 'Till',
+        serviceId: inserted.serviceId,
+        items: inserted.items as PosLineItem[] | null,
+        total: String(inserted.total),
+        tipAmount: String(inserted.tipAmount),
+        paymentMethod: inserted.paymentMethod,
+        createdAt: inserted.createdAt,
+        source: (inserted as { source?: string }).source ?? 'deduction',
+        deductionReason: inserted.refundReason ?? deductionReason,
+      }
+      const todayRows = await fetchTodayTicketRows()
+      const totals = computeTotals(todayRows)
+      return NextResponse.json({
+        ticket: toTicketPayload(ticketRow),
+        totals,
+      })
+    } catch (e) {
+      console.error('POST /api/dashboard/tickets deduction', e)
+      return NextResponse.json({ error: 'Failed to create deduction' }, { status: 500 })
+    }
+  }
+
+  const { barberProfileId, paymentMethod, serviceId, tipAmount, addCustomAmount, customAmount } = parsed.data
+  if (!barberProfileId || !paymentMethod || !serviceId) {
+    return NextResponse.json({ error: 'Missing required ticket fields' }, { status: 400 })
+  }
   const tip = tipAmount ?? 0
   const customerName = (parsed.data.customerName?.trim() || 'Walk-in').trim() || 'Walk-in'
 
@@ -352,13 +488,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid or inactive service' }, { status: 400 })
   }
 
-  const amount = Number.parseFloat(String(svcRow.price))
-  if (!Number.isFinite(amount) || amount <= 0) {
+  const { items, serviceAmount, subtotal, total } = buildManualTicketLines(svcRow, tip, {
+    addCustomAmount,
+    customAmount,
+  })
+  if (!Number.isFinite(serviceAmount) || serviceAmount <= 0) {
     return NextResponse.json({ error: 'Invalid service price' }, { status: 400 })
   }
-
-  const total = amount + tip
-  const items: PosLineItem[] = [{ serviceId: svcRow.id, name: svcRow.name, price: amount.toFixed(2) }]
 
   const baseInsert = {
     customerName,
@@ -367,7 +503,7 @@ export async function POST(request: Request) {
     appointmentId: null,
     serviceId: svcRow.id,
     items,
-    subtotal: amount.toFixed(2),
+    subtotal: subtotal.toFixed(2),
     tipAmount: tip.toFixed(2),
     total: total.toFixed(2),
     paymentMethod,
@@ -412,7 +548,7 @@ export async function POST(request: Request) {
           appointmentId: null as string | null,
           serviceId: svcRow.id,
           items,
-          subtotal: amount.toFixed(2),
+          subtotal: subtotal.toFixed(2),
           tipAmount: tip.toFixed(2),
           total: total.toFixed(2),
           paymentMethod,
@@ -470,6 +606,7 @@ export async function POST(request: Request) {
       paymentMethod: inserted.paymentMethod,
       createdAt: inserted.createdAt,
       source: rowSource,
+      deductionReason: inserted.refundReason ?? null,
     }
 
     const todayRows = await fetchTodayTicketRows()

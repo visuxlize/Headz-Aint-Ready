@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Banknote, ChevronLeft, CreditCard, Download, ExternalLink, ReceiptText, RefreshCw, Search } from 'lucide-react'
+import { Banknote, ChevronLeft, CreditCard, ExternalLink, Printer, ReceiptText, RefreshCw, Search } from 'lucide-react'
 import { ConfirmModal } from '@/components/barber/ConfirmModal'
 import { format } from 'date-fns'
 import { formatMoney } from '@/lib/utils/format-money'
@@ -158,38 +158,57 @@ export default function PaymentsPage() {
     }
   }
 
-  const exportCsv = () => {
-    if (!data?.transactions.length) {
-      toast.error('Nothing to export')
-      return
+  const printSummary = useMemo(() => {
+    const txns = (data?.transactions ?? []).filter((t) => t.paymentStatus === 'paid')
+    const ticketInputs = txns.filter((t) => t.source !== 'deduction')
+    let cashSales = 0
+    let cardSales = 0
+    let cashCount = 0
+    let cardCount = 0
+    const byBarber = new Map<
+      string,
+      { barberName: string; tickets: number; total: number; cashSales: number; cardSales: number }
+    >()
+    const byHour = new Map<string, number>()
+
+    for (const t of ticketInputs) {
+      const total = Number(t.total)
+      if (t.paymentMethod === 'cash') {
+        cashSales += total
+        cashCount += 1
+      }
+      if (t.paymentMethod === 'card') {
+        cardSales += total
+        cardCount += 1
+      }
+      const key = t.barberName ?? 'Staff'
+      const prev = byBarber.get(key) ?? { barberName: key, tickets: 0, total: 0, cashSales: 0, cardSales: 0 }
+      prev.tickets += 1
+      prev.total += total
+      if (t.paymentMethod === 'cash') prev.cashSales += total
+      if (t.paymentMethod === 'card') prev.cardSales += total
+      byBarber.set(key, prev)
+
+      const h = format(new Date(t.createdAt), 'h a')
+      byHour.set(h, (byHour.get(h) ?? 0) + 1)
     }
-    const rows = data.transactions.map((t) => {
-      const d = new Date(t.createdAt)
-      const service = t.items?.[0]?.name ?? ''
-      return [
-        format(d, 'yyyy-MM-dd'),
-        format(d, 'HH:mm:ss'),
-        t.barberName ?? '',
-        t.customerName,
-        service,
-        t.paymentMethod,
-        t.subtotal,
-        t.tipAmount,
-        t.total,
-        t.paymentStatus,
-      ]
-    })
-    const header = ['Date', 'Time', 'Barber', 'Customer', 'Service', 'Method', 'Subtotal', 'Tip', 'Total', 'Status']
-    const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `payments-${from}-to-${to}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success('Download started')
-  }
+
+    const byBarberRows = [...byBarber.values()]
+      .map((r) => ({ ...r, avgTicket: r.tickets > 0 ? r.total / r.tickets : 0 }))
+      .sort((a, b) => b.total - a.total)
+    const popularHour = [...byHour.entries()].sort((a, b) => b[1] - a[1])[0]
+    return {
+      totalSales: cashSales + cardSales,
+      ticketCount: ticketInputs.length,
+      cashSales,
+      cardSales,
+      cashCount,
+      cardCount,
+      byBarberRows,
+      popularHourLabel: popularHour?.[0] ?? 'N/A',
+      popularHourCount: popularHour?.[1] ?? 0,
+    }
+  }, [data?.transactions])
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-12 pt-2 text-headz-black sm:pt-4">
@@ -209,7 +228,7 @@ export default function PaymentsPage() {
             </span>
             <div>
               <h1 className="font-serif text-2xl font-bold md:text-3xl">Payments</h1>
-              <p className="mt-0.5 text-sm text-headz-gray">Card, cash, and manual tickets — filter, export, void, refund.</p>
+              <p className="mt-0.5 text-sm text-headz-gray">Card, cash, and manual tickets — filter, print, void, refund.</p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -242,12 +261,12 @@ export default function PaymentsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => exportCsv()}
+            onClick={() => window.print()}
             disabled={!data?.transactions.length}
             className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-headz-cream/80 disabled:opacity-50"
           >
-            <Download className="h-4 w-4" />
-            Export CSV
+            <Printer className="h-4 w-4" />
+            Print summary
           </button>
           <button
             type="button"
@@ -327,6 +346,75 @@ export default function PaymentsPage() {
               <span className="font-semibold text-teal-800">Cash {formatMoney(monthBar.cash)}</span>
             </p>
           </div>
+
+          <section className="rounded-2xl border-2 border-black/[0.06] bg-gradient-to-br from-white to-headz-cream/30 p-1 shadow-lg shadow-black/[0.06] print:break-inside-avoid">
+            <div className="rounded-[14px] border border-white/80 bg-white/90 p-5 backdrop-blur-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-serif text-xl font-bold text-headz-black">Print summary</h2>
+                <p className="text-xs text-headz-gray">
+                  {from} → {to}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-rose-200/70 bg-rose-50/50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-800/80">Total sales</p>
+                  <p className="mt-1 font-mono text-xl font-black text-rose-900">{formatMoney(printSummary.totalSales)}</p>
+                </div>
+                <div className="rounded-xl border border-teal-200/70 bg-teal-50/50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-teal-800/80">Cash tickets</p>
+                  <p className="mt-1 font-mono text-xl font-black text-teal-800">
+                    {printSummary.cashCount} · {formatMoney(printSummary.cashSales)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-sky-200/70 bg-sky-50/50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-sky-800/80">Card tickets</p>
+                  <p className="mt-1 font-mono text-xl font-black text-sky-800">
+                    {printSummary.cardCount} · {formatMoney(printSummary.cardSales)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-violet-200/70 bg-violet-50/50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-violet-900/70">Most popular hour</p>
+                  <p className="mt-1 font-mono text-xl font-black text-violet-900">
+                    {printSummary.popularHourLabel}
+                  </p>
+                  <p className="text-xs text-headz-gray">{printSummary.popularHourCount} ticket inputs</p>
+                </div>
+              </div>
+              <div className="mt-4 overflow-x-auto rounded-xl border border-black/5">
+                <table className="w-full min-w-[680px] text-sm">
+                  <thead>
+                    <tr className="border-b border-black/5 bg-headz-cream/40 text-left text-[10px] font-bold uppercase tracking-wider text-headz-gray">
+                      <th className="px-3 py-2">Barber</th>
+                      <th className="px-3 py-2">Tickets</th>
+                      <th className="px-3 py-2">Avg ticket</th>
+                      <th className="px-3 py-2">Cash sales</th>
+                      <th className="px-3 py-2">Card sales</th>
+                      <th className="px-3 py-2">Total sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printSummary.byBarberRows.map((r) => (
+                      <tr key={r.barberName} className="border-b border-black/[0.04] last:border-0">
+                        <td className="px-3 py-2.5 font-medium">{r.barberName}</td>
+                        <td className="px-3 py-2.5">{r.tickets}</td>
+                        <td className="px-3 py-2.5">{formatMoney(r.avgTicket)}</td>
+                        <td className="px-3 py-2.5 text-teal-800">{formatMoney(r.cashSales)}</td>
+                        <td className="px-3 py-2.5 text-sky-800">{formatMoney(r.cardSales)}</td>
+                        <td className="px-3 py-2.5 font-semibold">{formatMoney(r.total)}</td>
+                      </tr>
+                    ))}
+                    {printSummary.byBarberRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-3 py-8 text-center text-headz-gray">
+                          No ticket sales in this range.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
 
           <div className="rounded-2xl border border-black/8 bg-white p-5 shadow-md shadow-black/[0.03]">
             <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-headz-gray">Filters</p>
