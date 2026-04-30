@@ -11,8 +11,7 @@ values
   ('Jerome Glenn', 'jerome-glenn', null, 5, true),
   ('David Fernandez', 'david-fernandez', null, 6, true),
   ('Carlos Principal', 'carlos-principal', 'https://headzaintready.com/wp-content/uploads/2023/02/CARLOS.jpg', 7, true),
-  ('Angle Miranda', 'angle-miranda', 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg', 8, true),
-  ('Daniel', 'daniel', null, 9, true)
+  ('Angle Miranda', 'angle-miranda', 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg', 8, true)
 on conflict (slug) do update set
   name = excluded.name,
   avatar_url = coalesce(excluded.avatar_url, barbers.avatar_url),

@@ -70,7 +70,6 @@ const BARBERS = [
     avatarUrl: 'https://headzaintready.com/wp-content/uploads/2023/02/ANGEL.jpg',
     sortOrder: 8,
   },
-  { name: 'Daniel', slug: 'daniel', avatarUrl: null, sortOrder: 9 },
 ]
 
 async function main() {

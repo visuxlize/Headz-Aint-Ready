@@ -14,7 +14,6 @@ export const MANUAL_TICKET_BARBER_SLUGS = [
   'david-fernandez',
   'carlos-principal',
   'angle-miranda',
-  'daniel',
 ] as const
 
 const MANUAL_SLUG_SET = new Set(

@@ -5,7 +5,9 @@ import {
   HOMEPAGE_TEAM_ALL_SLUGS,
   buildHomepageTeamCards,
 } from '@/lib/marketing/homepage-team'
-import { and, asc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, isNull, notInArray, or } from 'drizzle-orm'
+
+const EXCLUDED_PUBLIC_BARBER_SLUGS: string[] = ['daniel']
 
 /** Postgres undefined_column — or driver message when a migrated column is missing in an older DB. */
 function isLikelyMissingColumnError(e: unknown): boolean {
@@ -68,6 +70,7 @@ export async function fetchMarketingBarbersForHomePage(): Promise<MarketingBarbe
  */
 export const barbersForMarketingCondition = and(
   eq(barbers.isActive, true),
+  notInArray(barbers.slug, EXCLUDED_PUBLIC_BARBER_SLUGS),
   or(isNull(barbers.userId), eq(users.isActive, true))
 )
 
