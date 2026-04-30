@@ -1,6 +1,6 @@
 /**
  * Gallery images for public marketing pages (@headzaintready.nyc).
- * Use `https://www.instagram.com/p/<SHORTCODE>/media/?size=l` so URLs stay stable across devices.
+ * Uses local files in `/public/instagram/` to avoid external fetch failures.
  *
  * @see https://www.instagram.com/headzaintready.nyc
  */
@@ -30,23 +30,15 @@ function dedupeGallery(rows: InstagramGalleryPhoto[]): InstagramGalleryPhoto[] {
   return out
 }
 
-function buildInstagramMediaUrl(postUrl: string): string {
-  const normalized = postUrl.endsWith('/') ? postUrl : `${postUrl}/`
-  return `${normalized}media/?size=l`
-}
-
 const instagramGalleryPhotosRaw: InstagramGalleryPhoto[] = [
-  { postUrl: 'https://www.instagram.com/p/C4jR-uqxqZd/', alt: 'Headz Ain’t Ready — from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/DGJNcEuPuGo/', alt: 'Headz Ain’t Ready — work from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/C_5yoYEx3LJ/', alt: 'Headz Ain’t Ready — lineup from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/C5UOiA1xBBc/', alt: 'Headz Ain’t Ready — fresh cut from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/ClzYHovO_wA/', alt: 'Headz Ain’t Ready — shop photo from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/ClzaV6COyWx/', alt: 'Headz Ain’t Ready — style from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/ClzY-cOu6sB/', alt: 'Headz Ain’t Ready — barbershop from Instagram', src: '' },
-  { postUrl: 'https://www.instagram.com/p/CEutbC5j1pw/', alt: 'Headz Ain’t Ready — classic cut from Instagram', src: '' },
-].map((item) => ({
-  ...item,
-  src: buildInstagramMediaUrl(item.postUrl),
-}))
+  { postUrl: 'https://www.instagram.com/p/C4jR-uqxqZd/', alt: 'Headz Ain’t Ready — from Instagram', src: '/instagram/IG_1.png' },
+  { postUrl: 'https://www.instagram.com/p/DGJNcEuPuGo/', alt: 'Headz Ain’t Ready — work from Instagram', src: '/instagram/IG_2.png' },
+  { postUrl: 'https://www.instagram.com/p/C_5yoYEx3LJ/', alt: 'Headz Ain’t Ready — lineup from Instagram', src: '/instagram/IG_3.png' },
+  { postUrl: 'https://www.instagram.com/p/C5UOiA1xBBc/', alt: 'Headz Ain’t Ready — fresh cut from Instagram', src: '/instagram/IG_4.png' },
+  { postUrl: 'https://www.instagram.com/p/ClzYHovO_wA/', alt: 'Headz Ain’t Ready — shop photo from Instagram', src: '/instagram/IG_5.png' },
+  { postUrl: 'https://www.instagram.com/p/ClzaV6COyWx/', alt: 'Headz Ain’t Ready — style from Instagram', src: '/instagram/IG_6.png' },
+  { postUrl: 'https://www.instagram.com/p/ClzY-cOu6sB/', alt: 'Headz Ain’t Ready — barbershop from Instagram', src: '/instagram/IG_7.png' },
+  { postUrl: 'https://www.instagram.com/p/CEutbC5j1pw/', alt: 'Headz Ain’t Ready — classic cut from Instagram', src: '/instagram/IG_8.png' },
+]
 
 export const instagramGalleryPhotos = dedupeGallery(instagramGalleryPhotosRaw)
